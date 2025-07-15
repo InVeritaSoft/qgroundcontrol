@@ -1,0 +1,6 @@
+---
+alwaysApply: true
+---
+# QGCCorePlugin 
+
+This allows you to modify the parts of QGC which are not directly related to vehicle but are related to the QGC application itself. This includes things like application settings, color palettes, branding and so forth.
