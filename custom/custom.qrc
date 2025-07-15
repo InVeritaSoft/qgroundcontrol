@@ -36,9 +36,11 @@
         <file alias="QGroundControl/PlanView/MissionAreaMapOverlay.qml">res/Custom/MissionAreaMapOverlay.qml</file>
         <file alias="QGroundControl/PlanView/MissionAreaPlannerPanel.qml">res/Custom/MissionAreaPlannerPanel.qml</file>
         <file alias="QGroundControl/QmlControls/PlanView.qml">res/Custom/PlanView.qml</file>
+        <file alias="QGroundControl/QmlControls/FlyViewToolBar.qml">res/Custom/FlyViewToolBar.qml</file>
     </qresource>
     <qresource prefix="/Custom/res">
         <file alias="QGCLogoFull.svg">res/Images/QGCLogoFull.svg</file>
         <file alias="qgroundcontrol.ico">res/icons/custom_qgroundcontrol.ico</file>
+        <file alias="res/icons/inverita.png">res/icons/inverita.png</file>
     </qresource>
 </RCC>

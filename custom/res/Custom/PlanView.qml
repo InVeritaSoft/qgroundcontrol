@@ -12,6 +12,7 @@ import QGroundControl.PlanView 1.0
 import QGroundControl.FlightMap 1.0
 import QGroundControl.Controllers 1.0
 import QtPositioning 5.15
+import "MissionAreaPlannerPanel.qml" as MissionAreaPlannerPanel
 
 // Right Panel Controls (override)
 Item {
@@ -28,13 +29,12 @@ Item {
         anchors.top:        parent.top
         // ... existing QGCTabBar, etc ...
         // Mission Area Planner Panel (custom)
-        import "MissionAreaPlannerPanel.qml" as MissionAreaPlannerPanel
+
         MissionAreaPlannerPanel {
             planMasterController: _planMasterController
             map: editorMap
-            visible: _editingLayer == _layerMission
         }
         // ... rest of right panel controls ...
     }
     // ... rest of right panel ...
-} 
+}
