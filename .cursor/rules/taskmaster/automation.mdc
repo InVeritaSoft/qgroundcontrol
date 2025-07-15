@@ -1,0 +1,19 @@
+---
+alwaysApply: true
+---
+
+# Taskmaster Automation Principle
+
+-   **Automatic Execution**
+    -   Taskmaster should proceed with actions and workflow steps automatically, without pausing for user confirmation, unless:
+        -   User input is explicitly required (e.g., ambiguous choices, destructive actions, or missing information)
+        -   A decision point is reached that cannot be resolved with available context
+    -   Default to proactive, uninterrupted execution of the standard development workflow
+    -   Only prompt the user when a clear choice or clarification is needed
+
+## Examples
+
+```markdown
+// ✅ DO: Automatically run `analyze_project_complexity` after parsing a PRD
+// ❌ DON'T: Pause after each step to ask "Should I continue?" unless the user has requested step-by-step confirmation
+```

@@ -1,0 +1,138 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Setup Custom Build Environment",
+        "description": "Initialize the custom build environment for QGroundControl with proper plugin architecture setup",
+        "status": "done",
+        "dependencies": [],
+        "priority": "high",
+        "details": "Create the basic custom build structure following QGC's custom build architecture. This includes setting up the custom directory structure, CMakeLists.txt, and basic plugin framework. Reference the custom-example directory for the proper structure. Ensure the build system can compile and link with QGC's existing codebase.",
+        "testStrategy": "Verify the custom build compiles successfully and can be loaded by QGC without errors. Test that the basic plugin framework is functional."
+      },
+      {
+        "id": 2,
+        "title": "Create Mission Area Planner QML UI Component",
+        "description": "Implement the QML UI component for the Mission Area Planner with parameter controls",
+        "status": "done",
+        "dependencies": [
+          1
+        ],
+        "priority": "high",
+        "details": "Create a QML component that provides controls for area parameters (center, width, height, line spacing, number of points). The UI should include input fields, sliders, and buttons for parameter adjustment. Follow QGC's UI design patterns and use QML controls that match the existing QGC interface. Include real-time parameter validation and user feedback.",
+        "testStrategy": "Test all UI controls respond correctly to user input, validate parameter ranges, and ensure the interface matches QGC's look and feel."
+      },
+      {
+        "id": 3,
+        "title": "Implement Area Definition Data Model",
+        "description": "Create the data model for representing rectangular areas with center coordinates and dimensions",
+        "status": "done",
+        "dependencies": [
+          1
+        ],
+        "priority": "high",
+        "details": "Implement a C++ class or QML object to represent the area definition. This should include center coordinates (latitude/longitude), width, and height. Use Qt's QGeoCoordinate for coordinate handling. The model should provide methods for updating area parameters and calculating area boundaries. Include proper signal/slot mechanisms for notifying UI components of changes.",
+        "testStrategy": "Test area parameter updates, coordinate calculations, and signal emission when parameters change. Verify coordinate conversions work correctly."
+      },
+      {
+        "id": 4,
+        "title": "Create Map Overlay Components",
+        "description": "Implement map overlays for displaying the rectangular area, grid lines, and mission points",
+        "status": "done",
+        "dependencies": [
+          2,
+          3
+        ],
+        "priority": "high",
+        "details": "Create QML map overlay components using QGC's MapPolygon, MapPolyline, and MapCircle types. Implement overlays for: 1) The rectangular area boundary, 2) Grid lines within the area, 3) Mission points at grid intersections. The overlays should update in real-time as area parameters change. Use proper styling that matches QGC's map appearance.",
+        "testStrategy": "Test overlays display correctly on the map, update when parameters change, and maintain proper visual hierarchy. Verify overlay positioning and scaling work correctly at different zoom levels."
+      },
+      {
+        "id": 5,
+        "title": "Implement Geodesic Grid Calculation Logic",
+        "description": "Create the mathematical logic for generating grid points within the rectangular area",
+        "status": "done",
+        "dependencies": [
+          3
+        ],
+        "priority": "high",
+        "details": "Implement geodesic calculations to generate grid points within the rectangular area. Use Qt's QGeoCoordinate and geospatial functions for accurate coordinate calculations. The logic should handle: 1) Converting area dimensions to coordinate offsets, 2) Generating evenly spaced grid lines, 3) Creating mission points at grid intersections. Consider Earth's curvature for large areas. Optimize for performance with large grids.",
+        "testStrategy": "Test grid generation with various area sizes and spacing parameters. Verify coordinate accuracy and grid density calculations. Test performance with large grids (100+ points)."
+      },
+      {
+        "id": 6,
+        "title": "Integrate with QGC Mission System",
+        "description": "Connect the Mission Area Planner with QGC's mission upload and waypoint system",
+        "status": "done",
+        "dependencies": [
+          4,
+          5
+        ],
+        "priority": "high",
+        "details": "Integrate the generated grid points with QGC's mission system. This involves: 1) Converting grid points to QGC waypoint format, 2) Using QGC's mission upload APIs to send waypoints to the vehicle, 3) Providing mission preview and validation. Follow QGC's mission interface patterns and ensure compatibility with different vehicle types. Include proper error handling for mission upload failures.",
+        "testStrategy": "Test mission generation and upload with connected vehicles. Verify waypoints are correctly formatted and uploaded. Test mission validation and error handling."
+      },
+      {
+        "id": 7,
+        "title": "Add Interactive Area Movement",
+        "description": "Implement drag-and-drop and UI controls for moving the area on the map",
+        "status": "done",
+        "dependencies": [
+          4
+        ],
+        "priority": "medium",
+        "details": "Add interactive capabilities for moving the area on the map. This includes: 1) Drag-and-drop functionality for the area rectangle, 2) UI controls for precise center coordinate input, 3) Real-time area position updates. Implement proper mouse event handling and coordinate conversion between screen and map coordinates. Ensure smooth interaction and visual feedback.",
+        "testStrategy": "Test drag-and-drop functionality, coordinate input accuracy, and real-time updates. Verify area movement is smooth and responsive."
+      },
+      {
+        "id": 8,
+        "title": "Implement Home Location Setting",
+        "description": "Add functionality to set home/launch location using device geolocation or map interaction",
+        "status": "done",
+        "dependencies": [
+          6
+        ],
+        "priority": "medium",
+        "details": "Implement home location setting functionality. This includes: 1) Using device geolocation APIs to get current position, 2) Allowing manual home location selection on the map, 3) Integrating with QGC's home position system. Handle geolocation permissions and fallback to manual selection. Ensure home location is properly communicated to the vehicle.",
+        "testStrategy": "Test geolocation functionality, manual home selection, and integration with QGC's home position system. Verify proper permission handling."
+      },
+      {
+        "id": 9,
+        "title": "Create Resource Override Integration",
+        "description": "Integrate the Mission Area Planner into QGC's Plan Flight view using resource overrides",
+        "status": "done",
+        "dependencies": [
+          2,
+          6
+        ],
+        "priority": "medium",
+        "details": "Integrate the Mission Area Planner into QGC's Plan Flight view using resource overrides. This involves: 1) Creating a custom panel that can be added to the Plan Flight view, 2) Using QQmlEngine::addUrlInterceptor for resource override, 3) Ensuring the panel integrates seamlessly with existing Plan Flight functionality. Follow QGC's resource override conventions and maintain compatibility with upstream changes.",
+        "testStrategy": "Test the panel appears correctly in Plan Flight view, integrates with existing functionality, and doesn't interfere with other QGC features."
+      },
+      {
+        "id": 10,
+        "title": "Polish UI/UX and Performance Optimization",
+        "description": "Finalize the user interface, optimize performance, and ensure native QGC integration",
+        "status": "done",
+        "dependencies": [
+          7,
+          8,
+          9
+        ],
+        "priority": "medium",
+        "details": "Polish the user interface and optimize performance. This includes: 1) Refining UI styling to match QGC's design language, 2) Optimizing map overlay rendering for smooth performance, 3) Adding user feedback and loading states, 4) Implementing proper error handling and user messaging. Ensure the interface feels native to QGC and provides a smooth user experience.",
+        "testStrategy": "Test overall user experience, performance with large areas/grids, and integration with QGC's interface. Conduct usability testing with target user personas."
+      }
+    ],
+    "metadata": {
+      "projectName": "QGroundControl Mission Area Planner",
+      "totalTasks": 10,
+      "sourceFile": ".taskmaster/docs/mission_area_planner_prd.md",
+      "generatedAt": "2024-12-19",
+      "created": "2025-07-15T12:31:47.275Z",
+      "description": "Tasks for master context",
+      "updated": "2025-07-15T12:55:30.270Z"
+    }
+  }
+}

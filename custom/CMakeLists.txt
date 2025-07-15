@@ -70,6 +70,8 @@ set(CUSTOM_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/FirmwarePlugin/CustomFirmwarePlugin.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/FirmwarePlugin/CustomFirmwarePluginFactory.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/FirmwarePlugin/CustomFirmwarePluginFactory.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/MissionAreaPlanner.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/MissionAreaPlanner.h
     CACHE INTERNAL "" FORCE
 )
 
@@ -94,5 +96,7 @@ set(CUSTOM_DEFINITIONS
 
 set(CUSTOM_QT_COMPONENTS
     Core
+    Location
+    Positioning
     CACHE INTERNAL "" FORCE
 )

@@ -8,6 +8,7 @@
  ****************************************************************************/
 
 #include "CustomPlugin.h"
+#include "MissionAreaPlanner.h"
 #include "QmlComponentInfo.h"
 #include "QGCLoggingCategory.h"
 #include "QGCPalette.h"
@@ -20,6 +21,7 @@
 #endif
 #include <QtQml/QQmlApplicationEngine>
 #include <QtQml/QQmlFile>
+#include <QtQml/QQmlEngine>
 
 QGC_LOGGING_CATEGORY(CustomLog, "gcs.custom.customplugin")
 
@@ -280,6 +282,9 @@ QQmlApplicationEngine* CustomPlugin::createQmlApplicationEngine(QObject* parent)
     _qmlEngine = QGCCorePlugin::createQmlApplicationEngine(parent);
     _qmlEngine->addImportPath("qrc:/Custom/Widgets");
     // TODO: Investigate _qmlEngine->setExtraSelectors({"custom"})
+
+    // Register MissionAreaPlanner with QML
+    qmlRegisterType<MissionAreaPlanner>("QGroundControl.PlanView", 1, 0, "MissionAreaPlanner");
 
     _selector = new CustomOverrideInterceptor();
     _qmlEngine->addUrlInterceptor(_selector);

@@ -32,6 +32,10 @@
         <file alias="QGroundControl/FlightDisplay/CustomGuidedActionsController.qml">src/CustomGuidedActionsController.qml</file>
         <file alias="QGroundControl/FlightDisplay/FlyViewCustomLayer.qml">src/FlyViewCustomLayer.qml</file>
         <file alias="QGroundControl/FlightDisplay/FlyViewToolStripActionList.qml">src/FlyViewToolStripActionList.qml</file>
+        <file alias="QGroundControl/PlanView/MissionAreaPlanner.qml">res/Custom/MissionAreaPlanner.qml</file>
+        <file alias="QGroundControl/PlanView/MissionAreaMapOverlay.qml">res/Custom/MissionAreaMapOverlay.qml</file>
+        <file alias="QGroundControl/PlanView/MissionAreaPlannerPanel.qml">res/Custom/MissionAreaPlannerPanel.qml</file>
+        <file alias="QGroundControl/QmlControls/PlanView.qml">res/Custom/PlanView.qml</file>
     </qresource>
     <qresource prefix="/Custom/res">
         <file alias="QGCLogoFull.svg">res/Images/QGCLogoFull.svg</file>
