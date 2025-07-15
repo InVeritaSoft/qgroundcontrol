@@ -1,0 +1,74 @@
+---
+alwaysApply: true
+---
+
+# Custom Builds
+
+A custom build enables third parties to create their own version of QGroundControl (QGC) while staying up to date with upstream changes. QGC provides an architecture that allows custom builds to modify or extend features without directly altering the mainline source.
+
+## Capabilities of a Custom Build
+
+A custom build can:
+
+- Fully brand the application (logos, colors, images)
+- Specify a single flight stack to reduce unnecessary code
+- Implement custom `AutoPilotPlugin` and `FirmwarePlugin` subclasses
+- Provide a custom camera manager and camera plugin
+- Add or override QtQuick interface modules
+- Customize the toolbar, toolbar indicators, and navigation
+- Override the Fly View overlay and selectively hide upstream UI elements
+- Implement custom QtQuick camera controls
+- Provide a custom pre-flight checklist
+- Override resources (QML, images, icons, etc.) as needed
+
+QGC supports both generic MAVLink vehicles and firmware-specific support (e.g., PX4 Pro, ArduPilot). This flexibility can add UI complexity. If your use case is known (e.g., only PX4 multi-rotors), you can simplify the UI by hiding irrelevant features. QGC also targets both DIY and commercial users; custom builds can hide DIY-specific functionality for off-the-shelf vehicle users, resulting in a simpler user experience.
+
+## Plugin Architecture
+
+QGC uses a plugin architecture for customization. The main extension points are:
+
+- `QGCCorePlugin`
+- `FirmwarePlugin`
+- `AutoPilotPlugin`
+
+To create a custom build, subclass the standard plugins and override the relevant methods for your requirements. See `QGCCorePlugin.h`, `FirmwarePlugin.h`, and `AutoPilotPlugin.h` for details.
+
+## Resource Overrides
+
+QGC allows resource overrides to replace QML files, images, and other resources. This enables you to change UI elements or entire pages without modifying upstream code. Refer to the custom example for implementation details.
+
+## Advanced Mode
+
+By default, custom builds start in regular (not advanced) mode, hiding advanced features from normal users. Advanced mode can be enabled by clicking the Fly View button five times quickly; a warning is shown before entering advanced mode. This mechanism allows you to restrict access to setup pages or features intended only for advanced or DIY users. The custom example demonstrates this approach.
+
+## Getting Started
+
+To explore customization options:
+
+1. Review the documentation in the relevant plugin header files.
+2. Examine the `custom-example` source code and README for practical guidance.
+
+# QGroundControl Ground Control Station
+
+## Custom Build Example
+
+To build the sample custom version:
+
+1. Clean your build directory of any previous build.
+2. Rename the directory from `custom-example` to `custom`.
+3. Change to the `custom` directory.
+4. Build QGC.
+
+![Custom Build Screenshot](README.jpg)
+
+For more information, see the [QGC Dev Guide](https://dev.qgroundcontrol.com/en/custom_build/custom_build.html).
+
+### Main Features of the Example
+
+- Assumes an "off the shelf" commercial vehicle; most setup options are hidden, as they are preconfigured by the manufacturer.
+- The UI is simplified by hiding unnecessary elements for the target user.
+- Advanced features remain accessible in "Advanced Mode."
+- Custom branding is applied (images, color palette) to match corporate identity.
+- Portions of the interface are customized (e.g., a custom instrument widget replaces the standard UI).
+- Application settings are overridden to hide or adjust defaults as needed.
+- The source code is fully commented to explain the rationale for each customization.

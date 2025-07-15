@@ -1,0 +1,13 @@
+---
+alwaysApply: true
+---
+
+# Custom Build Plugins
+
+QGroundControl supports custom builds by allowing you to extend or override core functionality using the existing plugin architecture. The primary extension points are:
+
+- **FirmwarePlugin**
+- **AutoPilotPlugin**
+- **QGCCorePlugin**
+
+To customize QGC, create subclasses of these plugins in your custom build. This approach enables you to modify application behavior, add features, or change UI elements without altering the upstream QGC source code. This helps maintain compatibility with future QGC updates and reduces merge conflicts.

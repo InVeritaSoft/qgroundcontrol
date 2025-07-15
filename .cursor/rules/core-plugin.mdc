@@ -1,0 +1,7 @@
+---
+alwaysApply: true
+---
+
+# QGCCorePlugin
+
+QGCCorePlugin enables customization of QGroundControl features that are not directly associated with vehicles, but instead pertain to the overall application. This includes modifying application settings, color palettes, branding, and other global aspects of the QGC user experience.

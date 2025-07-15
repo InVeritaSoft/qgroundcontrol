@@ -1,0 +1,47 @@
+---
+alwaysApply: true
+---
+
+# Toolbar Customization
+
+The QGroundControl toolbar is modular and can be tailored to your custom build requirements. The toolbar is composed of several sections, ordered from left to right:
+
+- View Switching
+- Indicators
+- App Indicators
+- Vehicle Indicators
+- Vehicle Mode Indicators
+- Connection Management
+- Branding
+
+The content and visibility of these sections depend on the current view:
+
+- **Fly View**: Displays all indicator types.
+- **Plan View**: Hides standard indicators and uses a dedicated section for plan status values.
+- **Other Views**: Vehicle Mode Indicators are not shown.
+
+## Customization Options
+
+### Indicators
+
+You can add or remove indicators as needed. The method for customization depends on the indicator type:
+
+- **App Indicators**: These display information not tied to a vehicle (e.g., RTK status). Customize the list by overriding `QGCPlugin::toolbarIndicators`.
+- **Vehicle Indicators**: These show vehicle-specific information and are only visible when a vehicle is connected. Override `FirmwarePlugin::toolIndicators` to modify them.
+- **Vehicle Mode Indicators**: These require additional Fly View UI for actions like arming/disarming. They are only available with a connected vehicle. Override `FirmwarePlugin::modeIndicators` to customize.
+
+### Modifying Toolbar UI
+
+To change the toolbar's appearance or structure, use resource overrides for the relevant QML files:
+
+- The main toolbar UI is defined in `MainToolBar.qml`.
+- `MainRootWindow.qml` manages which indicator sections are visible based on the current view and handles mode indicator visibility.
+
+For complete control, override `MainToolBar.qml` with your own implementation. Ensure you replicate necessary interactions with `MainRootWindow.qml` to maintain correct behavior.
+
+### Standard Indicator UI Sections
+
+- **MainToolBarIndicators.qml**: Used in all views except Plan. Arranges indicators in a row. Overriding this file mainly affects layout.
+- **PlanToolBarIndicators.qml**: Used in Plan View to display plan status values. Override this file to customize the Plan View indicator UI.
+
+Refer to the custom example and upstream documentation for implementation details.

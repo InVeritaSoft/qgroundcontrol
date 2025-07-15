@@ -1,0 +1,23 @@
+---
+alwaysApply: true
+---
+
+# First Run Prompts
+
+When QGroundControl (QGC) starts for the first time, it prompts the user to configure initial settings. The standard prompts include:
+
+- **Unit Settings**: Select preferred display units.
+- **Offline Vehicle Settings**: Configure vehicle information for offline planning.
+
+Custom builds can override the display of these prompts and/or add new first run prompts.
+
+## First Run Prompt Dialogs
+
+Each first run prompt is a dialog that presents UI to the user. Whether a prompt has been shown is tracked in persistent settings. The standard upstream dialogs are:
+
+- Units Settings
+- Offline Vehicle Settings
+
+## Standard First Run Prompt Dialogs
+
+Each dialog is associated with a unique integer ID. When a dialog is shown, its ID is recorded so it is not shown again (unless settings are cleared). The list of standard prompts is provided by:

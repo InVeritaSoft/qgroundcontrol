@@ -1,0 +1,11 @@
+---
+alwaysApply: true
+---
+
+# Modifying Mainline QGC Source Code
+
+When developing a custom build of QGroundControl (QGC), you may encounter situations where the existing plugin and resource override architecture does not provide the flexibility you need. In such cases, it may be necessary to propose changes or additions to the mainline QGC source code.
+
+To ensure long-term maintainability and compatibility with upstream updates, keep direct modifications to the mainline QGC source to an absolute minimum. Instead, discuss your requirements with the QGC development community and, where appropriate, submit pull requests to improve the extensibility of the core architecture. This collaborative approach benefits both your project and the broader QGC ecosystem.
+
+Be aware that any changes made directly to the mainline source can increase the complexity of future merges and make it more challenging to stay up to date with upstream QGC releases.

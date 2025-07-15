@@ -1,0 +1,18 @@
+---
+alwaysApply: true
+---
+
+# Resource Overrides
+
+In QGroundControl (QGC), a "resource" refers to any file included in a Qt resource collection, such as:
+
+- `qgroundcontrol.qrc`
+- `qgcresources.qrc`
+- `InstrumentValueIcons.qrc`
+- QML files
+
+Resource overrides allow you to replace any of these resources with your own version. This can range from a single icon to an entire QML UI page (for example, a Vehicle Setup page). When you override a resource, you are duplicating part of the QGC source code. This approach can help avoid merge conflicts when updating to newer upstream QGC versions, but it also requires you to monitor upstream changes and update your overrides as needed.
+
+Resource overrides are implemented using `QQmlEngine::addUrlInterceptor`, which intercepts resource requests and redirects them to your custom resources. For implementation details, refer to `custom_example/CustomPlugin.cc` in the custom example.
+
+To override a resource, add your custom resource with a `/Custom` prefix in the resource path within your custom resource file. The file alias must match the original QGC resource exactly. See `custom_example/custom.qrc` and `custom_example/CMakeLists.txt` for practical examples of this setup.

@@ -1,0 +1,16 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+
+# Coding Style
+
+## High-Level Guidelines
+
+- Use tabs expanded to 4 spaces for indentation.
+- Use PascalCase or camelCase naming conventions as appropriate.
+- Refer to the following example files for detailed style guidance:
+    - CodingStyle.cc
+    - CodingStyle.h
+    - CodingStyle.qml

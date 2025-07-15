@@ -1,0 +1,43 @@
+---
+alwaysApply: true
+---
+
+# Fly View Customization
+
+The Fly View in QGroundControl is structured for flexible customization, supporting a range of modifications from simple UI additions to complex behavioral changes. The architecture is divided into three main QML layers, each offering a different level of customization.
+
+## Layers Overview
+
+- **FlyView.qml**: The foundational layer containing core UI and business logic, such as map and video display, and guided controls.
+- **FlyViewWidgetsOverlay.qml**: Sits above the base layer and contains additional widgets for the Fly View.
+- **FlyViewCustomLayer.qml**: The topmost layer, intended for custom builds to add or override UI elements using resource overrides.
+
+## Inset Management with QGCToolInsets
+
+Fly View uses the `QGCToolInsets` object in each layer to manage the available central map area, ensuring that UI widgets at the window edges do not obscure important map content. Each layer receives inset data from the layer below via `parentToolInsets`, calculates its own insets, and reports the combined result through `toolInsets`. The final inset values are provided to the map component to adjust panning and visibility accordingly. Refer to both upstream and custom example code for implementation details.
+
+## Layer Customization Details
+
+### FlyView.qml
+
+This is the most complex layer, handling primary UI interactions and logic. While it is possible to override this layer via resource override, it is generally discouraged unless absolutely necessary, as it increases maintenance complexity and risk of missing upstream improvements.
+
+### FlyViewCustomLayer.qml
+
+This layer is designed for straightforward customizations. By overriding this QML file, you can add new UI elements that complement the existing Fly View without modifying upstream code. The upstream version is intentionally minimal, serving as a template for custom additions. See the custom example code for guidance.
+
+## Customization Recommendations
+
+### Simple Customization
+
+Start by overriding `FlyViewCustomLayer.qml` to add custom UI elements. If needed, disable specific widgets in the overlay layer. This approach minimizes the impact of upstream changes and simplifies maintenance.
+
+### Moderate Complexity
+
+If you need to reposition or modify upstream UI elements, override `FlyViewWidgetsOverlay.qml`. This allows for more control but requires you to manually track and integrate upstream changes to this layer.
+
+### High Complexity
+
+Overriding `FlyView.qml` is the most invasive option and should be avoided unless absolutely necessary. Doing so requires careful management to keep up with upstream updates and may increase the risk of merge conflicts.
+
+For most use cases, prefer customizing via `FlyViewCustomLayer.qml` and only escalate to deeper overrides as required by your project needs.

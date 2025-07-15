@@ -1,0 +1,29 @@
+---
+description:
+globs:
+alwaysApply: true 
+---
+
+# Unit Testing in QGroundControl
+
+QGroundControl (QGC) includes a comprehensive suite of unit tests. All unit tests must pass before a pull request is accepted. When adding new complex subsystems, you are expected to provide corresponding unit tests to ensure proper coverage.
+
+The complete list of unit tests is maintained in `UnitTestList.cc`.
+
+## Running Unit Tests
+
+1. **Build QGC in debug mode** with the `QGC_UNITTEST_BUILD` definition enabled.
+2. **Copy the startup script**: Place `deploy/qgroundcontrol-start.sh` into your debug build directory.
+3. **Run all unit tests** from the command line:
+
+   ```sh
+   qgroundcontrol-start.sh --unittest
+   ```
+
+4. **Run a specific unit test** by specifying its name. For example, to run only the `RadioConfigTest`:
+
+   ```sh
+   qgroundcontrol-start.sh --unittest:RadioConfigTest
+   ```
+
+Refer to the QGC developer documentation for additional details on writing and maintaining unit tests.
