@@ -35,7 +35,7 @@
         <file alias="QGroundControl/PlanView/MissionAreaPlanner.qml">res/Custom/MissionAreaPlanner.qml</file>
         <file alias="QGroundControl/PlanView/MissionAreaMapOverlay.qml">res/Custom/MissionAreaMapOverlay.qml</file>
         <file alias="QGroundControl/PlanView/MissionAreaPlannerPanel.qml">res/Custom/MissionAreaPlannerPanel.qml</file>
-        <file alias="QGroundControl/PlanView/AreaPlannerVisuals.qml">res/Custom/AreaPlannerVisuals.qml</file>
+        <file alias="QGroundControl/QmlControls/PlanView.qml">res/Custom/PlanView.qml</file>
         <file alias="QGroundControl/QmlControls/FlyViewToolBar.qml">res/Custom/FlyViewToolBar.qml</file>
     </qresource>
     <qresource prefix="/Custom/res">

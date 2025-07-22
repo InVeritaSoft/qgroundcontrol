@@ -1,0 +1,89 @@
+# Task Validation Rules
+
+## **TASK COMPLETION VALIDATION: No Errors Allowed**
+
+### **Core Validation Principles**
+
+- **NEVER mark task as done** if it ended with errors
+- **NEVER mark task as done** if execution failed
+- **NEVER mark task as done** if tests are failing
+- **NEVER mark task as done** if build is broken
+- **ALWAYS verify success** before marking done
+- **ALWAYS retry and fix** until success is achieved
+- **NEVER give up** on error resolution
+
+### **Error Detection Requirements**
+
+- **Check exit codes** of all commands executed
+- **Verify build success** before marking done
+- **Confirm tests pass** before marking done
+- **Validate functionality** before marking done
+- **Check for error messages** in output
+
+### **Task Completion Criteria**
+
+- **All commands executed successfully** (exit code 0)
+- **All tests passing** without failures
+- **Build completes successfully** without errors
+- **Functionality verified** and working
+- **No error messages** in final output
+
+### **Validation Process**
+
+- **Before marking done**: Verify all execution steps succeeded
+- **Check command outputs**: Look for error messages or warnings
+- **Test functionality**: Ensure the implemented feature works
+- **Verify dependencies**: Confirm all required components are working
+- **Document success**: Log successful completion with evidence
+
+### **Error Handling - Automatic Retry & Fix**
+
+- **On command failure**: Automatically retry with different approach
+- **On build failure**: Fix issues automatically and retry until success
+- **On test failure**: Debug and fix automatically, retry until all tests pass
+- **On validation failure**: Continue fixing and retrying until all issues resolved
+- **On timeout**: Retry with different strategy, never give up
+- **On dependency issues**: Resolve conflicts automatically and retry
+- **On syntax errors**: Fix code automatically and retry
+- **On configuration errors**: Update config automatically and retry
+
+### **Success Verification**
+
+- **Exit code validation**: All commands must return 0
+- **Output validation**: No error messages in final output
+- **Functionality testing**: Feature must work as expected
+- **Integration testing**: Must work with other components
+- **Documentation**: Success must be documented
+
+### **Automatic Validation**
+
+- **Check last command exit code** before marking done
+- **Verify build status** before marking done
+- **Confirm test results** before marking done
+- **Validate implementation** before marking done
+- **Ensure no pending errors** before marking done
+
+### **Continuous Retry Loop**
+
+- **Implement → Test → Fix → Repeat** until success
+- **Analyze failures** and implement fixes automatically
+- **Refactor code** when needed for better solutions
+- **Optimize performance** through iterative improvements
+- **Validate quality** at each iteration
+- **Loop until completion** - never accept partial success
+
+### **Error Resolution Strategies**
+
+- **Primary approach fails**: Try alternative method
+- **Alternative fails**: Research and implement new solution
+- **Research fails**: Innovate custom solution
+- **Custom solution fails**: Simplify and retry
+- **All approaches fail**: Document issue and continue with best available
+
+---
+
+**See also:** [autonomous-execution.mdc](mdc:.cursor/rules/taskmaster/autonomous-execution.mdc), [automation.mdc](mdc:.cursor/rules/taskmaster/automation.mdc), [timeout-handling.mdc](mdc:.cursor/rules/taskmaster/timeout-handling.mdc)
+
+---
+
+**See also:** [autonomous-execution.mdc](mdc:.cursor/rules/taskmaster/autonomous-execution.mdc), [automation.mdc](mdc:.cursor/rules/taskmaster/automation.mdc), [timeout-handling.mdc](mdc:.cursor/rules/taskmaster/time

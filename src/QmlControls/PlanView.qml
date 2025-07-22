@@ -26,6 +26,8 @@ import QGroundControl.Controllers
 import QGroundControl.ShapeFileHelper
 import QGroundControl.FlightDisplay
 import QGroundControl.UTMSP
+import QGroundControl.PlanView
+import QGroundControl.PlanView
 
 
 Item {
@@ -60,13 +62,14 @@ Item {
     property bool   _triggerSubmit
     property bool   _resetRegisterFlightPlan
 
-    readonly property var       _layers:                    [_layerMission, _layerGeoFence, _layerRallyPoints]
-    readonly property var       _layersUTMSP:               [_layerMission, _layerRallyPoints, _layerUTMSP] //Adds additional UTMSP layer
+    readonly property var       _layers:                    [_layerMission, _layerAreaPlanner, _layerGeoFence, _layerRallyPoints]
+    readonly property var       _layersUTMSP:               [_layerMission, _layerAreaPlanner, _layerRallyPoints, _layerUTMSP] //Adds additional UTMSP layer
 
     readonly property int       _layerMission:              1
-    readonly property int       _layerGeoFence:             2
-    readonly property int       _layerRallyPoints:          3
-    readonly property int       _layerUTMSP:                4 // Additional Tab button when UTMSP is enabled
+    readonly property int       _layerAreaPlanner:          2
+    readonly property int       _layerGeoFence:             3
+    readonly property int       _layerRallyPoints:          4
+    readonly property int       _layerUTMSP:                5 // Additional Tab button when UTMSP is enabled
     readonly property string    _armedVehicleUploadPrompt:  qsTr("Vehicle is currently armed. Do you want to upload the mission to the vehicle?")
 
 
@@ -77,6 +80,130 @@ Item {
         coordinate.altitude  = coordinate.altitude.toFixed(_decimalPlaces)
         return coordinate
     }
+    
+    function calculateRectangleFromPoints() {
+        if (!areaPlannerPanel.rectangleStart || !areaPlannerPanel.rectangleEnd) {
+            return
+        }
+        
+        var start = areaPlannerPanel.rectangleStart
+        var end = areaPlannerPanel.rectangleEnd
+        
+        // Calculate center point
+        var centerLat = (start.latitude + end.latitude) / 2
+        var centerLon = (start.longitude + end.longitude) / 2
+        areaPlannerPanel.areaCenter = QtPositioning.coordinate(centerLat, centerLon)
+        areaPlannerPanel.centerSet = true
+        
+        // Calculate width and height using geodesic distance
+        var width = geodesicDistance(start, QtPositioning.coordinate(start.latitude, end.longitude))
+        var height = geodesicDistance(start, QtPositioning.coordinate(end.latitude, start.longitude))
+        
+        // Set the larger dimension as width, smaller as height
+        if (width > height) {
+            areaPlannerPanel.areaWidth = width
+            areaPlannerPanel.areaHeight = height
+        } else {
+            areaPlannerPanel.areaWidth = height
+            areaPlannerPanel.areaHeight = width
+        }
+        
+        console.log("Rectangle calculated: Width =", areaPlannerPanel.areaWidth, "m, Height =", areaPlannerPanel.areaHeight, "m")
+        console.log("Center set to:", centerLat, centerLon)
+    }
+    
+    function geodesicDistance(coord1, coord2) {
+        var lat1 = coord1.latitude * Math.PI / 180.0
+        var lon1 = coord1.longitude * Math.PI / 180.0
+        var lat2 = coord2.latitude * Math.PI / 180.0
+        var lon2 = coord2.longitude * Math.PI / 180.0
+        
+        var dLat = lat2 - lat1
+        var dLon = lon2 - lon1
+        
+        var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+               Math.cos(lat1) * Math.cos(lat2) *
+               Math.sin(dLon/2) * Math.sin(dLon/2)
+        var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+        
+        return 6371000 * c // Earth radius in meters
+    }
+    
+    function updateAreaPlannerVisuals() {
+        // Remove existing items
+        if (_areaPlannerRectangle) {
+            editorMap.removeMapItem(_areaPlannerRectangle)
+            _areaPlannerRectangle.destroy()
+            _areaPlannerRectangle = null
+        }
+        if (_areaPlannerStartMarker) {
+            editorMap.removeMapItem(_areaPlannerStartMarker)
+            _areaPlannerStartMarker.destroy()
+            _areaPlannerStartMarker = null
+        }
+        if (_areaPlannerEndMarker) {
+            editorMap.removeMapItem(_areaPlannerEndMarker)
+            _areaPlannerEndMarker.destroy()
+            _areaPlannerEndMarker = null
+        }
+        if (_areaPlannerCenterMarker) {
+            editorMap.removeMapItem(_areaPlannerCenterMarker)
+            _areaPlannerCenterMarker.destroy()
+            _areaPlannerCenterMarker = null
+        }
+        
+        // Only add items if we're in Area Planner layer
+        if (_editingLayer !== _layerAreaPlanner) {
+            return
+        }
+        
+        // Add rectangle if in drawing mode with both points
+        if (areaPlannerPanel && areaPlannerPanel.drawingMode && areaPlannerPanel.rectangleStart && areaPlannerPanel.rectangleEnd) {
+            _areaPlannerRectangle = areaPlannerRectangleComponent.createObject(editorMap)
+            _areaPlannerRectangle.startCoord = areaPlannerPanel.rectangleStart
+            _areaPlannerRectangle.endCoord = areaPlannerPanel.rectangleEnd
+            editorMap.addMapItem(_areaPlannerRectangle)
+        }
+        
+        // Add start marker if in drawing mode with start point
+        if (areaPlannerPanel && areaPlannerPanel.drawingMode && areaPlannerPanel.rectangleStart) {
+            _areaPlannerStartMarker = areaPlannerStartMarkerComponent.createObject(editorMap)
+            editorMap.addMapItem(_areaPlannerStartMarker)
+        }
+        
+        // Add end marker if in drawing mode with end point
+        if (areaPlannerPanel && areaPlannerPanel.drawingMode && areaPlannerPanel.rectangleEnd) {
+            _areaPlannerEndMarker = areaPlannerEndMarkerComponent.createObject(editorMap)
+            editorMap.addMapItem(_areaPlannerEndMarker)
+        }
+        
+        // Add center marker if not in drawing mode and center is set
+        if (areaPlannerPanel && areaPlannerPanel.centerSet && !areaPlannerPanel.drawingMode) {
+            _areaPlannerCenterMarker = areaPlannerCenterMarkerComponent.createObject(editorMap)
+            editorMap.addMapItem(_areaPlannerCenterMarker)
+        }
+    }
+    
+    function updateRectangleCoordinates() {
+        if (_areaPlannerRectangle && areaPlannerPanel && areaPlannerPanel.rectangleStart && areaPlannerPanel.rectangleEnd) {
+            _areaPlannerRectangle.startCoord = areaPlannerPanel.rectangleStart
+            _areaPlannerRectangle.endCoord = areaPlannerPanel.rectangleEnd
+        }
+    }
+    
+    function calculateEstimatedTime() {
+        var numLines = Math.ceil(areaPlannerPanel.areaHeight / areaPlannerPanel.lineSpacing) + 1
+        var totalDistance = numLines * areaPlannerPanel.areaWidth
+        var estimatedSpeed = 10.0 // m/s (typical drone speed)
+        var estimatedTime = totalDistance / estimatedSpeed / 60.0 // Convert to minutes
+        return Math.ceil(estimatedTime)
+    }
+    
+    // Dynamic map items for Area Planner
+    property var _areaPlannerRectangle: null
+    property var _areaPlannerStartMarker: null
+    property var _areaPlannerEndMarker: null
+    property var _areaPlannerCenterMarker: null
 
     property bool _firstMissionLoadComplete:    false
     property bool _firstFenceLoadComplete:      false
@@ -392,6 +519,27 @@ Item {
                     }
 
                     break
+                case _layerAreaPlanner:
+                    if (areaPlannerPanel.drawingMode) {
+                        // Rectangle drawing mode
+                        if (!areaPlannerPanel.rectangleStart) {
+                            // First click - set start point
+                            areaPlannerPanel.rectangleStart = coordinate
+                            console.log("Rectangle start set to:", coordinate.latitude, coordinate.longitude)
+                        } else {
+                            // Second click - set end point and calculate rectangle
+                            areaPlannerPanel.rectangleEnd = coordinate
+                            calculateRectangleFromPoints()
+                            areaPlannerPanel.drawingMode = false
+                            console.log("Rectangle end set to:", coordinate.latitude, coordinate.longitude)
+                        }
+                    } else {
+                        // Center point mode
+                        areaPlannerPanel.areaCenter = coordinate
+                        areaPlannerPanel.centerSet = true
+                        console.log("Area center set to:", coordinate.latitude, coordinate.longitude)
+                    }
+                    break
                 case _layerRallyPoints:
                     if (_rallyPointController.supported && addWaypointRallyPointAction.checked) {
                         _rallyPointController.addPoint(coordinate)
@@ -427,6 +575,8 @@ Item {
                 model:              _missionController.simpleFlightPathSegments
                 opacity:            _editingLayer == _layerMission ||  _editingLayer == _layerUTMSP  ? 1 : editorMap._nonInteractiveOpacity
             }
+            
+
 
             // Direction arrows in waypoint lines
             MapItemView {
@@ -518,7 +668,7 @@ Item {
                 opacity:                _editingLayer != _layerRallyPoints ? editorMap._nonInteractiveOpacity : 1
             }
 
-            UTMSPMapVisuals {
+                        UTMSPMapVisuals {
                 id: utmspvisual
                 enabled:                _utmspEnabled
                 map:                    editorMap
@@ -530,6 +680,153 @@ Item {
                 opacity:                _editingLayer != _layerUTMSP ? editorMap._nonInteractiveOpacity : 1
                 resetCheck:             _resetGeofencePolygon
             }
+            
+            //-------------------------------------------------------
+            // Area Planner Visuals (cloned from QGCMapPolygonVisuals patterns)
+            Component {
+                id: areaPlannerRectangleComponent
+                
+                MapPolygon {
+                    id: areaPlannerRectangle
+                    color: "transparent"
+                    border.color: qgcPal.colorGreen
+                    border.width: 3
+                    z: QGroundControl.zOrderWaypointLines + 3
+                    
+                    property var startCoord: null
+                    property var endCoord: null
+                    
+                    onStartCoordChanged: updatePath()
+                    onEndCoordChanged: updatePath()
+                    
+                    function updatePath() {
+                        if (!startCoord || !endCoord) {
+                            path = []
+                            return
+                        }
+                        
+                        // Create rectangle path from start and end points
+                        var path = []
+                        path.push(startCoord)
+                        path.push(QtPositioning.coordinate(startCoord.latitude, endCoord.longitude))
+                        path.push(endCoord)
+                        path.push(QtPositioning.coordinate(endCoord.latitude, startCoord.longitude))
+                        path.push(startCoord)
+                        
+                        areaPlannerRectangle.path = path
+                    }
+                }
+            }
+            
+            Component {
+                id: areaPlannerStartMarkerComponent
+                
+                MapQuickItem {
+                    id: areaPlannerStartMarker
+                    coordinate: areaPlannerPanel ? areaPlannerPanel.rectangleStart : QtPositioning.coordinate(0, 0)
+                    z: QGroundControl.zOrderWaypointLines + 4
+                    
+                    anchorPoint.x: sourceItem.width / 2
+                    anchorPoint.y: sourceItem.height / 2
+                    
+                    sourceItem: Rectangle {
+                        width: ScreenTools.defaultFontPixelHeight * 1.5
+                        height: width
+                        radius: width * 0.5
+                        color: qgcPal.colorGreen
+                        border.color: "white"
+                        border.width: 2
+                    }
+                }
+            }
+            
+            Component {
+                id: areaPlannerEndMarkerComponent
+                
+                MapQuickItem {
+                    id: areaPlannerEndMarker
+                    coordinate: areaPlannerPanel ? areaPlannerPanel.rectangleEnd : QtPositioning.coordinate(0, 0)
+                    z: QGroundControl.zOrderWaypointLines + 4
+                    
+                    anchorPoint.x: sourceItem.width / 2
+                    anchorPoint.y: sourceItem.height / 2
+                    
+                    sourceItem: Rectangle {
+                        width: ScreenTools.defaultFontPixelHeight * 1.5
+                        height: width
+                        radius: width * 0.5
+                        color: qgcPal.colorOrange
+                        border.color: "white"
+                        border.width: 2
+                    }
+                }
+            }
+            
+            Component {
+                id: areaPlannerCenterMarkerComponent
+                
+                MapQuickItem {
+                    id: areaPlannerCenterMarker
+                    coordinate: areaPlannerPanel ? areaPlannerPanel.areaCenter : QtPositioning.coordinate(0, 0)
+                    z: QGroundControl.zOrderWaypointLines + 4
+                    
+                    anchorPoint.x: sourceItem.width / 2
+                    anchorPoint.y: sourceItem.height / 2
+                    
+                    sourceItem: Rectangle {
+                        width: ScreenTools.defaultFontPixelHeight * 1.2
+                        height: width
+                        radius: width * 0.5
+                        color: qgcPal.colorBlue
+                        border.color: "white"
+                        border.width: 2
+                    }
+                }
+            }
+            
+
+            
+            Connections {
+                target: areaPlannerPanel
+                
+                function onDrawingModeChanged() {
+                    updateAreaPlannerVisuals()
+                }
+                
+                function onRectangleStartChanged() {
+                    if (areaPlannerPanel.drawingMode && areaPlannerPanel.rectangleEnd) {
+                        updateRectangleCoordinates()
+                    } else {
+                        updateAreaPlannerVisuals()
+                    }
+                }
+                
+                function onRectangleEndChanged() {
+                    if (areaPlannerPanel.drawingMode && areaPlannerPanel.rectangleStart) {
+                        updateRectangleCoordinates()
+                    } else {
+                        updateAreaPlannerVisuals()
+                    }
+                }
+                
+                function onCenterSetChanged() {
+                    updateAreaPlannerVisuals()
+                }
+            }
+            
+            Connections {
+                target: layerTabBar
+                
+                function onCurrentIndexChanged() {
+                    updateAreaPlannerVisuals()
+                }
+            }
+            
+
+            
+
+
+            
 
             Connections {
                 target: utmspEditor
@@ -546,6 +843,11 @@ Item {
                     _resetGeofencePolygon = true
                 }
             }
+            
+
+            
+
+
         }
 
         //-----------------------------------------------------------
@@ -708,6 +1010,9 @@ Item {
                         text:       qsTr("Mission")
                     }
                     QGCTabButton {
+                        text:       qsTr("Area Planner")
+                    }
+                    QGCTabButton {
                         text:       qsTr("Fence")
                         enabled:    _geoFenceController.supported
                     }
@@ -725,6 +1030,9 @@ Item {
                         text:       qsTr("Mission")
                     }
                     QGCTabButton {
+                        text:       qsTr("Area Planner")
+                    }
+                    QGCTabButton {
                         text:       qsTr("Rally")
                         enabled:    _rallyPointController.supported
                     }
@@ -733,8 +1041,12 @@ Item {
                         text:       qsTr("UTM-Adapter")
                         visible: _utmspEnabled
                     }
-                }
-            }
+                            }
+
+
+
+
+        }
             //-------------------------------------------------------
             // Mission Item Editor
             Item {
@@ -776,6 +1088,305 @@ Item {
                     }
                 }
             }
+            
+            //-------------------------------------------------------
+            // Area Planner Panel
+            Rectangle {
+                id: areaPlannerPanel
+                anchors.top:            rightControls.bottom
+                anchors.topMargin:      ScreenTools.defaultFontPixelHeight * 0.25
+                anchors.bottom:         parent.bottom
+                anchors.left:           parent.left
+                anchors.right:          parent.right
+                visible:                _editingLayer == _layerAreaPlanner
+                color: qgcPal.window
+                border.color: qgcPal.colorGrey
+                border.width: 1
+                radius: ScreenTools.defaultFontPixelWidth * 0.5
+                
+                property real areaWidth: 100.0
+                property real areaHeight: 100.0
+                property real lineSpacing: 10.0
+                property real flightAltitude: 50.0
+                property real photoInterval: 5.0
+                property var areaCenter: QtPositioning.coordinate(0, 0)
+                property bool centerSet: false
+                property bool drawingMode: false
+                property var rectangleStart: null
+                property var rectangleEnd: null
+                
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: ScreenTools.defaultFontPixelHeight * 0.5
+                    spacing: ScreenTools.defaultFontPixelHeight * 0.5
+                    
+                    QGCLabel {
+                        text: qsTr("Mission Area Planner")
+                        font.pointSize: ScreenTools.largeFontPointSize
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+                    
+                    // Area Width
+                    RowLayout {
+                        Layout.fillWidth: true
+                        QGCLabel {
+                            text: qsTr("Area Width:")
+                            Layout.preferredWidth: 80
+                        }
+                        QGCTextField {
+                            text: areaPlannerPanel.areaWidth
+                            Layout.fillWidth: true
+                            onTextChanged: {
+                                areaPlannerPanel.areaWidth = parseFloat(text) || 100.0
+                            }
+                        }
+                        QGCLabel {
+                            text: qsTr("m")
+                            Layout.preferredWidth: 20
+                        }
+                    }
+                    
+                    // Area Height
+                    RowLayout {
+                        Layout.fillWidth: true
+                        QGCLabel {
+                            text: qsTr("Area Height:")
+                            Layout.preferredWidth: 80
+                        }
+                        QGCTextField {
+                            text: areaPlannerPanel.areaHeight
+                            Layout.fillWidth: true
+                            onTextChanged: {
+                                areaPlannerPanel.areaHeight = parseFloat(text) || 100.0
+                            }
+                        }
+                        QGCLabel {
+                            text: qsTr("m")
+                            Layout.preferredWidth: 20
+                        }
+                    }
+                    
+                    // Line Spacing
+                    RowLayout {
+                        Layout.fillWidth: true
+                        QGCLabel {
+                            text: qsTr("Line Spacing:")
+                            Layout.preferredWidth: 80
+                        }
+                        QGCTextField {
+                            text: areaPlannerPanel.lineSpacing
+                            Layout.fillWidth: true
+                            onTextChanged: {
+                                areaPlannerPanel.lineSpacing = parseFloat(text) || 10.0
+                            }
+                        }
+                        QGCLabel {
+                            text: qsTr("m")
+                            Layout.preferredWidth: 20
+                        }
+                    }
+                    
+                    // Flight Altitude (Structure Scan Integration)
+                    RowLayout {
+                        Layout.fillWidth: true
+                        QGCLabel {
+                            text: qsTr("Flight Alt:")
+                            Layout.preferredWidth: 80
+                        }
+                        QGCTextField {
+                            text: areaPlannerPanel.flightAltitude
+                            Layout.fillWidth: true
+                            onTextChanged: {
+                                areaPlannerPanel.flightAltitude = parseFloat(text) || 50.0
+                            }
+                        }
+                        QGCLabel {
+                            text: qsTr("m")
+                            Layout.preferredWidth: 20
+                        }
+                    }
+                    
+                    // Photo Interval (Structure Scan Integration)
+                    RowLayout {
+                        Layout.fillWidth: true
+                        QGCLabel {
+                            text: qsTr("Photo Int:")
+                            Layout.preferredWidth: 80
+                        }
+                        QGCTextField {
+                            text: areaPlannerPanel.photoInterval
+                            Layout.fillWidth: true
+                            onTextChanged: {
+                                areaPlannerPanel.photoInterval = parseFloat(text) || 5.0
+                            }
+                        }
+                        QGCLabel {
+                            text: qsTr("sec")
+                            Layout.preferredWidth: 20
+                        }
+                    }
+                    
+                    // Center Position Status
+                    QGCLabel {
+                        text: areaPlannerPanel.centerSet ? 
+                              qsTr("Center: %1, %2").arg(areaPlannerPanel.areaCenter.latitude.toFixed(6)).arg(areaPlannerPanel.areaCenter.longitude.toFixed(6)) :
+                              qsTr("Center: Click on map to set")
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        color: areaPlannerPanel.centerSet ? qgcPal.colorGreen : qgcPal.colorGrey
+                    }
+                    
+                    QGCButton {
+                        text: qsTr("Clear Center")
+                        Layout.fillWidth: true
+                        visible: areaPlannerPanel.centerSet
+                        onClicked: {
+                            areaPlannerPanel.areaCenter = QtPositioning.coordinate(0, 0)
+                            areaPlannerPanel.centerSet = false
+                        }
+                    }
+                    
+                    // Rectangle Drawing Controls
+                    SectionHeader {
+                        text: qsTr("Rectangle Drawing")
+                        Layout.fillWidth: true
+                    }
+                    
+                    QGCButton {
+                        text: areaPlannerPanel.drawingMode ? qsTr("Cancel Drawing") : qsTr("Draw Rectangle")
+                        Layout.fillWidth: true
+                        onClicked: {
+                            if (areaPlannerPanel.drawingMode) {
+                                areaPlannerPanel.drawingMode = false
+                                areaPlannerPanel.rectangleStart = null
+                                areaPlannerPanel.rectangleEnd = null
+                            } else {
+                                areaPlannerPanel.drawingMode = true
+                                areaPlannerPanel.rectangleStart = null
+                                areaPlannerPanel.rectangleEnd = null
+                            }
+                        }
+                    }
+                    
+                    QGCLabel {
+                        text: areaPlannerPanel.drawingMode ? 
+                              qsTr("Click on map to set rectangle corners") :
+                              qsTr("Use 'Draw Rectangle' to define area visually")
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        color: areaPlannerPanel.drawingMode ? qgcPal.colorGreen : qgcPal.colorGrey
+                        font.pointSize: ScreenTools.smallFontPointSize
+                    }
+                    
+                    QGCButton {
+                        text: qsTr("Generate Mission")
+                        Layout.fillWidth: true
+                        enabled: areaPlannerPanel.centerSet
+                        onClicked: {
+                            console.log("Generate Mission clicked!")
+                            generateMission()
+                        }
+                    }
+                    
+                    // Mission Statistics (Structure Scan Integration)
+                    SectionHeader {
+                        text: qsTr("Mission Statistics")
+                        Layout.fillWidth: true
+                    }
+                    
+                    Grid {
+                        columns: 2
+                        columnSpacing: ScreenTools.defaultFontPixelWidth
+                        Layout.fillWidth: true
+                        
+                        QGCLabel { text: qsTr("Grid Lines") }
+                        QGCLabel { text: Math.ceil(areaPlannerPanel.areaHeight / areaPlannerPanel.lineSpacing) + 1 }
+                        
+                        QGCLabel { text: qsTr("Flight Altitude") }
+                        QGCLabel { text: areaPlannerPanel.flightAltitude + " m" }
+                        
+                        QGCLabel { text: qsTr("Photo Interval") }
+                        QGCLabel { text: areaPlannerPanel.photoInterval + " sec" }
+                        
+                        QGCLabel { text: qsTr("Area Coverage") }
+                        QGCLabel { text: (areaPlannerPanel.areaWidth * areaPlannerPanel.areaHeight / 10000).toFixed(2) + " ha" }
+                        
+                        QGCLabel { text: qsTr("Estimated Time") }
+                        QGCLabel { text: calculateEstimatedTime() + " min" }
+                    }
+                }
+                
+                function generateMission() {
+                    console.log("Generating mission with area:", areaWidth, "x", areaHeight, "m")
+                    console.log("Using center:", areaCenter.latitude, areaCenter.longitude)
+                    console.log("Flight altitude:", flightAltitude, "m")
+                    console.log("Photo interval:", photoInterval, "sec")
+                    
+                    // Calculate grid parameters
+                    var halfWidth = areaWidth / 2
+                    var halfHeight = areaHeight / 2
+                    var numLines = Math.ceil(areaHeight / lineSpacing) + 1
+                    
+                    console.log("Grid: ", numLines, "lines, spacing:", lineSpacing, "m")
+                    
+                    // Switch to Mission tab
+                    layerTabBar.currentIndex = 0
+                    
+                    // Clear existing mission items
+                    _planMasterController.removeAll()
+                    
+                    // Add takeoff waypoint at specified altitude
+                    var takeoffCoord = QtPositioning.coordinate(
+                        areaCenter.latitude,
+                        areaCenter.longitude,
+                        flightAltitude
+                    )
+                    _planMasterController.addMissionItem("Takeoff", takeoffCoord)
+                    
+                    // Add camera trigger interval command
+                    _planMasterController.addMissionItem("Camera Trigger Interval", takeoffCoord, {
+                        "trigger_interval": photoInterval * 1000 // Convert to milliseconds
+                    })
+                    
+                    // Generate grid waypoints with altitude
+                    for (var i = 0; i < numLines; i++) {
+                        var yOffset = -halfHeight + (i * lineSpacing)
+                        
+                        // Calculate start and end points for this line
+                        var startLat = areaCenter.latitude + (yOffset / 111320.0) // Approximate conversion
+                        var endLat = startLat
+                        var startLon = areaCenter.longitude - (halfWidth / (111320.0 * Math.cos(areaCenter.latitude * Math.PI / 180)))
+                        var endLon = areaCenter.longitude + (halfWidth / (111320.0 * Math.cos(areaCenter.latitude * Math.PI / 180)))
+                        
+                        var startCoord = QtPositioning.coordinate(startLat, startLon, flightAltitude)
+                        var endCoord = QtPositioning.coordinate(endLat, endLon, flightAltitude)
+                        
+                        // Add waypoints for this line
+                        if (i % 2 === 0) {
+                            // Left to right
+                            _planMasterController.addMissionItem("Waypoint", startCoord)
+                            _planMasterController.addMissionItem("Waypoint", endCoord)
+                        } else {
+                            // Right to left
+                            _planMasterController.addMissionItem("Waypoint", endCoord)
+                            _planMasterController.addMissionItem("Waypoint", startCoord)
+                        }
+                    }
+                    
+                    // Add RTL waypoint
+                    _planMasterController.addMissionItem("RTL", takeoffCoord)
+                    
+                    console.log("Mission generated successfully with altitude control and camera triggers!")
+                }
+                
+
+                
+
+            }
+            
+
+            
             // GeoFence Editor
             GeoFenceEditor {
                 anchors.top:            rightControls.bottom

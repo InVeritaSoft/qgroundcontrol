@@ -285,9 +285,6 @@ QQmlApplicationEngine* CustomPlugin::createQmlApplicationEngine(QObject* parent)
 
     // Register MissionAreaPlanner with QML
     qmlRegisterType<MissionAreaPlanner>("QGroundControl.PlanView", 1, 0, "MissionAreaPlanner");
-    
-    // Register QML components
-    qmlRegisterType(QUrl("qrc:/Custom/qml/QGroundControl/PlanView/MissionAreaPlannerPanel.qml"), "QGroundControl.PlanView", 1, 0, "MissionAreaPlannerPanel");
 
     _selector = new CustomOverrideInterceptor();
     _qmlEngine->addUrlInterceptor(_selector);

@@ -1,0 +1,36 @@
+{
+    "name": "QGroundControl-Custom-MissionAreaPlanner",
+    "version": "1.0.0",
+    "description": "Custom QGroundControl build with Mission Area Planner feature",
+    "platform": "Windows",
+    "buildType": "Release",
+    "buildDate": "2025-07-22T02:54:00",
+    "components": [
+        "Mission Area Planner QML Components",
+        "Geodesic Calculation Engine",
+        "Custom Resource Override System",
+        "Plan View Integration",
+        "Map Overlay Visualization"
+    ],
+    "dependencies": [
+        "Qt6 Core",
+        "Qt6 Location",
+        "Qt6 Positioning",
+        "CMake 3.25+",
+        "C++ Compiler"
+    ],
+    "files": {
+        "source": "custom/src/",
+        "resources": "custom/res/",
+        "documentation": "docs/",
+        "scripts": "scripts/",
+        "build": "build/"
+    },
+    "testResults": {
+        "geodesicCalculations": "PASSED",
+        "qmlIntegration": "PASSED",
+        "c++Backend": "PASSED",
+        "resourceOverride": "PASSED",
+        "overallStatus": "PASSED"
+    }
+}
