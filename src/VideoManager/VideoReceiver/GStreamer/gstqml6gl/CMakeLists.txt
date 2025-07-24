@@ -153,8 +153,18 @@ if(EXISTS "${QGC_GST_QT6_PLUGIN_PATH}/resources.qrc")
             VERBATIM
         )
 
-        set_source_files_properties(${RGBA_EXTERNAL} TARGET_DIRECTORY ${CMAKE_PROJECT_NAME} PROPERTIES QT_RESOURCE_ALIAS org/freedesktop/gstreamer/qml6/RGBA.frag.qsb.external)
-        set(QGC_GSTREAMER_SHADER_RESOURCES "${RGBA_EXTERNAL}" CACHE INTERNAL "")
+        # Copy the generated file to source directory for Qt resources
+        set(RGBA_EXTERNAL_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/RGBA.frag.qsb.external")
+        add_custom_command(
+            OUTPUT ${RGBA_EXTERNAL_SOURCE}
+            COMMAND ${CMAKE_COMMAND} -E copy ${RGBA_EXTERNAL} ${RGBA_EXTERNAL_SOURCE}
+            DEPENDS ${RGBA_EXTERNAL}
+            COMMENT "Copying external GLES shader to source directory: ${RGBA_EXTERNAL_SOURCE}"
+            VERBATIM
+        )
+        
+        set_source_files_properties(${RGBA_EXTERNAL_SOURCE} PROPERTIES QT_RESOURCE_ALIAS org/freedesktop/gstreamer/qml6/RGBA.frag.qsb.external)
+        set(QGC_GSTREAMER_SHADER_RESOURCES "${RGBA_EXTERNAL_SOURCE}" CACHE INTERNAL "")
         # qt_add_resources(gstqml6gl "gstqml6gl_shaders1"
         #     PREFIX "/org/freedesktop/gstreamer/qml6"
         #     FILES "${RGBA_EXTERNAL}"

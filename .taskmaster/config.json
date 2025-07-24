@@ -2,19 +2,19 @@
     "models": {
         "main": {
             "provider": "ollama",
-            "modelId": "llama3.1:latest",
+            "modelId": "devstral:latest",
             "maxTokens": 4096,
             "temperature": 0.1
         },
         "research": {
             "provider": "ollama",
-            "modelId": "llama3.1:latest",
+            "modelId": "devstral:latest",
             "maxTokens": 4096,
             "temperature": 0.1
         },
         "fallback": {
             "provider": "ollama",
-            "modelId": "llama3.1:latest",
+            "modelId": "devstral:latest",
             "maxTokens": 4096,
             "temperature": 0.1
         }
