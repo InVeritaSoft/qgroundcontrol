@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- * (c) 2009-2024 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
+ * (c) 2009-2020 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
  *
  * QGroundControl is licensed according to the terms in the file
  * COPYING.md in the root of the source code directory.
@@ -11,6 +11,7 @@
 
 #include <QObject>
 #include <QGeoCoordinate>
+#include <QList>
 #include <QVariantList>
 
 class MissionAreaPlanner : public QObject
@@ -20,84 +21,49 @@ class MissionAreaPlanner : public QObject
 public:
     explicit MissionAreaPlanner(QObject* parent = nullptr);
 
-    Q_PROPERTY(QGeoCoordinate areaCenter READ areaCenter WRITE setAreaCenter NOTIFY areaCenterChanged)
-    Q_PROPERTY(double areaWidth READ areaWidth WRITE setAreaWidth NOTIFY areaWidthChanged)
-    Q_PROPERTY(double areaHeight READ areaHeight WRITE setAreaHeight NOTIFY areaHeightChanged)
+    Q_PROPERTY(double width READ width WRITE setWidth NOTIFY widthChanged)
+    Q_PROPERTY(double height READ height WRITE setHeight NOTIFY heightChanged)
     Q_PROPERTY(double lineSpacing READ lineSpacing WRITE setLineSpacing NOTIFY lineSpacingChanged)
-    Q_PROPERTY(int pointsPerLine READ pointsPerLine WRITE setPointsPerLine NOTIFY pointsPerLineChanged)
-    Q_PROPERTY(QVariantList waypoints READ waypoints NOTIFY waypointsChanged)
-    Q_PROPERTY(QVariantList gridLines READ gridLines NOTIFY gridLinesChanged)
-    Q_PROPERTY(QVariantList areaCorners READ areaCorners NOTIFY areaCornersChanged)
-    Q_PROPERTY(QString status READ status NOTIFY statusChanged)
-    Q_PROPERTY(QColor statusColor READ statusColor NOTIFY statusColorChanged)
+    Q_PROPERTY(int numPoints READ numPoints WRITE setNumPoints NOTIFY numPointsChanged)
+    Q_PROPERTY(QGeoCoordinate center READ center WRITE setCenter NOTIFY centerChanged)
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
+    Q_PROPERTY(QString status READ status NOTIFY statusChanged)
 
-    // Property getters
-    QGeoCoordinate areaCenter() const { return _areaCenter; }
-    double areaWidth() const { return _areaWidth; }
-    double areaHeight() const { return _areaHeight; }
+    double width() const { return _width; }
+    double height() const { return _height; }
     double lineSpacing() const { return _lineSpacing; }
-    int pointsPerLine() const { return _pointsPerLine; }
-    QVariantList waypoints() const { return _waypoints; }
-    QVariantList gridLines() const { return _gridLines; }
-    QVariantList areaCorners() const { return _areaCorners; }
-    QString status() const { return _status; }
-    QColor statusColor() const { return _statusColor; }
+    int numPoints() const { return _numPoints; }
+    QGeoCoordinate center() const { return _center; }
     bool busy() const { return _busy; }
+    QString status() const { return _status; }
 
-    // Property setters
-    Q_INVOKABLE void setAreaCenter(const QGeoCoordinate& center);
-    Q_INVOKABLE void setAreaWidth(double width);
-    Q_INVOKABLE void setAreaHeight(double height);
-    Q_INVOKABLE void setLineSpacing(double spacing);
-    Q_INVOKABLE void setPointsPerLine(int points);
+    void setWidth(double width);
+    void setHeight(double height);
+    void setLineSpacing(double spacing);
+    void setNumPoints(int points);
+    void setCenter(const QGeoCoordinate& center);
 
-    // Public methods
-    Q_INVOKABLE void updateArea();
-    Q_INVOKABLE void updateGrid();
-    Q_INVOKABLE void moveArea(double deltaX, double deltaY);
     Q_INVOKABLE void generateMission();
-
-    // Geodesic calculation methods
-    Q_INVOKABLE double geodesicDistance(const QGeoCoordinate& coord1, const QGeoCoordinate& coord2);
-    Q_INVOKABLE QGeoCoordinate coordinateAtDistance(const QGeoCoordinate& referenceCoord, double distance, double bearing);
-    Q_INVOKABLE double calculateBearing(const QGeoCoordinate& coord1, const QGeoCoordinate& coord2);
+    Q_INVOKABLE void clearMission();
 
 signals:
-    void areaCenterChanged();
-    void areaWidthChanged();
-    void areaHeightChanged();
+    void widthChanged();
+    void heightChanged();
     void lineSpacingChanged();
-    void pointsPerLineChanged();
-    void waypointsChanged();
-    void gridLinesChanged();
-    void areaCornersChanged();
-    void statusChanged();
-    void statusColorChanged();
+    void numPointsChanged();
+    void centerChanged();
     void busyChanged();
-    void areaUpdated();
-    void gridUpdated();
-    void missionGenerated();
+    void statusChanged();
 
 private:
-    void setStatus(const QString& status, const QColor& color);
-    void setBusy(bool busy);
-    QGeoCoordinate interpolateCoordinate(const QGeoCoordinate& coord1, const QGeoCoordinate& coord2, double progress);
+    void updateStatus(const QString& status);
+    QList<QGeoCoordinate> calculateWaypoints() const;
 
-    // Properties
-    QGeoCoordinate _areaCenter;
-    double _areaWidth;
-    double _areaHeight;
-    double _lineSpacing;
-    int _pointsPerLine;
-    QVariantList _waypoints;
-    QVariantList _gridLines;
-    QVariantList _areaCorners;
-    QString _status;
-    QColor _statusColor;
-    bool _busy;
-
-    // Constants
-    static constexpr double EARTH_RADIUS = 6371000.0; // meters
-    static constexpr double PI = 3.14159265358979323846;
+    double _width = 30.0;
+    double _height = 90.0;
+    double _lineSpacing = 3.0;
+    int _numPoints = 1;
+    QGeoCoordinate _center = QGeoCoordinate(49.82824897481479, 24.033390804256005);
+    bool _busy = false;
+    QString _status = "Ready";
 }; 
