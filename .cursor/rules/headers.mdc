@@ -1,0 +1,118 @@
+# QGroundControl C++ Header Coding Style Rules
+
+## File Header
+- All header files must include the QGroundControl licensing header format
+- Use `#pragma once` instead of include guards
+- Include proper copyright notice with current year range
+
+## Include Organization
+- **Qt headers** first (alphabetical order)
+- **System headers** second (alphabetical order)
+- **QGroundControl headers** third (alphabetical order)
+- Keep includes in separate groups with blank lines between groups
+
+## Class Documentation
+- Document all classes with clear purpose description
+- Use PascalCase for class names
+- Prefix with `QGC` for generic base implementations (e.g., `QGCMessageBox`, `QGCPalette`)
+- No prefix for normal single-use classes
+
+## Class Structure Order
+1. **Q_OBJECT macro** (if using Qt signals/slots)
+2. **Public section** (constructors, destructors, public methods)
+3. **Signals section** (Qt signals)
+4. **Public slots section** (only if connected from other classes)
+5. **Protected section** (only if meant as base class)
+6. **Private slots section**
+7. **Private section** (private methods and variables)
+
+## Method and Variable Naming
+- **Public members**: camelCase, no underscore prefix
+- **Private members**: camelCase with underscore prefix (`_privateMethod`, `_privateVariable`)
+- **Protected members**: camelCase with underscore prefix
+- **Static constants**: camelCase with underscore prefix
+
+## Documentation Standards
+- Document non-obvious public methods in header file
+- Document non-obvious signals in header file
+- Document non-obvious variables in header file
+- Use `///<` for short inline descriptions
+- Use `///` for longer descriptions
+
+## Logging Categories
+- Use same name as class with `Log` suffix
+- Declare with `Q_DECLARE_LOGGING_CATEGORY(ClassNameLog)`
+
+## Method Signatures
+- Use `void` for methods with no parameters
+- Use `const` references for large objects
+- Use pointers for Qt objects
+- Group similar parameters together
+
+## Example Header Structure
+```cpp
+/****************************************************************************
+ *
+ *   (c) 2009-2016 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
+ *
+ * QGroundControl is licensed according to the terms in the file
+ * COPYING.md in the root of the source code directory.
+ *
+ ****************************************************************************/
+
+#pragma once
+
+#include <QObject>
+#include <QMap>
+#include <QXmlStreamReader>
+#include <QLoggingCategory>
+
+#include <limits.h>
+
+#include "Fact.h"
+
+Q_DECLARE_LOGGING_CATEGORY(ClassNameLog)
+
+/// Class documentation goes here
+class ClassName : public QObject
+{
+    Q_OBJECT
+    
+public:
+    ClassName(QObject* parent = NULL);
+    ~ClassName();
+    
+    /// Document non-obvious public methods
+    bool publicMethod(void);
+    
+signals:
+    /// Document non-obvious signals
+    void signalName(void);
+    
+public slots:
+    void publicSlot(void);
+    
+private slots:
+    void _privateSlot(void);
+    
+private:
+    void _privateMethod(void);
+    
+    int _privateVariable1;    ///< Short description
+    int _privateVariable2;    ///< Another short description
+    
+    static const int _privateStaticVariable;
+};
+```
+
+## Best Practices
+- Keep public interface minimal
+- Use private slots for internal signal connections
+- Document complex method signatures
+- Use const correctness appropriately
+- Follow Qt naming conventions for Qt-specific code
+
+alwaysApply: true
+---
+
+

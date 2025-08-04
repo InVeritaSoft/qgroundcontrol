@@ -830,7 +830,7 @@ Item {
                 resetRegisterFlightPlan: _resetRegisterFlightPlan
             }
             
-            Rectangle {
+            AreaPlanEditor {
                 id: areaPlanEditor
                 anchors.top:             rightControls.bottom
                 anchors.topMargin:       ScreenTools.defaultFontPixelHeight * 0.25
@@ -838,49 +838,6 @@ Item {
                 anchors.left:            parent.left
                 anchors.right:           parent.right
                 visible:                 _editingLayer == _layerAreaPlan
-                color:                   qgcPal.window
-                
-                ScrollView {
-                    anchors.fill: parent
-                    anchors.margins: ScreenTools.defaultFontPixelHeight * 0.5
-                    clip: true
-                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-                    ScrollBar.vertical.policy: ScrollBar.AsNeeded
-                    
-                    ColumnLayout {
-                        width: parent.width
-                        spacing: ScreenTools.defaultFontPixelHeight * 0.5
-                        
-                        QGCLabel {
-                            text: qsTr("I am Area Plan Editor")
-                            font.pointSize: ScreenTools.largeFontPointSize
-                            Layout.alignment: Qt.AlignHCenter
-                            Layout.fillWidth: true
-                            wrapMode: Text.WordWrap
-                        }
-                        
-                        // Add some sample content to demonstrate scrolling
-                        Repeater {
-                            model: 20
-                            
-                            Rectangle {
-                                Layout.fillWidth: true
-                                height: ScreenTools.defaultFontPixelHeight * 2
-                                color: index % 2 === 0 ? qgcPal.button : qgcPal.buttonHighlight
-                                radius: ScreenTools.defaultFontPixelWidth * 0.25
-                                
-                                QGCLabel {
-                                    anchors.centerIn: parent
-                                    text: qsTr("Area Plan Item %1").arg(index + 1)
-                                    color: parent.color === qgcPal.button ? qgcPal.buttonText : qgcPal.buttonHighlightText
-                                    horizontalAlignment: Text.AlignHCenter
-                                    width: parent.width - ScreenTools.defaultFontPixelWidth
-                                    elide: Text.ElideRight
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
 

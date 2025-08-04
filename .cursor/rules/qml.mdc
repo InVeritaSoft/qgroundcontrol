@@ -1,0 +1,128 @@
+---
+description:
+globs: **/*.qml
+alwaysApply: true
+---
+
+# QGroundControl QML Development Rules
+
+## QML File Structure
+- All QML files must follow the QGroundControl licensing header format
+- Use proper imports: QtQuick, QtQuick.Controls, QtQuick.Layouts
+- Import QGroundControl modules: QGroundControl, QGroundControl.Controls, QGroundControl.ScreenTools
+- Use Item as root component unless specific component type is required
+
+## QML Component Guidelines
+- Use descriptive component names (e.g., AreaPlanEditor, MissionItemEditor)
+- Follow QGroundControl naming conventions (QGC prefix for custom components)
+- Use proper anchoring and layout management
+- Implement proper scrolling with ScrollBar.horizontal.policy: ScrollBar.AlwaysOff for vertical-only scrolling
+
+## CMakeLists.txt Integration
+- All new QML files must be added to src/QmlControls/CMakeLists.txt in the QML_FILES section
+- Add files in alphabetical order within their section
+- Use the format: `ComponentName.qml`
+
+## QML Content Standards
+- Use qsTr() for all user-facing text for internationalization
+- Use ScreenTools for consistent sizing and spacing
+- Use qgcPal for consistent theming and colors
+- Implement proper text wrapping and elision to prevent horizontal overflow
+
+## Example QML Template
+```qml
+/****************************************************************************
+ *
+ * (c) 2009-2020 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
+ *
+ * QGroundControl is licensed according to the terms in the file
+ * COPYING.md in the root of the source code directory.
+ *
+ ****************************************************************************/
+
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+
+import QGroundControl
+import QGroundControl.Controls
+import QGroundControl.ScreenTools
+
+Item {
+    id: _root
+    
+    // Component implementation here
+}
+```
+
+## Integration with PlanView
+- When adding new tabs to PlanView, update the layer constants and arrays
+- Add tab buttons to both regular and UTMSP tab bars
+- Use proper visibility conditions based on editing layer
+- Follow the existing pattern for component placement and anchoring
+
+## Testing and Validation
+- Ensure no horizontal scrolling unless specifically required
+- Test with different screen sizes and themes
+- Verify proper integration with existing QGroundControl components
+- Check that all text is properly internationalized
+
+## QGroundControl QML Coding Style
+
+### Property Definitions
+- **Public properties** come first, no underscore prefix
+- **Private properties** use underscore prefix (`_privateProperty`)
+- **Readonly properties** use `readonly` keyword for better binding performance
+- **Property binding** to item properties should use ScreenTools for sizing
+
+### Sizing and Layout
+- **No hardcoded sizing** - All sizing must be relative to ScreenTools font sizes
+- **Use ScreenTools.defaultFontPixelHeight** for height calculations
+- **Use ScreenTools.defaultFontPixelWidth** for width calculations
+- **Use ScreenTools.defaultFontPixelHeight * multiplier** for spacing
+
+### Color and Theming
+- **Use QGCPalette** for all colors - no hardcoded colors
+- **Use qgcPal.window, qgcPal.button, qgcPal.text** etc.
+- **Always use QGC provided variants** of base controls for automatic theming
+
+### Component Structure
+- **Property definitions** come first (public, then private with underscore)
+- **Functions** come after properties
+- **Visual elements** come last
+- **Use descriptive comments** for long scoped blocks
+
+### Naming Conventions
+- **Component IDs** don't use underscore (e.g., `qgcPal`, not `_qgcPal`)
+- **Private properties** use underscore prefix (`_rectWidth`)
+- **Use descriptive names** for all properties and functions
+
+### Example Structure
+```qml
+Item {
+    // Public properties first
+    property int myIntProperty: 10
+    property real myRealProperty: 20.0
+    
+    // Private properties with underscore
+    readonly property real _rectWidth: ScreenTools.defaultFontPixelWidth * 10
+    readonly property real _rectHeight: ScreenTools.defaultFontPixelWidth * 10
+    
+    // Functions
+    function myFunction() {
+        console.log("myFunction was called")
+    }
+    
+    // Visual elements last
+    QGCPalette {
+        id: qgcPal
+        colorGroupEnabled: enabled
+    }
+    
+    Rectangle {
+        width: _rectWidth
+        height: _rectHeight
+        color: qgcPal.window
+    }
+} // Item - ComponentName
+``` 

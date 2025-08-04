@@ -1,0 +1,134 @@
+# QGroundControl C++ Source File Coding Style Rules
+
+## File Header
+- All source files must include the QGroundControl licensing header format
+- Include proper copyright notice with current year range
+- Add file description comment explaining the purpose
+
+## Include Organization
+- **Header file** first (`#include "ClassName.h"`)
+- **QGroundControl headers** second (alphabetical order)
+- **Qt headers** third (alphabetical order)
+- **System headers** last (alphabetical order)
+- Keep includes in separate groups with blank lines between groups
+
+## Logging Setup
+- Use `Q_LOGGING_CATEGORY(ClassNameLog, "ClassNameLog")`
+- Match the category name declared in header file
+
+## Static Variable Definitions
+- Define static constants at file scope
+- Use format: `const Type ClassName::_staticVariable = value;`
+
+## Constructor Implementation
+- Use initialization list format
+- Initialize base class first, then member variables
+- Use proper indentation and alignment
+- Include braces even for empty constructor body
+
+## Method Implementation
+- Document non-obvious private methods in source file (not header)
+- Use descriptive method names with underscore prefix for private methods
+- Include braces for all control structures, even single-line
+
+## Control Structure Style
+- **Always use braces** for if/for/while statements, even single-line
+- **Brace placement**: Opening brace on same line, closing brace on new line
+- **Indentation**: 4 spaces for code blocks
+- **Spacing**: Space after keywords (if, for, while)
+
+## Switch Statement Style
+- Use `case` with proper indentation
+- Include `break;` for each case
+- Use braces for case blocks with local variables
+- Handle all possible enum values
+
+## Assertions and Debugging
+- Use `Q_ASSERT()` for runtime checks
+- Use `Q_UNUSED()` for unused parameters
+- Use `qobject_cast<>()` for safe Qt object casting
+- Include proper error checking
+
+## Variable Declaration and Usage
+- Use `const` references for large objects
+- Use pointers for Qt objects
+- Use `qobject_cast<>()` for Qt object casting
+- Declare variables close to usage
+
+## Method Parameter Handling
+- Use `const` references for large parameters
+- Use pointers for Qt objects
+- For unused parameters, comment out the name but keep the type
+- Do not use `Q_UNUSED()` macro
+
+## Example Source File Structure
+```cpp
+/****************************************************************************
+ *
+ *   (c) 2009-2016 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
+ *
+ * QGroundControl is licensed according to the terms in the file
+ * COPYING.md in the root of the source code directory.
+ *
+ ****************************************************************************/
+
+// File description goes here
+
+#include "ClassName.h"
+#include "QGCApplication.h"
+
+#include <QFile>
+#include <QDebug>
+
+#include <math.h>
+
+Q_LOGGING_CATEGORY(ClassNameLog, "ClassNameLog")
+
+const int ClassName::_privateStaticVariable = 0;
+
+ClassName::ClassName(QObject* parent) :
+    QObject(parent),
+    _protectedVariable(1),
+    _privateVariable1(2),
+    _privateVariable2(3)
+{
+    // Constructor implementation
+}
+
+/// Document non-obvious private methods here
+void ClassName::_privateMethod(void)
+{
+    if (condition) {
+        return;
+    }
+    
+    if (_lastSeenComponent == -1) {
+        _lastSeenComponent = component;
+    } else {
+        Q_ASSERT(component == _lastSeenComponent);
+    }
+}
+
+void ClassName::_methodWithManyArguments(QWidget*         parent,
+                                       const QString&   caption,
+                                       const QString&   dir,
+                                       Options          options1,
+                                       Options          /* options2 */,
+                                       Options          options3)
+{
+    // Implementation here
+}
+```
+
+## Best Practices
+- Keep methods focused and single-purpose
+- Use meaningful variable names
+- Include proper error handling
+- Use Qt's type system effectively
+- Follow Qt naming conventions
+- Document complex logic
+- Use const correctness appropriately
+description:
+globs: **/*.cc
+alwaysApply: true
+---
