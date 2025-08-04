@@ -59,13 +59,14 @@ Item {
     property bool   _triggerSubmit
     property bool   _resetRegisterFlightPlan
 
-    readonly property var       _layers:                    [_layerMission, _layerGeoFence, _layerRallyPoints]
-    readonly property var       _layersUTMSP:               [_layerMission, _layerRallyPoints, _layerUTMSP] //Adds additional UTMSP layer
+    readonly property var       _layers:                    [_layerMission, _layerGeoFence, _layerRallyPoints, _layerAreaPlan]
+    readonly property var       _layersUTMSP:               [_layerMission, _layerRallyPoints, _layerUTMSP, _layerAreaPlan] //Adds additional UTMSP layer
 
     readonly property int       _layerMission:              1
     readonly property int       _layerGeoFence:             2
     readonly property int       _layerRallyPoints:          3
     readonly property int       _layerUTMSP:                4 // Additional Tab button when UTMSP is enabled
+    readonly property int       _layerAreaPlan:             5 // Area tab
     readonly property string    _armedVehicleUploadPrompt:  qsTr("Vehicle is currently armed. Do you want to upload the mission to the vehicle?")
 
 
@@ -714,6 +715,9 @@ Item {
                         text:       qsTr("Rally")
                         enabled:    _rallyPointController.supported
                     }
+                    QGCTabButton {
+                        text:       qsTr("Area")
+                    }
                 }
 
                 QGCTabBar {
@@ -731,6 +735,9 @@ Item {
                         id: utmspbutton
                         text:       qsTr("UTM-Adapter")
                         visible: _utmspEnabled
+                    }
+                    QGCTabButton {
+                        text:       qsTr("Area")
                     }
                 }
             }
@@ -821,6 +828,59 @@ Item {
                 visible:                 _editingLayer == _layerUTMSP
                 triggerSubmitButton:     _triggerSubmit
                 resetRegisterFlightPlan: _resetRegisterFlightPlan
+            }
+            
+            Rectangle {
+                id: areaPlanEditor
+                anchors.top:             rightControls.bottom
+                anchors.topMargin:       ScreenTools.defaultFontPixelHeight * 0.25
+                anchors.bottom:          parent.bottom
+                anchors.left:            parent.left
+                anchors.right:           parent.right
+                visible:                 _editingLayer == _layerAreaPlan
+                color:                   qgcPal.window
+                
+                ScrollView {
+                    anchors.fill: parent
+                    anchors.margins: ScreenTools.defaultFontPixelHeight * 0.5
+                    clip: true
+                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                    ScrollBar.vertical.policy: ScrollBar.AsNeeded
+                    
+                    ColumnLayout {
+                        width: parent.width
+                        spacing: ScreenTools.defaultFontPixelHeight * 0.5
+                        
+                        QGCLabel {
+                            text: qsTr("I am Area Plan Editor")
+                            font.pointSize: ScreenTools.largeFontPointSize
+                            Layout.alignment: Qt.AlignHCenter
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                        }
+                        
+                        // Add some sample content to demonstrate scrolling
+                        Repeater {
+                            model: 20
+                            
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: ScreenTools.defaultFontPixelHeight * 2
+                                color: index % 2 === 0 ? qgcPal.button : qgcPal.buttonHighlight
+                                radius: ScreenTools.defaultFontPixelWidth * 0.25
+                                
+                                QGCLabel {
+                                    anchors.centerIn: parent
+                                    text: qsTr("Area Plan Item %1").arg(index + 1)
+                                    color: parent.color === qgcPal.button ? qgcPal.buttonText : qgcPal.buttonHighlightText
+                                    horizontalAlignment: Text.AlignHCenter
+                                    width: parent.width - ScreenTools.defaultFontPixelWidth
+                                    elide: Text.ElideRight
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
