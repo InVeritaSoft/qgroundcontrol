@@ -24,6 +24,9 @@ class QQmlContext;
 
 Q_DECLARE_LOGGING_CATEGORY(VehicleComponentLog)
 
+// Declare opaque pointer types for Qt meta-object system
+Q_DECLARE_OPAQUE_POINTER(AutoPilotPlugin*)
+
 /// A vehicle component is an object which abstracts the physical portion of a vehicle into a set of
 /// configurable values and user interface.
 class VehicleComponent : public QObject

@@ -21,6 +21,9 @@ class VehicleComponent;
 
 Q_DECLARE_LOGGING_CATEGORY(AutoPilotPluginLog)
 
+// Declare opaque pointer types for Qt meta-object system
+Q_DECLARE_OPAQUE_POINTER(VehicleComponent*)
+
 /// The AutoPilotPlugin class is an abstract base class which represent the methods and objects
 /// which are specific to a certain AutoPilot. This is the only place where AutoPilot specific
 /// code should reside in QGroundControl. The remainder of the QGroundControl source is
