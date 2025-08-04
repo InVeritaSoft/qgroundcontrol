@@ -1,0 +1,7 @@
+---
+description:
+globs: **/*
+alwaysApply: true
+---
+
+Edit only source files without using custom-example
