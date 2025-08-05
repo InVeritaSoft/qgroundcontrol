@@ -14,6 +14,7 @@
 #include "LinkManager.h"
 #include "MAVLinkProtocol.h"
 #include "FirmwarePluginManager.h"
+#include "AreaPlanEditor.h"
 #include "AppSettings.h"
 #include "FlightMapSettings.h"
 #include "SettingsManager.h"
@@ -50,6 +51,7 @@ QGroundControlQmlGlobal::QGroundControlQmlGlobal(QObject *parent)
     : QObject(parent)
     , _mapEngineManager(QGCMapEngineManager::instance())
     , _adsbVehicleManager(ADSBVehicleManager::instance())
+    , _areaPlanEditor(new AreaPlanEditor(this))
     , _qgcPositionManager(QGCPositionManager::instance())
     , _missionCommandTree(MissionCommandTree::instance())
     , _videoManager(VideoManager::instance())

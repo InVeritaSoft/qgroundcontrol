@@ -20,6 +20,7 @@
 Q_DECLARE_LOGGING_CATEGORY(GuidedActionsControllerLog)
 
 class ADSBVehicleManager;
+class AreaPlanEditor;
 class FactGroup;
 class LinkManager;
 class MissionCommandTree;
@@ -34,6 +35,7 @@ class UTMSPManager;
 class AirLinkManager;
 
 Q_MOC_INCLUDE("ADSBVehicleManager.h")
+Q_MOC_INCLUDE("AreaPlanEditor.h")
 Q_MOC_INCLUDE("FactGroup.h")
 Q_MOC_INCLUDE("LinkManager.h")
 Q_MOC_INCLUDE("MissionCommandTree.h")
@@ -89,6 +91,7 @@ public:
 #endif
     Q_PROPERTY(bool                 airlinkSupported        READ    airlinkSupported        CONSTANT)
     Q_PROPERTY(QGCPalette*          globalPalette           MEMBER  _globalPalette          CONSTANT)   ///< This palette will always return enabled colors
+    Q_PROPERTY(AreaPlanEditor*      areaPlanEditor          READ    areaPlanEditor          CONSTANT)
     Q_PROPERTY(QmlUnitsConversion*  unitsConversion         READ    unitsConversion         CONSTANT)
     Q_PROPERTY(bool                 singleFirmwareSupport   READ    singleFirmwareSupport   CONSTANT)
     Q_PROPERTY(bool                 singleVehicleSupport    READ    singleVehicleSupport    CONSTANT)
@@ -162,6 +165,7 @@ public:
     // Property accessors
 
     static QString appName();
+    AreaPlanEditor*         areaPlanEditor      ()  { return _areaPlanEditor; }
     LinkManager*            linkManager         ()  { return _linkManager; }
     MultiVehicleManager*    multiVehicleManager ()  { return _multiVehicleManager; }
     QGCMapEngineManager*    mapEngineManager    ()  { return _mapEngineManager; }
@@ -238,6 +242,7 @@ signals:
 private:
     QGCMapEngineManager*    _mapEngineManager       = nullptr;
     ADSBVehicleManager*     _adsbVehicleManager     = nullptr;
+    AreaPlanEditor*         _areaPlanEditor         = nullptr;
     QGCPositionManager*     _qgcPositionManager     = nullptr;
     MissionCommandTree*     _missionCommandTree     = nullptr;
     VideoManager*           _videoManager           = nullptr;
