@@ -20,6 +20,7 @@
 class Vehicle;
 class MissionManager;
 class MissionItem;
+class MissionController;
 
 class AreaPlanEditor : public QObject
 {
@@ -38,6 +39,7 @@ public:
     Q_PROPERTY(qreal missionAltitude READ missionAltitude WRITE setMissionAltitude NOTIFY missionAltitudeChanged)
     Q_PROPERTY(QGeoCoordinate areaCenter READ areaCenter WRITE setAreaCenter NOTIFY areaCenterChanged)
     Q_PROPERTY(QGeoCoordinate homeLocation READ homeLocation WRITE setHomeLocation NOTIFY homeLocationChanged)
+    Q_PROPERTY(qreal areaRotation READ areaRotation WRITE setAreaRotation NOTIFY areaRotationChanged)
     Q_PROPERTY(QString validationError READ validationError NOTIFY validationErrorChanged)
     Q_PROPERTY(bool isProcessing READ isProcessing NOTIFY isProcessingChanged)
     Q_PROPERTY(int progressValue READ progressValue NOTIFY progressValueChanged)
@@ -46,6 +48,7 @@ public:
     Q_PROPERTY(bool isOptimized READ isOptimized NOTIFY isOptimizedChanged)
     Q_PROPERTY(int cacheSize READ cacheSize NOTIFY cacheSizeChanged)
     Q_PROPERTY(bool isDrawingMode READ isDrawingMode WRITE setIsDrawingMode NOTIFY isDrawingModeChanged)
+    Q_PROPERTY(QObject* planMasterController READ planMasterController WRITE setPlanMasterController NOTIFY planMasterControllerChanged)
 
     // Property getters
     qreal areaWidth() const { return _areaWidth; }
@@ -55,6 +58,7 @@ public:
     qreal missionAltitude() const { return _missionAltitude; }
     QGeoCoordinate areaCenter() const { return _areaCenter; }
     QGeoCoordinate homeLocation() const { return _homeLocation; }
+    qreal areaRotation() const { return _areaRotation; }
     QString validationError() const { return _validationError; }
     bool isProcessing() const { return _isProcessing; }
     int progressValue() const { return _progressValue; }
@@ -63,6 +67,7 @@ public:
     bool isOptimized() const { return _isOptimized; }
     int cacheSize() const { return _cacheSize; }
     bool isDrawingMode() const { return _isDrawingMode; }
+    QObject* planMasterController() const { return _planMasterController; }
 
     // Property setters
     Q_INVOKABLE void setAreaWidth(qreal width);
@@ -72,13 +77,17 @@ public:
     Q_INVOKABLE void setMissionAltitude(qreal altitude);
     Q_INVOKABLE void setAreaCenter(const QGeoCoordinate& center);
     Q_INVOKABLE void setHomeLocation(const QGeoCoordinate& location);
+    Q_INVOKABLE void setAreaRotation(qreal rotation);
     Q_INVOKABLE void setIsDrawingMode(bool drawingMode);
+    Q_INVOKABLE void setPlanMasterController(QObject* controller);
 
     // Mission planning functions
     Q_INVOKABLE void moveAreaNorth();
     Q_INVOKABLE void moveAreaSouth();
     Q_INVOKABLE void moveAreaEast();
     Q_INVOKABLE void moveAreaWest();
+    Q_INVOKABLE void rotateAreaClockwise();
+    Q_INVOKABLE void rotateAreaCounterClockwise();
     Q_INVOKABLE void centerArea();
     Q_INVOKABLE void resetArea();  // Add reset functionality
     Q_INVOKABLE int calculateTotalWaypoints() const;
@@ -94,9 +103,11 @@ public:
     // Mission upload helper methods
     Q_INVOKABLE Vehicle* getCurrentVehicle() const;
     Q_INVOKABLE MissionManager* getMissionManager() const;
+    Q_INVOKABLE MissionController* getMissionController() const;
     
     // Mission file saving helper method
     void saveMissionToFile(const QList<MissionItem*>& missionItems, const QString& filename);
+    void saveMissionToFile(MissionController* missionController, const QString& filename);
     
     // Mission workflow testing methods
     Q_INVOKABLE void testCompleteWorkflow();
@@ -137,6 +148,7 @@ signals:
     void missionAltitudeChanged();
     void areaCenterChanged();
     void homeLocationChanged();
+    void areaRotationChanged();
     void statusChanged(const QString& message);
     void validationErrorChanged();
     void isProcessingChanged();
@@ -146,6 +158,7 @@ signals:
     void isOptimizedChanged();
     void cacheSizeChanged();
     void isDrawingModeChanged();
+    void planMasterControllerChanged();
 
 private:
 
@@ -164,6 +177,7 @@ private:
     qreal _missionAltitude = _defaultAltitude;
     QGeoCoordinate _areaCenter = QGeoCoordinate(49.82824897481479, 24.033390804256005);
     QGeoCoordinate _homeLocation = QGeoCoordinate(49.82824897481479, 24.033390804256005);
+    qreal _areaRotation = 0.0;  // Rotation in degrees, 0 = North
     QString _validationError;
     bool _isProcessing = false;
     int _progressValue = 0;
@@ -172,6 +186,7 @@ private:
     bool _isOptimized = false;
     int _cacheSize = 0;
     bool _isDrawingMode = false;
+    QObject* _planMasterController = nullptr;
     
     // Performance optimization members
     QHash<QString, QVariantList> _waypointCache;

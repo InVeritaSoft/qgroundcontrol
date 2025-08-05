@@ -38,7 +38,15 @@ Item {
     property bool isDrawingMode: areaPlanEditor ? areaPlanEditor.isDrawingMode : false
     property bool showGridLines: true
     property bool showWaypoints: true
-
+    property bool isDragging: false
+    
+    Component.onCompleted: {
+        console.log("AreaPlanMapVisuals: Component completed")
+        console.log("AreaPlanMapVisuals: interactive:", interactive)
+        console.log("AreaPlanMapVisuals: isDrawingMode:", isDrawingMode)
+        console.log("AreaPlanMapVisuals: areaPlanEditor:", areaPlanEditor)
+        console.log("AreaPlanMapVisuals: mapControl:", mapControl)
+    }
 
 
     // Object managers following QGC patterns
@@ -57,8 +65,9 @@ Item {
         var center = areaPlanEditor.areaCenter
         var width = areaPlanEditor.areaWidth
         var height = areaPlanEditor.areaHeight
+        var rotation = areaPlanEditor.areaRotation || 0.0
         
-        console.log("AreaPlanMapVisuals: Calculating corners - center:", center.latitude, center.longitude, "width:", width, "height:", height)
+        console.log("AreaPlanMapVisuals: Calculating corners - center:", center.latitude, center.longitude, "width:", width, "height:", height, "rotation:", rotation)
         console.log("AreaPlanMapVisuals: Center valid:", center.isValid)
         console.log("AreaPlanMapVisuals: Width > 0:", width > 0, "Height > 0:", height > 0)
         
@@ -76,29 +85,40 @@ Item {
                 return []
             }
             
-            // Calculate corners using geodesic calculations
-            // North and South points (along the meridian)
-            var northPoint = areaPlanEditor.calculateOffsetCoordinate(center, height/2, 0)  // North
-            var southPoint = areaPlanEditor.calculateOffsetCoordinate(center, height/2, 180) // South
+            // Calculate corners using geodesic calculations with rotation
+            // First, calculate the four corner points relative to center (without rotation)
+            var halfWidth = width / 2
+            var halfHeight = height / 2
             
-            console.log("AreaPlanMapVisuals: North point:", northPoint.latitude, northPoint.longitude)
-            console.log("AreaPlanMapVisuals: South point:", southPoint.latitude, southPoint.longitude)
+            // Calculate the four corner points using proper rectangle geometry
+            // For a rectangle rotated by 'rotation' degrees, we need to calculate each corner
+            // using the distance from center and the angle to each corner
             
-            // Top-left corner (North-West)
-            var topLeft = areaPlanEditor.calculateOffsetCoordinate(northPoint, width/2, 270)
-            corners.push(topLeft)
+            // Calculate the distance from center to each corner
+            var cornerDistance = Math.sqrt(halfWidth * halfWidth + halfHeight * halfHeight)
             
-            // Top-right corner (North-East)
-            var topRight = areaPlanEditor.calculateOffsetCoordinate(northPoint, width/2, 90)
-            corners.push(topRight)
+            // Calculate the angle to each corner (relative to the rectangle's orientation)
+            var angleNW = Math.atan2(-halfHeight, -halfWidth) * 180 / Math.PI  // North-West
+            var angleNE = Math.atan2(-halfHeight, halfWidth) * 180 / Math.PI   // North-East
+            var angleSE = Math.atan2(halfHeight, halfWidth) * 180 / Math.PI    // South-East
+            var angleSW = Math.atan2(halfHeight, -halfWidth) * 180 / Math.PI   // South-West
             
-            // Bottom-right corner (South-East)
-            var bottomRight = areaPlanEditor.calculateOffsetCoordinate(southPoint, width/2, 90)
-            corners.push(bottomRight)
+            // Apply rotation and calculate final coordinates
+            var northWest = areaPlanEditor.calculateOffsetCoordinate(center, cornerDistance, rotation + angleNW)
+            var northEast = areaPlanEditor.calculateOffsetCoordinate(center, cornerDistance, rotation + angleNE)
+            var southEast = areaPlanEditor.calculateOffsetCoordinate(center, cornerDistance, rotation + angleSE)
+            var southWest = areaPlanEditor.calculateOffsetCoordinate(center, cornerDistance, rotation + angleSW)
             
-            // Bottom-left corner (South-West)
-            var bottomLeft = areaPlanEditor.calculateOffsetCoordinate(southPoint, width/2, 270)
-            corners.push(bottomLeft)
+            console.log("AreaPlanMapVisuals: North-West:", northWest.latitude, northWest.longitude)
+            console.log("AreaPlanMapVisuals: North-East:", northEast.latitude, northEast.longitude)
+            console.log("AreaPlanMapVisuals: South-East:", southEast.latitude, southEast.longitude)
+            console.log("AreaPlanMapVisuals: South-West:", southWest.latitude, southWest.longitude)
+            
+            // Add corners in clockwise order starting from top-left
+            corners.push(northWest)
+            corners.push(northEast)
+            corners.push(southEast)
+            corners.push(southWest)
             
             console.log("AreaPlanMapVisuals: Calculated", corners.length, "corners")
             if (corners.length > 0) {
@@ -152,38 +172,95 @@ Item {
             MouseArea {
                 id: rectangleMouseArea
                 anchors.fill: parent
-                enabled: interactive
+                enabled: false  // Disabled since we have map area MouseArea handling everything
                 hoverEnabled: true
+                preventStealing: true
+                z: 1000  // High z-order to ensure it receives events
                 
                 property point startPos
                 property var startCenter
+                property var startCoordinate
+                property bool hasMoved: false
+                
+                Component.onCompleted: {
+                    console.log("Rectangle MouseArea completed - enabled:", enabled, "interactive:", interactive)
+                }
                 
                 onPressed: {
-                    console.log("Rectangle pressed")
+                    console.log("Rectangle pressed - setting isDragging to true")
+                    console.log("Rectangle MouseArea - enabled:", enabled, "interactive:", interactive)
                     startPos = Qt.point(mouse.x, mouse.y)
                     startCenter = areaPlanEditor ? areaPlanEditor.areaCenter : null
+                    isDragging = true
+                    hasMoved = false
+                    console.log("Rectangle isDragging set to:", isDragging)
+                    // Get the coordinate at the press position
+                    if (mapControl) {
+                        startCoordinate = mapControl.toCoordinate(startPos, false)
+                        console.log("Rectangle drag started at coordinate:", startCoordinate.latitude, startCoordinate.longitude)
+                    }
                 }
                 
                 onPositionChanged: {
-                    if (pressed && startCenter && areaPlanEditor) {
-                        // Calculate offset from start position
-                        var deltaX = mouse.x - startPos.x
-                        var deltaY = mouse.y - startPos.y
+                    if (pressed && areaPlanEditor && mapControl) {
+                        hasMoved = true
+                        console.log("Rectangle dragging - isDragging:", isDragging)
+                        // Get current mouse position coordinate
+                        var currentPos = Qt.point(mouse.x, mouse.y)
+                        var currentCoordinate = mapControl.toCoordinate(currentPos, false)
                         
-                        // Convert pixel offset to coordinate offset (approximate)
-                        var latOffset = -deltaY * 0.00001  // Rough conversion
-                        var lonOffset = deltaX * 0.00001   // Rough conversion
-                        
-                        var newLat = startCenter.latitude + latOffset
-                        var newLon = startCenter.longitude + lonOffset
-                        
-                        var newCenter = QtPositioning.coordinate(newLat, newLon)
-                        areaPlanEditor.setAreaCenter(newCenter)
+                        if (currentCoordinate.isValid) {
+                            // Move center directly to current mouse position
+                            console.log("Rectangle dragging to:", currentCoordinate.latitude, currentCoordinate.longitude)
+                            areaPlanEditor.setAreaCenter(currentCoordinate)
+                        }
                     }
                 }
                 
                 onReleased: {
-                    console.log("Rectangle released")
+                    console.log("Rectangle released - setting isDragging to false")
+                    isDragging = false
+                    console.log("Rectangle isDragging set to:", isDragging)
+                    
+                    // If we didn't move, treat as a click
+                    if (!hasMoved && areaPlanEditor && mapControl) {
+                        var clickPos = Qt.point(mouse.x, mouse.y)
+                        var clickCoordinate = mapControl.toCoordinate(clickPos, false)
+                        
+                        if (clickCoordinate.isValid) {
+                            console.log("Rectangle clicked at:", clickCoordinate.latitude, clickCoordinate.longitude)
+                            
+                            // Set center point on first click or if center is not valid
+                            if (!areaPlanEditor.areaCenter.isValid || 
+                                (Math.abs(areaPlanEditor.areaCenter.latitude) < 0.001 && Math.abs(areaPlanEditor.areaCenter.longitude) < 0.001) ||
+                                areaPlanEditor.areaWidth <= 0 || areaPlanEditor.areaHeight <= 0) {
+                                
+                                areaPlanEditor.setAreaCenter(clickCoordinate)
+                                console.log("Area center set to:", clickCoordinate.latitude, clickCoordinate.longitude)
+                                
+                                // Set default area size if not already set
+                                if (areaPlanEditor.areaWidth <= 0 || areaPlanEditor.areaHeight <= 0) {
+                                    areaPlanEditor.setAreaWidth(100.0)
+                                    areaPlanEditor.setAreaHeight(100.0)
+                                    console.log("Set default area size: 100x100 meters")
+                                }
+                            } else {
+                                // Calculate new area size based on distance from center
+                                var center = areaPlanEditor.areaCenter
+                                var distance = center.distanceTo(clickCoordinate)
+                                var newWidth = Math.max(distance * 2, 10)
+                                var newHeight = Math.max(distance * 2, 10)
+                                
+                                // Limit maximum size
+                                newWidth = Math.min(newWidth, 1000)
+                                newHeight = Math.min(newHeight, 1000)
+                                
+                                areaPlanEditor.setAreaWidth(newWidth)
+                                areaPlanEditor.setAreaHeight(newHeight)
+                                console.log("Updated area size:", newWidth, "x", newHeight, "meters")
+                            }
+                        }
+                    }
                 }
                 
                 onEntered: {
@@ -205,6 +282,8 @@ Item {
             id: centerMarker
             coordinate: areaPlanEditor ? areaPlanEditor.areaCenter : QtPositioning.coordinate()
             z: _zorderCenterMarker
+            anchorPoint.x: sourceItem.width / 2
+            anchorPoint.y: sourceItem.height / 2
             
             sourceItem: Rectangle {
                 id: centerMarkerRect
@@ -238,38 +317,51 @@ Item {
                 MouseArea {
                     id: centerMouseArea
                     anchors.fill: parent
-                    enabled: interactive
+                    enabled: false  // Disabled since we have map area MouseArea handling everything
                     hoverEnabled: true
+                    preventStealing: true
                     
                     property point startPos
                     property var startCenter
+                    property var startCoordinate
+                    
+                    Component.onCompleted: {
+                        console.log("Center marker MouseArea completed - enabled:", enabled, "interactive:", interactive)
+                    }
                     
                     onPressed: {
-                        console.log("Center marker pressed")
+                        console.log("Center marker pressed - setting isDragging to true")
+                        console.log("Center marker MouseArea - enabled:", enabled, "interactive:", interactive)
                         startPos = Qt.point(mouse.x, mouse.y)
                         startCenter = areaPlanEditor ? areaPlanEditor.areaCenter : null
+                        isDragging = true
+                        console.log("Center marker isDragging set to:", isDragging)
+                        // Get the coordinate at the press position
+                        if (mapControl) {
+                            startCoordinate = mapControl.toCoordinate(startPos, false)
+                            console.log("Center marker drag started at coordinate:", startCoordinate.latitude, startCoordinate.longitude)
+                        }
                     }
                     
                     onPositionChanged: {
-                        if (pressed && startCenter && areaPlanEditor) {
-                            // Calculate offset from start position
-                            var deltaX = mouse.x - startPos.x
-                            var deltaY = mouse.y - startPos.y
+                        if (pressed && areaPlanEditor && mapControl) {
+                            console.log("Center marker dragging - isDragging:", isDragging)
+                            // Get current mouse position coordinate
+                            var currentPos = Qt.point(mouse.x, mouse.y)
+                            var currentCoordinate = mapControl.toCoordinate(currentPos, false)
                             
-                            // Convert pixel offset to coordinate offset (approximate)
-                            var latOffset = -deltaY * 0.00001  // Rough conversion
-                            var lonOffset = deltaX * 0.00001   // Rough conversion
-                            
-                            var newLat = startCenter.latitude + latOffset
-                            var newLon = startCenter.longitude + lonOffset
-                            
-                            var newCenter = QtPositioning.coordinate(newLat, newLon)
-                            areaPlanEditor.setAreaCenter(newCenter)
+                            if (currentCoordinate.isValid) {
+                                // Move center directly to current mouse position
+                                console.log("Center marker dragging to:", currentCoordinate.latitude, currentCoordinate.longitude)
+                                areaPlanEditor.setAreaCenter(currentCoordinate)
+                            }
                         }
                     }
                     
                     onReleased: {
-                        console.log("Center marker released")
+                        console.log("Center marker released - setting isDragging to false")
+                        isDragging = false
+                        console.log("Center marker isDragging set to:", isDragging)
                     }
                     
                     onEntered: {
@@ -303,6 +395,8 @@ Item {
         MapQuickItem {
             id: waypointMarker
             z: _zorderWaypoints
+            anchorPoint.x: sourceItem.width / 2
+            anchorPoint.y: sourceItem.height / 2
             
             sourceItem: Rectangle {
                 width: ScreenTools.defaultFontPixelHeight * 1.5
@@ -340,6 +434,7 @@ Item {
         var height = areaPlanEditor.areaHeight
         var lineSpacing = areaPlanEditor.lineSpacing
         var numPoints = areaPlanEditor.numPoints
+        var rotation = areaPlanEditor.areaRotation || 0.0
         
         var waypoints = []
         
@@ -347,15 +442,17 @@ Item {
             // Calculate number of lines based on height and spacing
             var numLines = Math.max(1, Math.floor(height / lineSpacing))
             console.log("AreaPlanMapVisuals: Creating waypoints for", numLines, "lines with", numPoints, "points per line")
+            console.log("AreaPlanMapVisuals: Area dimensions:", width, "x", height, "spacing:", lineSpacing, "rotation:", rotation)
             
             for (var i = 0; i < numLines; i++) {
-                // Calculate offset from center for this line
+                // Calculate offset from center for this line (perpendicular to rotation)
                 var offset = (-height/2) + (i + 0.5) * lineSpacing
                 
-                // Calculate line center point
-                var lineCenter = areaPlanEditor.calculateOffsetCoordinate(center, offset, 180)
+                // Calculate line center point (perpendicular to rotation direction)
+                var lineCenter = areaPlanEditor.calculateOffsetCoordinate(center, offset, rotation + 180)
+                console.log("AreaPlanMapVisuals: Line", i, "center at:", lineCenter.latitude, lineCenter.longitude, "offset:", offset)
                 
-                // Calculate waypoints along this line
+                // Calculate waypoints along this line (parallel to rotation direction)
                 for (var j = 0; j < numPoints; j++) {
                     // Calculate position along the line (0 to 1)
                     var fraction = (j + 0.5) / numPoints
@@ -363,8 +460,8 @@ Item {
                     // Calculate offset from line center (-width/2 to width/2)
                     var pointOffset = (fraction - 0.5) * width
                     
-                    // Calculate waypoint position
-                    var waypoint = areaPlanEditor.calculateOffsetCoordinate(lineCenter, pointOffset, 90)
+                    // Calculate waypoint position (parallel to rotation direction)
+                    var waypoint = areaPlanEditor.calculateOffsetCoordinate(lineCenter, pointOffset, rotation + 90)
                     
                     waypoints.push({
                         coordinate: waypoint,
@@ -372,7 +469,7 @@ Item {
                         pointIndex: j
                     })
                     
-                    console.log("AreaPlanMapVisuals: Waypoint", i, "-", j, ":", waypoint.latitude, waypoint.longitude)
+                    console.log("AreaPlanMapVisuals: Waypoint", i, "-", j, "fraction:", fraction, "offset:", pointOffset, "at:", waypoint.latitude, waypoint.longitude)
                 }
             }
         } catch (e) {
@@ -393,24 +490,25 @@ Item {
         var width = areaPlanEditor.areaWidth
         var height = areaPlanEditor.areaHeight
         var lineSpacing = areaPlanEditor.lineSpacing
+        var rotation = areaPlanEditor.areaRotation || 0.0
         
         var lines = []
         
         try {
             // Calculate number of lines based on height and spacing
             var numLines = Math.max(1, Math.floor(height / lineSpacing))
-            console.log("AreaPlanMapVisuals: Creating", numLines, "grid lines")
+            console.log("AreaPlanMapVisuals: Creating", numLines, "grid lines with rotation:", rotation)
             
             for (var i = 0; i < numLines; i++) {
-                // Calculate offset from center for this line
+                // Calculate offset from center for this line (perpendicular to rotation)
                 var offset = (-height/2) + (i + 0.5) * lineSpacing
                 
-                // Calculate line center point
-                var lineCenter = areaPlanEditor.calculateOffsetCoordinate(center, offset, 180)
+                // Calculate line center point (perpendicular to rotation direction)
+                var lineCenter = areaPlanEditor.calculateOffsetCoordinate(center, offset, rotation + 180)
                 
-                // Calculate line endpoints (full width)
-                var startPoint = areaPlanEditor.calculateOffsetCoordinate(lineCenter, width/2, 270)
-                var endPoint = areaPlanEditor.calculateOffsetCoordinate(lineCenter, width/2, 90)
+                // Calculate line endpoints (parallel to rotation direction)
+                var startPoint = areaPlanEditor.calculateOffsetCoordinate(lineCenter, width/2, rotation + 270)
+                var endPoint = areaPlanEditor.calculateOffsetCoordinate(lineCenter, width/2, rotation + 90)
                 
                 lines.push({
                     start: startPoint,
@@ -475,14 +573,22 @@ Item {
         // Remove existing grid lines first
         removeGridLines()
         
+        console.log("AreaPlanMapVisuals: Creating", gridLines.length, "grid lines")
+        
         // Create new grid lines based on current parameters
         for (var i = 0; i < gridLines.length; i++) {
             var lineData = gridLines[i]
             var gridLine = _objMgrGridLines.createObject(gridLineComponent, mapControl, true)
             if (gridLine) {
                 gridLine.path = [lineData.start, lineData.end]
+                console.log("AreaPlanMapVisuals: Created grid line", i, "from:", lineData.start.latitude, lineData.start.longitude, "to:", lineData.end.latitude, lineData.end.longitude)
+                console.log("AreaPlanMapVisuals: Grid line visible:", gridLine.visible)
+            } else {
+                console.log("AreaPlanMapVisuals: Failed to create grid line", i)
             }
         }
+        
+        console.log("AreaPlanMapVisuals: Grid lines creation completed")
     }
     
     function removeGridLines() {
@@ -494,14 +600,23 @@ Item {
         // Remove existing waypoint markers first
         removeWaypointMarkers()
         
+        console.log("AreaPlanMapVisuals: Creating", waypointPositions.length, "waypoint markers")
+        
         // Create new waypoint markers based on current parameters
         for (var i = 0; i < waypointPositions.length; i++) {
             var waypointData = waypointPositions[i]
             var waypointMarker = _objMgrWaypointMarkers.createObject(waypointMarkerComponent, mapControl, true)
             if (waypointMarker) {
                 waypointMarker.coordinate = waypointData.coordinate
+                console.log("AreaPlanMapVisuals: Created waypoint marker", i, "at:", waypointData.coordinate.latitude, waypointData.coordinate.longitude)
+                console.log("AreaPlanMapVisuals: Marker coordinate valid:", waypointData.coordinate.isValid)
+                console.log("AreaPlanMapVisuals: Marker visible:", waypointMarker.visible)
+            } else {
+                console.log("AreaPlanMapVisuals: Failed to create waypoint marker", i)
             }
         }
+        
+        console.log("AreaPlanMapVisuals: Waypoint markers creation completed")
     }
     
     function removeWaypointMarkers() {
@@ -537,6 +652,11 @@ Item {
             addMapItems()
         }
         
+        function onAreaRotationChanged() {
+            console.log("AreaPlanMapVisuals: Area rotation changed, updating map items")
+            addMapItems()
+        }
+        
         function onLineSpacingChanged() {
             console.log("AreaPlanMapVisuals: Line spacing changed, updating map items")
             addGridLines()
@@ -563,22 +683,116 @@ Item {
         }
     }
 
-    // Initialize map items when component is ready
-    Component.onCompleted: {
-        console.log("AreaPlanMapVisuals: Component completed")
-        console.log("Interactive:", interactive)
-        console.log("MapControl valid:", !!mapControl)
-        console.log("AreaPlanEditor valid:", !!areaPlanEditor)
-        console.log("IsDrawingMode:", isDrawingMode)
+    // Add a transparent MouseArea for the entire map area when in drawing mode
+    MouseArea {
+        id: mapAreaMouseArea
+        anchors.fill: parent
+        enabled: interactive && isDrawingMode
+        hoverEnabled: true
+        preventStealing: true
+        z: 999  // High z-order but below the rectangle MouseArea
         
-        // Force initial map item creation
-        if (mapControl && areaPlanEditor) {
-            console.log("AreaPlanMapVisuals: Forcing initial map item creation")
-            addMapItems()
-        } else {
-            console.log("AreaPlanMapVisuals: Skipping initial map item creation - missing dependencies")
-            console.log("  mapControl:", !!mapControl)
-            console.log("  areaPlanEditor:", !!areaPlanEditor)
+        // Add a visible background for debugging (semi-transparent red)
+        Rectangle {
+            anchors.fill: parent
+            color: "red"
+            opacity: 0.1
+            visible: interactive && isDrawingMode
+        }
+        
+        property point startPos
+        property var startCenter
+        property var startCoordinate
+        property bool hasMoved: false
+        
+        Component.onCompleted: {
+            console.log("Map area MouseArea completed - enabled:", enabled, "interactive:", interactive, "isDrawingMode:", isDrawingMode)
+            console.log("Map area MouseArea - z-order:", z)
+        }
+        
+        // Monitor property changes
+        onEnabledChanged: {
+            console.log("Map area MouseArea enabled changed to:", enabled)
+        }
+        
+        onPressed: {
+            console.log("Map area pressed - setting isDragging to true")
+            console.log("Map area MouseArea - enabled:", enabled, "interactive:", interactive, "isDrawingMode:", isDrawingMode)
+            console.log("Mouse position:", mouse.x, mouse.y)
+            startPos = Qt.point(mouse.x, mouse.y)
+            startCenter = areaPlanEditor ? areaPlanEditor.areaCenter : null
+            isDragging = true
+            hasMoved = false
+            console.log("Map area isDragging set to:", isDragging)
+            // Get the coordinate at the press position
+            if (mapControl) {
+                startCoordinate = mapControl.toCoordinate(startPos, false)
+                console.log("Map area drag started at coordinate:", startCoordinate.latitude, startCoordinate.longitude)
+            } else {
+                console.log("ERROR: mapControl is null!")
+            }
+        }
+        
+        onPositionChanged: {
+            if (pressed && areaPlanEditor && mapControl) {
+                hasMoved = true
+                console.log("Map area dragging - isDragging:", isDragging)
+                // Get current mouse position coordinate
+                var currentPos = Qt.point(mouse.x, mouse.y)
+                var currentCoordinate = mapControl.toCoordinate(currentPos, false)
+                
+                if (currentCoordinate.isValid) {
+                    // Move center directly to current mouse position
+                    console.log("Map area dragging to:", currentCoordinate.latitude, currentCoordinate.longitude)
+                    areaPlanEditor.setAreaCenter(currentCoordinate)
+                }
+            }
+        }
+        
+        onReleased: {
+            console.log("Map area released - setting isDragging to false")
+            isDragging = false
+            console.log("Map area isDragging set to:", isDragging)
+            
+            // If we didn't move, treat as a click
+            if (!hasMoved && areaPlanEditor && mapControl) {
+                var clickPos = Qt.point(mouse.x, mouse.y)
+                var clickCoordinate = mapControl.toCoordinate(clickPos, false)
+                
+                if (clickCoordinate.isValid) {
+                    console.log("Map area clicked at:", clickCoordinate.latitude, clickCoordinate.longitude)
+                    
+                    // Set center point on first click or if center is not valid
+                    if (!areaPlanEditor.areaCenter.isValid || 
+                        (Math.abs(areaPlanEditor.areaCenter.latitude) < 0.001 && Math.abs(areaPlanEditor.areaCenter.longitude) < 0.001) ||
+                        areaPlanEditor.areaWidth <= 0 || areaPlanEditor.areaHeight <= 0) {
+                        
+                        areaPlanEditor.setAreaCenter(clickCoordinate)
+                        console.log("Area center set to:", clickCoordinate.latitude, clickCoordinate.longitude)
+                        
+                        // Set default area size if not already set
+                        if (areaPlanEditor.areaWidth <= 0 || areaPlanEditor.areaHeight <= 0) {
+                            areaPlanEditor.setAreaWidth(100.0)
+                            areaPlanEditor.setAreaHeight(100.0)
+                            console.log("Set default area size: 100x100 meters")
+                        }
+                    } else {
+                        // Calculate new area size based on distance from center
+                        var center = areaPlanEditor.areaCenter
+                        var distance = center.distanceTo(clickCoordinate)
+                        var newWidth = Math.max(distance * 2, 10)
+                        var newHeight = Math.max(distance * 2, 10)
+                        
+                        // Limit maximum size
+                        newWidth = Math.min(newWidth, 1000)
+                        newHeight = Math.min(newHeight, 1000)
+                        
+                        areaPlanEditor.setAreaWidth(newWidth)
+                        areaPlanEditor.setAreaHeight(newHeight)
+                        console.log("Updated area size:", newWidth, "x", newHeight, "meters")
+                    }
+                }
+            }
         }
     }
 

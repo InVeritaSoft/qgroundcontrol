@@ -362,6 +362,31 @@ Item {
 							}
 						}
 
+						// Test re-centering functionality
+						QGCButton {
+							text: qsTr("Test Re-centering")
+							width: parent.width
+							height: 30
+							onClicked: {
+								console.log("Test re-centering clicked")
+								if (areaPlanEditor) {
+									console.log("Current center:", areaPlanEditor.areaCenter.latitude, areaPlanEditor.areaCenter.longitude)
+									
+									// Move center slightly to test re-centering
+									var newLat = areaPlanEditor.areaCenter.latitude + 0.001
+									var newLon = areaPlanEditor.areaCenter.longitude + 0.001
+									var newCenter = QtPositioning.coordinate(newLat, newLon)
+									
+									console.log("Moving center to:", newLat, newLon)
+									areaPlanEditor.setAreaCenter(newCenter)
+									
+									console.log("New center:", areaPlanEditor.areaCenter.latitude, areaPlanEditor.areaCenter.longitude)
+								} else {
+									console.log("ERROR: areaPlanEditor is null!")
+								}
+							}
+						}
+
 						// Reset button
 						QGCButton {
 							text: qsTr("Reset Area")
@@ -485,7 +510,7 @@ Item {
 									}
 								}
 								
-								// Step 3: Generate Waypoints
+								// Step 3: Generate Mission
 								Row {
 									width: parent.width
 									height: 20
@@ -501,7 +526,7 @@ Item {
 									}
 									
 									QGCLabel {
-										text: qsTr("3. Generate Waypoints")
+										text: qsTr("3. Generate Mission")
 										font.pointSize: ScreenTools.smallFontPointSize
 										color: areaPlanEditor && areaPlanEditor.numPoints > 0 ? "#00FF00" : "#808080"
 										anchors.verticalCenter: parent.verticalCenter
@@ -524,7 +549,7 @@ Item {
 									}
 									
 									QGCLabel {
-										text: qsTr("4. Save Mission")
+										text: qsTr("4. Upload to Vehicle (Optional)")
 										font.pointSize: ScreenTools.smallFontPointSize
 										color: "#808080"
 										anchors.verticalCenter: parent.verticalCenter
@@ -610,6 +635,136 @@ Item {
 					}
 				}
 
+				// Rotation Controls Section
+				Rectangle {
+					width: parent.width
+					height: rotationControlsColumn.height + 40
+					color: qgcPal.windowShade
+					radius: 8
+					
+					Column {
+						id: rotationControlsColumn
+						anchors.left: parent.left
+						anchors.right: parent.right
+						anchors.top: parent.top
+						anchors.margins: 20
+						spacing: 12
+
+						QGCLabel {
+							text: qsTr("Rotation Controls")
+							font.pointSize: ScreenTools.mediumFontPointSize
+							font.bold: true
+							width: parent.width
+							height: 24
+							verticalAlignment: Text.AlignVCenter
+						}
+
+						// Current rotation display
+						Row {
+							width: parent.width
+							height: 32
+							spacing: 10
+
+							QGCLabel {
+								text: qsTr("Current Rotation:")
+								width: parent.width * 0.4
+								height: parent.height
+								verticalAlignment: Text.AlignVCenter
+							}
+
+							QGCLabel {
+								text: areaPlanEditor ? qsTr("%1°").arg(areaPlanEditor.areaRotation.toFixed(1)) : qsTr("0.0°")
+								width: parent.width * 0.3
+								height: parent.height
+								verticalAlignment: Text.AlignVCenter
+								font.bold: true
+							}
+
+							QGCLabel {
+								text: areaPlanEditor && areaPlanEditor.areaRotation > 0 ? qsTr("(North = 0°)") : ""
+								width: parent.width * 0.3
+								height: parent.height
+								verticalAlignment: Text.AlignVCenter
+								font.pointSize: ScreenTools.smallFontPointSize
+								color: qgcPal.colorGrey
+							}
+						}
+
+						// Rotation input field
+						Row {
+							width: parent.width
+							height: 32
+							spacing: 10
+
+							QGCLabel {
+								text: qsTr("Set Rotation:")
+								width: parent.width * 0.4
+								height: parent.height
+								verticalAlignment: Text.AlignVCenter
+							}
+
+							QGCTextField {
+								id: rotationInput
+								width: parent.width * 0.3
+								height: parent.height
+								text: areaPlanEditor ? areaPlanEditor.areaRotation.toFixed(1) : "0.0"
+								placeholderText: qsTr("0.0")
+								inputMethodHints: Qt.ImhFormattedNumbersOnly
+								validator: DoubleValidator {
+									bottom: 0.0
+									top: 359.9
+									decimals: 1
+									notation: DoubleValidator.StandardNotation
+								}
+								onEditingFinished: {
+									if (areaPlanEditor && text !== "") {
+										var rotation = parseFloat(text)
+										if (!isNaN(rotation)) {
+											areaPlanEditor.setAreaRotation(rotation)
+										}
+									}
+								}
+							}
+
+							QGCLabel {
+								text: qsTr("degrees")
+								width: parent.width * 0.3
+								height: parent.height
+								verticalAlignment: Text.AlignVCenter
+								color: qgcPal.colorGrey
+							}
+						}
+
+						// Rotation buttons
+						Row {
+							width: parent.width
+							height: 40
+							spacing: 10
+
+							QGCButton {
+								text: qsTr("↺ -15°")
+								width: parent.width * 0.3
+								height: parent.height
+								onClicked: if (areaPlanEditor) areaPlanEditor.rotateAreaCounterClockwise()
+							}
+
+							QGCButton {
+								text: qsTr("Reset to 0°")
+								width: parent.width * 0.4
+								height: parent.height
+								onClicked: if (areaPlanEditor) areaPlanEditor.setAreaRotation(0.0)
+							}
+
+							QGCButton {
+								text: qsTr("+15° ↻")
+								width: parent.width * 0.3
+								height: parent.height
+								onClicked: if (areaPlanEditor) areaPlanEditor.rotateAreaClockwise()
+							}
+						}
+					}
+				}
+
 				// Mission Controls Section
 				Rectangle {
 					width: parent.width
@@ -634,13 +789,23 @@ Item {
 							verticalAlignment: Text.AlignVCenter
 						}
 
+						QGCLabel {
+							text: qsTr("Generate waypoints from the current area plan and add them to the Mission Tab. Works with or without a connected vehicle.")
+							width: parent.width
+							height: 40
+							wrapMode: Text.WordWrap
+							verticalAlignment: Text.AlignTop
+							font.pointSize: ScreenTools.smallFontPointSize
+							color: qgcPal.colorGrey
+						}
+
 						QGCButton {
-							text: qsTr("Generate Waypoints")
+							text: qsTr("Generate Mission & Add to Mission Tab")
 							width: parent.width
 							height: 44
 							onClicked: {
 								if (areaPlanEditor) {
-									console.log("Generate Waypoints button clicked")
+									console.log("Generate Mission button clicked")
 									areaPlanEditor.addWaypointsToMission()
 								}
 							}

@@ -1,0 +1,236 @@
+version: '3.8'
+
+services:
+  # ArduPilot SITL - Copter (Quadcopter)
+  sitl-copter:
+    image: ardupilot/ardupilot-sitl:latest
+    container_name: qgc-sitl-copter
+    ports:
+      - "14550:14550/udp"  # MAVLink UDP
+      - "14551:14551/udp"  # MAVLink UDP (secondary)
+      - "5760:5760/tcp"    # MAVLink TCP
+      - "5763:5763/tcp"    # MAVProxy console
+    environment:
+      - VEHICLE_TYPE=copter
+      - FRAME_TYPE=quad
+      - INSTANCE=0
+      - SIM_GPS_LAT=47.397742
+      - SIM_GPS_LON=8.545594
+      - SIM_GPS_ALT=488
+      - SIM_SPEEDUP=1
+    volumes:
+      - ./sitl-configs:/configs:ro
+      - ./sitl-logs:/logs
+      - ./sitl-missions:/missions:ro
+    command: >
+      bash -c "
+        cd /ardupilot/ArduCopter &&
+        sim_vehicle.py 
+        -w 
+        --map 
+        --console 
+        --out=127.0.0.1:14550 
+        --out=127.0.0.1:14551 
+        --instance $${INSTANCE}
+        --add-param-file=/configs/copter_demo.parm
+        --logfile=/logs/sitl-copter.log
+      "
+    restart: unless-stopped
+    networks:
+      - qgc-network
+
+  # ArduPilot SITL - Plane (Fixed-wing)
+  sitl-plane:
+    image: ardupilot/ardupilot-sitl:latest
+    container_name: qgc-sitl-plane
+    ports:
+      - "14552:14550/udp"  # MAVLink UDP
+      - "14553:14551/udp"  # MAVLink UDP (secondary)
+      - "5761:5760/tcp"    # MAVLink TCP
+      - "5764:5763/tcp"    # MAVProxy console
+    environment:
+      - VEHICLE_TYPE=plane
+      - FRAME_TYPE=plane
+      - INSTANCE=1
+      - SIM_GPS_LAT=47.397742
+      - SIM_GPS_LON=8.545594
+      - SIM_GPS_ALT=1000
+      - SIM_SPEEDUP=1
+    volumes:
+      - ./sitl-configs:/configs:ro
+      - ./sitl-logs:/logs
+      - ./sitl-missions:/missions:ro
+    command: >
+      bash -c "
+        cd /ardupilot/ArduPlane &&
+        sim_vehicle.py 
+        -w 
+        --map 
+        --console 
+        --out=127.0.0.1:14550 
+        --out=127.0.0.1:14551 
+        --instance $${INSTANCE}
+        --add-param-file=/configs/plane_demo.parm
+        --logfile=/logs/sitl-plane.log
+      "
+    restart: unless-stopped
+    networks:
+      - qgc-network
+
+  # ArduPilot SITL - Rover (Ground vehicle)
+  sitl-rover:
+    image: ardupilot/ardupilot-sitl:latest
+    container_name: qgc-sitl-rover
+    ports:
+      - "14554:14550/udp"  # MAVLink UDP
+      - "14555:14551/udp"  # MAVLink UDP (secondary)
+      - "5762:5760/tcp"    # MAVLink TCP
+      - "5765:5763/tcp"    # MAVProxy console
+    environment:
+      - VEHICLE_TYPE=rover
+      - FRAME_TYPE=rover
+      - INSTANCE=2
+      - SIM_GPS_LAT=47.397742
+      - SIM_GPS_LON=8.545594
+      - SIM_GPS_ALT=488
+      - SIM_SPEEDUP=1
+    volumes:
+      - ./sitl-configs:/configs:ro
+      - ./sitl-logs:/logs
+      - ./sitl-missions:/missions:ro
+    command: >
+      bash -c "
+        cd /ardupilot/APMrover2 &&
+        sim_vehicle.py 
+        -w 
+        --map 
+        --console 
+        --out=127.0.0.1:14550 
+        --out=127.0.0.1:14551 
+        --instance $${INSTANCE}
+        --add-param-file=/configs/rover_demo.parm
+        --logfile=/logs/sitl-rover.log
+      "
+    restart: unless-stopped
+    networks:
+      - qgc-network
+
+  # MAVProxy for advanced control and monitoring
+  mavproxy:
+    image: ardupilot/mavproxy:latest
+    container_name: qgc-mavproxy
+    ports:
+      - "8080:8080/tcp"    # MAVProxy web interface
+      - "14560:14550/udp"  # MAVProxy MAVLink output
+    environment:
+      - MAVLINK_PORT=udp:127.0.0.1:14550
+      - WEB_PORT=8080
+    volumes:
+      - ./sitl-configs:/configs:ro
+      - ./sitl-logs:/logs
+    command: >
+      bash -c "
+        mavproxy.py 
+        --master=$${MAVLINK_PORT}
+        --out=127.0.0.1:14560
+        --web=$${WEB_PORT}
+        --logfile=/logs/mavproxy.log
+      "
+    depends_on:
+      - sitl-copter
+    restart: unless-stopped
+    networks:
+      - qgc-network
+
+  # Mission Planner (optional - for comparison testing)
+  mission-planner:
+    image: missionplanner/missionplanner:latest
+    container_name: qgc-mission-planner
+    ports:
+      - "8081:8080/tcp"    # Mission Planner web interface
+    environment:
+      - MAVLINK_PORT=udp:127.0.0.1:14550
+    depends_on:
+      - sitl-copter
+    restart: unless-stopped
+    networks:
+      - qgc-network
+
+  # SITL Manager - Web interface for managing SITL instances
+  sitl-manager:
+    image: python:3.9-slim
+    container_name: qgc-sitl-manager
+    ports:
+      - "8082:8080/tcp"    # SITL Manager web interface
+    volumes:
+      - ./sitl-manager:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /app
+    command: >
+      bash -c "
+        pip install flask docker-compose &&
+        python app.py
+      "
+    depends_on:
+      - sitl-copter
+      - sitl-plane
+      - sitl-rover
+    restart: unless-stopped
+    networks:
+      - qgc-network
+
+  # Data Logger - For recording telemetry and mission data
+  data-logger:
+    image: python:3.9-slim
+    container_name: qgc-data-logger
+    volumes:
+      - ./sitl-logs:/logs
+      - ./sitl-data:/data
+    environment:
+      - LOG_LEVEL=INFO
+      - DATA_DIR=/data
+    command: >
+      bash -c "
+        pip install pymavlink pyserial &&
+        python /app/logger.py
+      "
+    depends_on:
+      - sitl-copter
+    restart: unless-stopped
+    networks:
+      - qgc-network
+
+  # Performance Monitor - Monitor system resources
+  performance-monitor:
+    image: python:3.9-slim
+    container_name: qgc-performance-monitor
+    ports:
+      - "8083:8080/tcp"    # Performance monitor web interface
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - ./sitl-logs:/logs
+    environment:
+      - HOST_PROC=/host/proc
+      - HOST_SYS=/host/sys
+    command: >
+      bash -c "
+        pip install flask psutil &&
+        python /app/monitor.py
+      "
+    restart: unless-stopped
+    networks:
+      - qgc-network
+
+networks:
+  qgc-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  sitl-data:
+    driver: local
+  sitl-logs:
+    driver: local 

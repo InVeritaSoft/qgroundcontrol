@@ -409,20 +409,13 @@ Item {
                     
                 case _layerAreaPlan:
                     // Handle Area Plan interactions
-                    if (QGroundControl.areaPlanEditor && QGroundControl.areaPlanEditor.isDrawingMode) {
+                    if (QGroundControl.areaPlanEditor) {
                         console.log("Area Plan: Map clicked at", coordinate.latitude, coordinate.longitude)
-                        console.log("Current area center:", QGroundControl.areaPlanEditor.areaCenter.latitude, QGroundControl.areaPlanEditor.areaCenter.longitude)
-                        console.log("Area center valid:", QGroundControl.areaPlanEditor.areaCenter.isValid)
-                        console.log("Current area dimensions:", QGroundControl.areaPlanEditor.areaWidth, "x", QGroundControl.areaPlanEditor.areaHeight)
                         
-                        // Set center point on first click or if center is not valid
-                        if (!QGroundControl.areaPlanEditor.areaCenter.isValid || 
-                            (Math.abs(QGroundControl.areaPlanEditor.areaCenter.latitude) < 0.001 && Math.abs(QGroundControl.areaPlanEditor.areaCenter.longitude) < 0.001) ||
-                            QGroundControl.areaPlanEditor.areaWidth <= 0 || QGroundControl.areaPlanEditor.areaHeight <= 0) {
-                            
+                        if (QGroundControl.areaPlanEditor.isDrawingMode) {
+                            // In drawing mode, just set the center point
+                            console.log("Area Plan: Drawing mode active - setting center point")
                             QGroundControl.areaPlanEditor.setAreaCenter(coordinate)
-                            console.log("Area center set to:", coordinate.latitude, coordinate.longitude)
-                            console.log("New area center valid:", QGroundControl.areaPlanEditor.areaCenter.isValid)
                             
                             // Set default area size if not already set
                             if (QGroundControl.areaPlanEditor.areaWidth <= 0 || QGroundControl.areaPlanEditor.areaHeight <= 0) {
@@ -431,22 +424,9 @@ Item {
                                 console.log("Set default area size: 100x100 meters")
                             }
                         } else {
-                            // Calculate new area size based on distance from center
-                            var center = QGroundControl.areaPlanEditor.areaCenter
-                            var distance = center.distanceTo(coordinate)
-                            var newWidth = Math.max(distance * 2, 10)
-                            var newHeight = Math.max(distance * 2, 10)
-                            
-                            // Limit maximum size
-                            newWidth = Math.min(newWidth, 1000)
-                            newHeight = Math.min(newHeight, 1000)
-                            
-                            QGroundControl.areaPlanEditor.setAreaWidth(newWidth)
-                            QGroundControl.areaPlanEditor.setAreaHeight(newHeight)
-                            console.log("Updated area size:", newWidth, "x", newHeight, "meters")
+                            // Not in drawing mode, ignore clicks
+                            console.log("Area Plan: Drawing mode not active, ignoring click")
                         }
-                    } else {
-                        console.log("Area Plan: Drawing mode not active, ignoring click")
                     }
                     break
                 }
@@ -891,6 +871,14 @@ Item {
                 anchors.left:            parent.left
                 anchors.right:           parent.right
                 visible:                 _editingLayer == _layerAreaPlan
+                
+                Component.onCompleted: {
+                    // Pass the plan master controller to the area plan editor
+                    if (QGroundControl.areaPlanEditor) {
+                        QGroundControl.areaPlanEditor.planMasterController = planMasterController
+                        console.log("AreaPlanEditor: PlanMasterController set")
+                    }
+                }
             }
         }
 
