@@ -40,6 +40,7 @@ public:
     Q_PROPERTY(QGeoCoordinate areaCenter READ areaCenter WRITE setAreaCenter NOTIFY areaCenterChanged)
     Q_PROPERTY(QGeoCoordinate homeLocation READ homeLocation WRITE setHomeLocation NOTIFY homeLocationChanged)
     Q_PROPERTY(qreal areaRotation READ areaRotation WRITE setAreaRotation NOTIFY areaRotationChanged)
+    Q_PROPERTY(qreal loiterTime READ loiterTime WRITE setLoiterTime NOTIFY loiterTimeChanged)
     Q_PROPERTY(QString validationError READ validationError NOTIFY validationErrorChanged)
     Q_PROPERTY(bool isProcessing READ isProcessing NOTIFY isProcessingChanged)
     Q_PROPERTY(int progressValue READ progressValue NOTIFY progressValueChanged)
@@ -59,6 +60,7 @@ public:
     QGeoCoordinate areaCenter() const { return _areaCenter; }
     QGeoCoordinate homeLocation() const { return _homeLocation; }
     qreal areaRotation() const { return _areaRotation; }
+    qreal loiterTime() const { return _loiterTime; }
     QString validationError() const { return _validationError; }
     bool isProcessing() const { return _isProcessing; }
     int progressValue() const { return _progressValue; }
@@ -78,6 +80,7 @@ public:
     Q_INVOKABLE void setAreaCenter(const QGeoCoordinate& center);
     Q_INVOKABLE void setHomeLocation(const QGeoCoordinate& location);
     Q_INVOKABLE void setAreaRotation(qreal rotation);
+    Q_INVOKABLE void setLoiterTime(qreal time);
     Q_INVOKABLE void setIsDrawingMode(bool drawingMode);
     Q_INVOKABLE void setPlanMasterController(QObject* controller);
 
@@ -149,6 +152,7 @@ signals:
     void areaCenterChanged();
     void homeLocationChanged();
     void areaRotationChanged();
+    void loiterTimeChanged();
     void statusChanged(const QString& message);
     void validationErrorChanged();
     void isProcessingChanged();
@@ -178,6 +182,7 @@ private:
     QGeoCoordinate _areaCenter = QGeoCoordinate(49.82824897481479, 24.033390804256005);
     QGeoCoordinate _homeLocation = QGeoCoordinate(49.82824897481479, 24.033390804256005);
     qreal _areaRotation = 0.0;  // Rotation in degrees, 0 = North
+    qreal _loiterTime = 10.0;   // Loiter time in seconds at each waypoint
     QString _validationError;
     bool _isProcessing = false;
     int _progressValue = 0;

@@ -19,9 +19,9 @@ services:
       - SIM_GPS_ALT=488
       - SIM_SPEEDUP=1
     volumes:
-      - ./sitl-configs:/configs:ro
-      - ./sitl-logs:/logs
-      - ./sitl-missions:/missions:ro
+      - ./configs:/configs:ro
+      - ./logs:/logs
+      - ./missions:/missions:ro
     command: >
       bash -c "
         cd /ardupilot/ArduCopter &&
@@ -57,9 +57,9 @@ services:
       - SIM_GPS_ALT=1000
       - SIM_SPEEDUP=1
     volumes:
-      - ./sitl-configs:/configs:ro
-      - ./sitl-logs:/logs
-      - ./sitl-missions:/missions:ro
+      - ./configs:/configs:ro
+      - ./logs:/logs
+      - ./missions:/missions:ro
     command: >
       bash -c "
         cd /ardupilot/ArduPlane &&
@@ -95,9 +95,9 @@ services:
       - SIM_GPS_ALT=488
       - SIM_SPEEDUP=1
     volumes:
-      - ./sitl-configs:/configs:ro
-      - ./sitl-logs:/logs
-      - ./sitl-missions:/missions:ro
+      - ./configs:/configs:ro
+      - ./logs:/logs
+      - ./missions:/missions:ro
     command: >
       bash -c "
         cd /ardupilot/APMrover2 &&
@@ -126,8 +126,8 @@ services:
       - MAVLINK_PORT=udp:127.0.0.1:14550
       - WEB_PORT=8080
     volumes:
-      - ./sitl-configs:/configs:ro
-      - ./sitl-logs:/logs
+      - ./configs:/configs:ro
+      - ./logs:/logs
     command: >
       bash -c "
         mavproxy.py 
@@ -163,7 +163,7 @@ services:
     ports:
       - "8082:8080/tcp"    # SITL Manager web interface
     volumes:
-      - ./sitl-manager:/app
+      - ./manager:/app
       - /var/run/docker.sock:/var/run/docker.sock
     working_dir: /app
     command: >
@@ -179,13 +179,100 @@ services:
     networks:
       - qgc-network
 
+  # AreaPlanner Integration Service
+  area-planner-integration:
+    image: python:3.9-slim
+    container_name: qgc-area-planner-integration
+    ports:
+      - "8084:8080/tcp"    # AreaPlanner integration web interface
+    volumes:
+      - ./scripts:/app/scripts:ro
+      - ./missions:/app/missions
+      - ./logs:/app/logs
+      - ./data:/app/data
+    environment:
+      - MAVLINK_HOST=sitl-copter
+      - MAVLINK_PORT=14550
+      - VEHICLE_TYPE=copter
+      - LOG_LEVEL=INFO
+    working_dir: /app
+    command: >
+      bash -c "
+        pip install pymavlink pyserial flask requests numpy matplotlib &&
+        cd /app/scripts &&
+        python area_planner_integration.py --demo workflow
+      "
+    depends_on:
+      - sitl-copter
+    restart: unless-stopped
+    networks:
+      - qgc-network
+
+  # QGC AreaPlanner Bridge Service
+  qgc-area-planner-bridge:
+    image: python:3.9-slim
+    container_name: qgc-area-planner-bridge
+    ports:
+      - "8085:8080/tcp"    # QGC Bridge web interface
+    volumes:
+      - ./scripts:/app/scripts:ro
+      - ./missions:/app/missions
+      - ./logs:/app/logs
+      - ./data:/app/data
+    environment:
+      - MAVLINK_HOST=sitl-copter
+      - MAVLINK_PORT=14550
+      - VEHICLE_TYPE=copter
+      - LOG_LEVEL=INFO
+    working_dir: /app
+    command: >
+      bash -c "
+        pip install pymavlink pyserial flask requests &&
+        cd /app/scripts &&
+        python qgc_area_planner_bridge.py --demo workflow
+      "
+    depends_on:
+      - sitl-copter
+    restart: unless-stopped
+    networks:
+      - qgc-network
+
+  # Complete AreaPlanner Demo Service
+  complete-area-planner-demo:
+    image: python:3.9-slim
+    container_name: qgc-complete-area-planner-demo
+    ports:
+      - "8086:8080/tcp"    # Complete demo web interface
+    volumes:
+      - ./scripts:/app/scripts:ro
+      - ./missions:/app/missions
+      - ./logs:/app/logs
+      - ./data:/app/data
+    environment:
+      - MAVLINK_HOST=sitl-copter
+      - MAVLINK_PORT=14550
+      - VEHICLE_TYPE=copter
+      - LOG_LEVEL=INFO
+    working_dir: /app
+    command: >
+      bash -c "
+        pip install pymavlink pyserial flask requests numpy matplotlib &&
+        cd /app/scripts &&
+        python demo_area_planner_complete.py
+      "
+    depends_on:
+      - sitl-copter
+    restart: unless-stopped
+    networks:
+      - qgc-network
+
   # Data Logger - For recording telemetry and mission data
   data-logger:
     image: python:3.9-slim
     container_name: qgc-data-logger
     volumes:
-      - ./sitl-logs:/logs
-      - ./sitl-data:/data
+      - ./logs:/logs
+      - ./data:/data
     environment:
       - LOG_LEVEL=INFO
       - DATA_DIR=/data
@@ -209,7 +296,7 @@ services:
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
-      - ./sitl-logs:/logs
+      - ./logs:/logs
     environment:
       - HOST_PROC=/host/proc
       - HOST_SYS=/host/sys

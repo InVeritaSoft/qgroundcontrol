@@ -18,12 +18,13 @@ while true; do
     echo "4. Show status"
     echo "5. Check connection"
     echo "6. Run demo automation"
-    echo "7. Open web manager"
-    echo "8. View logs"
-    echo "9. Exit"
+    echo "7. Run AreaPlanner demo"
+    echo "8. Open web manager"
+    echo "9. View logs"
+    echo "10. Exit"
     echo
 
-    read -p "Enter your choice (1-9): " choice
+    read -p "Enter your choice (1-10): " choice
 
     case $choice in
         1)
@@ -71,6 +72,13 @@ while true; do
             ;;
         7)
             echo
+            echo "Running AreaPlanner demo..."
+            python3 scripts/area_planner_integration.py --demo workflow
+            echo
+            read -p "Press Enter to continue..."
+            ;;
+        8)
+            echo
             echo "Opening web manager..."
             if command -v xdg-open > /dev/null; then
                 xdg-open http://localhost:8082
@@ -83,14 +91,14 @@ while true; do
             echo
             read -p "Press Enter to continue..."
             ;;
-        8)
+        9)
             echo
             echo "Viewing recent logs..."
             python3 scripts/start_demo.py logs --lines 50
             echo
             read -p "Press Enter to continue..."
             ;;
-        9)
+        10)
             echo
             echo "Thank you for using ArduPilot SITL Demo!"
             echo

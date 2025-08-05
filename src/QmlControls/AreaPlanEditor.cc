@@ -28,6 +28,7 @@
 #include "MultiVehicleManager.h"
 #include "QGCMAVLink.h"
 #include "MissionController.h" // Added for MissionController
+#include "SimpleMissionItem.h"
 
 AreaPlanEditor::AreaPlanEditor(QObject* parent)
     : QObject(parent)
@@ -171,16 +172,26 @@ void AreaPlanEditor::setIsDrawingMode(bool drawingMode)
 void AreaPlanEditor::setAreaRotation(qreal rotation)
 {
     // Normalize rotation to 0-360 degrees
-    while (rotation < 0) rotation += 360.0;
-    while (rotation >= 360) rotation -= 360.0;
+    while (rotation < 0.0) rotation += 360.0;
+    while (rotation >= 360.0) rotation -= 360.0;
     
-    if (qFuzzyCompare(_areaRotation, rotation))
-        return;
+    if (_areaRotation != rotation) {
+        _areaRotation = rotation;
+        emit areaRotationChanged();
+        updateStatus(QStringLiteral("Area rotation set to %1 degrees").arg(rotation));
+    }
+}
+
+void AreaPlanEditor::setLoiterTime(qreal time)
+{
+    if (time < 0.0) time = 0.0;
+    if (time > 3600.0) time = 3600.0; // Max 1 hour
     
-    _areaRotation = rotation;
-    clearValidationError();
-    emit areaRotationChanged();
-    updateStatus(QStringLiteral("Area rotated to %1 degrees").arg(rotation));
+    if (_loiterTime != time) {
+        _loiterTime = time;
+        emit loiterTimeChanged();
+        updateStatus(QStringLiteral("Loiter time set to %1 seconds").arg(time));
+    }
 }
 
 void AreaPlanEditor::moveAreaNorth()
@@ -270,7 +281,8 @@ int AreaPlanEditor::calculateFlightTime() const
 {
     const int totalWaypoints = calculateTotalWaypoints();
     const int timePerPoint = 2; // minutes per waypoint (including hover time)
-    return totalWaypoints * timePerPoint;
+    const int loiterTimeMinutes = static_cast<int>(_loiterTime / 60.0); // Convert seconds to minutes
+    return totalWaypoints * (timePerPoint + loiterTimeMinutes);
 }
 
 QVariantList AreaPlanEditor::generateWaypoints()
@@ -339,6 +351,9 @@ QVariantList AreaPlanEditor::generateWaypoints()
 
 void AreaPlanEditor::addWaypointsToMission()
 {
+    qDebug() << "AreaPlanEditor: Starting mission generation";
+    qDebug() << "AreaPlanEditor: _loiterTime value at start:" << _loiterTime;
+    
     startProgress(QStringLiteral("Generating Mission"), QStringLiteral("Preparing waypoints..."));
     
     // Validate all parameters before proceeding
@@ -376,13 +391,85 @@ void AreaPlanEditor::addWaypointsToMission()
     // Add takeoff item at home location
     missionController->insertTakeoffItem(_homeLocation, -1, false);
     
-    // Add generated waypoints
+    // Add generated waypoints with proper loiter commands
     for (const QVariant& waypointVariant : waypointVariants) {
         QGeoCoordinate coord = waypointVariant.value<QGeoCoordinate>();
+        
+        // Add waypoint to get to the point
         missionController->insertSimpleMissionItem(coord, -1, false);
+        
+        // Add loiter command at the same point using MAV_CMD_NAV_LOITER_TIME
+        // This creates a proper loiter/hold command with the specified time
+        QGeoCoordinate loiterCoord = coord;
+        loiterCoord.setAltitude(_missionAltitude);
+        
+        // Create a loiter mission item with the specified time using MAV_CMD_NAV_LOITER_TIME
+        // The loiter command parameters are:
+        // param1: time (seconds) - how long to loiter
+        // param2: leave loiter (direction) - 1 for direction of next waypoint
+        // param3: radius (meters) - loiter radius (50m default)
+        // param4: exit loiter from - 1 for tangent
+        
+        // Try to create the loiter mission item directly
+        // We'll need to access the private method, so we'll use a different approach
+        // For now, we'll add a waypoint and then modify it to be a loiter command
+        
+        // Add a simple mission item that we'll convert to a loiter command
+        VisualMissionItem* loiterItem = missionController->insertSimpleMissionItem(loiterCoord, -1, false);
+        
+        // Convert the simple mission item to a loiter command
+        if (loiterItem) {
+            SimpleMissionItem* simpleItem = qobject_cast<SimpleMissionItem*>(loiterItem);
+            if (simpleItem) {
+                qDebug() << "AreaPlanEditor: Converting waypoint to loiter command";
+                qDebug() << "AreaPlanEditor: Current _loiterTime value:" << _loiterTime;
+                
+                // Set the loiter parameters FIRST, before changing the command
+                // param1: Loiter Time (seconds)
+                simpleItem->missionItem().setParam1(_loiterTime);
+                qDebug() << "AreaPlanEditor: Set param1 (loiter time) to:" << _loiterTime;
+                qDebug() << "AreaPlanEditor: After setParam1, param1 value is:" << simpleItem->missionItem().param1();
+                
+                // param2: Leave Loiter (1 = direction of next waypoint)
+                simpleItem->missionItem().setParam2(1.0);
+                qDebug() << "AreaPlanEditor: Set param2 (leave loiter) to: 1.0";
+                
+                // param3: Radius (50 meters default)
+                simpleItem->missionItem().setParam3(50.0);
+                qDebug() << "AreaPlanEditor: Set param3 (radius) to: 50.0";
+                
+                // param4: Exit loiter from (1 = tangent)
+                simpleItem->missionItem().setParam4(1.0);
+                qDebug() << "AreaPlanEditor: Set param4 (exit loiter) to: 1.0";
+                
+                // NOW set the command to MAV_CMD_NAV_LOITER_TIME
+                simpleItem->setCommand(MAV_CMD_NAV_LOITER_TIME);
+                qDebug() << "AreaPlanEditor: Set command to MAV_CMD_NAV_LOITER_TIME";
+                
+                // Check if parameters were reset after command change
+                qDebug() << "AreaPlanEditor: After command change, param1 value is:" << simpleItem->missionItem().param1();
+                
+                // If parameters were reset, set them again
+                if (simpleItem->missionItem().param1() != _loiterTime) {
+                    qDebug() << "AreaPlanEditor: Parameters were reset, setting them again";
+                    simpleItem->missionItem().setParam1(_loiterTime);
+                    simpleItem->missionItem().setParam2(1.0);
+                    simpleItem->missionItem().setParam3(50.0);
+                    simpleItem->missionItem().setParam4(1.0);
+                }
+                
+                qDebug() << "AreaPlanEditor: Created loiter command at" << coord.latitude() << coord.longitude() << "for" << _loiterTime << "seconds";
+                qDebug() << "AreaPlanEditor: Loiter parameters set - time:" << _loiterTime << "radius:50m direction:next_waypoint exit:tangent";
+                qDebug() << "AreaPlanEditor: Final mission item params - param1:" << simpleItem->missionItem().param1() << "param2:" << simpleItem->missionItem().param2() << "param3:" << simpleItem->missionItem().param3() << "param4:" << simpleItem->missionItem().param4();
+            }
+        }
     }
     
-    // Add RTL item
+    // Add "back to takeoff" step - return to home location
+    qDebug() << "AreaPlanEditor: Adding 'back to takeoff' step - returning to home location";
+    missionController->insertSimpleMissionItem(_homeLocation, -1, false);
+    
+    // Add RTL item to return to launch position
     missionController->insertLandItem(_homeLocation, -1, false);
     
     updateProgress(80, QStringLiteral("Saving mission file..."));
@@ -398,24 +485,33 @@ void AreaPlanEditor::addWaypointsToMission()
     if (vehicle) {
         updateProgress(95, QStringLiteral("Uploading to connected vehicle..."));
         missionController->sendToVehicle();
-        updateStatus(QStringLiteral("Successfully generated and uploaded %1 waypoints to connected vehicle").arg(waypointVariants.size()));
+        updateStatus(QStringLiteral("Successfully generated and uploaded mission with %1 waypoints, loiter commands, and return to takeoff").arg(waypointVariants.size()));
     } else {
-        updateStatus(QStringLiteral("Generated %1 waypoints and added to mission (no vehicle connected - ready for upload)").arg(waypointVariants.size()));
+        updateStatus(QStringLiteral("Generated mission with %1 waypoints, loiter commands, and return to takeoff (no vehicle connected - ready for upload)").arg(waypointVariants.size()));
     }
     
-    finishProgress(QStringLiteral("Mission generated with %1 waypoints").arg(waypointVariants.size()));
+    finishProgress(QStringLiteral("Mission generated with %1 waypoints, loiter commands, and return to takeoff").arg(waypointVariants.size()));
     
     // Log the waypoints for debugging
-    qDebug() << "AreaPlanEditor: Generated" << waypointVariants.size() << "waypoints";
+    qDebug() << "AreaPlanEditor: Generated" << waypointVariants.size() << "waypoints with loiter commands";
     qDebug() << "AreaPlanEditor: Mission saved to:" << filename;
     qDebug() << "AreaPlanEditor: Mission controller now contains" << missionController->visualItems()->count() << "items";
+    qDebug() << "AreaPlanEditor: Loiter time set to" << _loiterTime << "seconds";
+    qDebug() << "AreaPlanEditor: Mission structure:";
+    qDebug() << "  1. Takeoff at home location";
+    for (int i = 0; i < waypointVariants.size(); ++i) {
+        qDebug() << "  " << (i*2 + 2) << ". Waypoint" << (i+1) << "to" << (i+1) << "waypoints";
+        qDebug() << "  " << (i*2 + 3) << ". Loiter at waypoint" << (i+1) << "for" << _loiterTime << "seconds";
+    }
+    qDebug() << "  " << (waypointVariants.size()*2 + 2) << ". Return to takeoff location";
+    qDebug() << "  " << (waypointVariants.size()*2 + 3) << ". Land at home location";
     
     for (int i = 0; i < qMin(5, waypointVariants.size()); ++i) {
         QGeoCoordinate coord = waypointVariants[i].value<QGeoCoordinate>();
-        qDebug() << "  Waypoint" << i << ":" << coord.latitude() << coord.longitude() << coord.altitude();
+        qDebug() << "  Waypoint" << i << ":" << coord.latitude() << coord.longitude() << coord.altitude() << "with" << _loiterTime << "s loiter";
     }
     if (waypointVariants.size() > 5) {
-        qDebug() << "  ... and" << (waypointVariants.size() - 5) << "more waypoints";
+        qDebug() << "  ... and" << (waypointVariants.size() - 5) << "more waypoints with loiter commands";
     }
 }
 

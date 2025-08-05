@@ -191,19 +191,54 @@ Item {
 								height: 32
 								verticalAlignment: Text.AlignVCenter
 							}
+
 							QGCTextField {
-								id: altitudeTextField
-								text: areaPlanEditor ? (areaPlanEditor.missionAltitude * 10).toString() : "100"
-								width: parent.width * 0.5
+								width: parent.width * 0.6
 								height: 32
+								text: areaPlanEditor ? areaPlanEditor.missionAltitude : 10.0
+								placeholderText: qsTr("10.0")
+								inputMethodHints: Qt.ImhFormattedNumbersOnly
 								validator: DoubleValidator {
-									bottom: 10
-									top: 1000
+									bottom: 1.0
+									top: 1000.0
 									decimals: 1
+									notation: DoubleValidator.StandardNotation
 								}
 								onEditingFinished: {
 									if (areaPlanEditor && text !== "") {
-										areaPlanEditor.missionAltitude = parseFloat(text) / 10
+										var altitude = parseFloat(text)
+										if (!isNaN(altitude)) {
+											areaPlanEditor.setMissionAltitude(altitude)
+										}
+									}
+								}
+							}
+
+							QGCLabel { 
+								text: qsTr("Loiter Time (s):")
+								width: parent.width * 0.4
+								height: 32
+								verticalAlignment: Text.AlignVCenter
+							}
+
+							QGCTextField {
+								width: parent.width * 0.6
+								height: 32
+								text: areaPlanEditor ? areaPlanEditor.loiterTime : 10.0
+								placeholderText: qsTr("10.0")
+								inputMethodHints: Qt.ImhFormattedNumbersOnly
+								validator: DoubleValidator {
+									bottom: 0.0
+									top: 3600.0
+									decimals: 1
+									notation: DoubleValidator.StandardNotation
+								}
+								onEditingFinished: {
+									if (areaPlanEditor && text !== "") {
+										var time = parseFloat(text)
+										if (!isNaN(time)) {
+											areaPlanEditor.setLoiterTime(time)
+										}
 									}
 								}
 							}
@@ -876,6 +911,13 @@ Item {
 
 						QGCLabel {
 							text: qsTr("Estimated Flight Time: %1 min").arg(areaPlanEditor ? areaPlanEditor.calculateFlightTime() : 0)
+							width: parent.width
+							height: 20
+							verticalAlignment: Text.AlignVCenter
+						}
+
+						QGCLabel {
+							text: qsTr("Loiter Time per Waypoint: %1 s").arg(areaPlanEditor ? areaPlanEditor.loiterTime : 10)
 							width: parent.width
 							height: 20
 							verticalAlignment: Text.AlignVCenter

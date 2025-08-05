@@ -528,6 +528,16 @@ Item {
     // Functions to manage map items following QGC patterns
     function addMapItems() {
         console.log("AreaPlanMapVisuals: Adding map items")
+        console.log("Component visible:", visible)
+        console.log("Component opacity:", opacity)
+        console.log("Component interactive:", interactive)
+        
+        // Don't add map items if component is not visible
+        if (!visible || opacity === 0) {
+            console.log("AreaPlanMapVisuals: Skipping map item creation - component not visible")
+            return
+        }
+        
         console.log("Rectangle corners count:", rectangleCorners.length)
         console.log("Area center valid:", areaPlanEditor ? areaPlanEditor.areaCenter.isValid : false)
         console.log("Area dimensions:", areaPlanEditor ? areaPlanEditor.areaWidth + "x" + areaPlanEditor.areaHeight : "null")
@@ -623,14 +633,50 @@ Item {
         // Remove all waypoint marker objects
         _objMgrWaypointMarkers.destroyObjects()
     }
-
+    
     function removeMapItems() {
-        console.log("AreaPlanMapVisuals: Removing map items")
+        console.log("AreaPlanMapVisuals: Removing all map items")
         _objMgrRectangle.destroyObjects()
         _objMgrCenterMarker.destroyObjects()
-        _objMgrGridLines.destroyObjects()
-        _objMgrWaypointMarkers.destroyObjects()
-        console.log("AreaPlanMapVisuals: Map items removed successfully")
+        removeGridLines()
+        removeWaypointMarkers()
+    }
+    
+    // Monitor visibility changes
+    onVisibleChanged: {
+        console.log("AreaPlanMapVisuals: Visibility changed to:", visible)
+        if (!visible) {
+            console.log("AreaPlanMapVisuals: Component not visible - removing all map items")
+            removeMapItems()
+        } else {
+            console.log("AreaPlanMapVisuals: Component visible - adding map items")
+            // Add items when becoming visible
+            addMapItems()
+        }
+    }
+    
+    onOpacityChanged: {
+        console.log("AreaPlanMapVisuals: Opacity changed to:", opacity)
+        if (opacity === 0) {
+            console.log("AreaPlanMapVisuals: Opacity is 0 - removing all map items")
+            removeMapItems()
+        } else if (visible) {
+            console.log("AreaPlanMapVisuals: Opacity is non-zero and visible - adding map items")
+            // Add items when opacity becomes non-zero and visible
+            addMapItems()
+        }
+    }
+    
+    // Also monitor the interactive property changes
+    onInteractiveChanged: {
+        console.log("AreaPlanMapVisuals: Interactive changed to:", interactive)
+        if (!interactive) {
+            console.log("AreaPlanMapVisuals: Not interactive - removing map items")
+            removeMapItems()
+        } else if (visible && opacity > 0) {
+            console.log("AreaPlanMapVisuals: Interactive and visible - adding map items")
+            addMapItems()
+        }
     }
 
     // Monitor area property changes and trigger map updates

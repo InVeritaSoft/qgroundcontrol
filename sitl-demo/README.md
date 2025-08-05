@@ -1,142 +1,120 @@
-# ArduPilot SITL (Software In The Loop) Demo Guide
+# ArduPilot SITL Demo with AreaPlanner Integration
 
-This guide provides comprehensive instructions for setting up and using ArduPilot SITL for QGroundControl demonstrations and development testing.
-
-## 📁 Project Structure
-
-```
-sitl-demo/
-├── README.md                 # This file
-├── docker-compose.yml        # Docker Compose configuration
-├── configs/                  # SITL configuration files
-│   ├── copter_demo.parm     # Copter parameters
-│   ├── plane_demo.parm      # Plane parameters
-│   └── rover_demo.parm      # Rover parameters
-├── scripts/                  # Management scripts
-│   ├── start_demo.py        # Main demo manager
-│   ├── demo_automation.py   # Automated demo sequences
-│   ├── requirements.txt     # Python dependencies
-│   ├── quick_start.bat      # Windows quick start
-│   └── quick_start.sh       # Linux/macOS quick start
-├── manager/                  # Web-based management interface
-│   ├── app.py              # Flask web application
-│   └── templates/          # HTML templates
-├── logs/                    # Log files (created automatically)
-├── missions/               # Mission files (created automatically)
-└── data/                   # Data files (created automatically)
-```
+A comprehensive demonstration environment for ArduPilot Software In The Loop (SITL) simulation with QGroundControl AreaPlanner integration.
 
 ## 🚀 Quick Start
 
-### Prerequisites
-
-- **Docker and Docker Compose** installed
-- **Python 3.7+** (for scripts and automation)
-- **QGroundControl** installed
-
-### Option 1: Using Quick Start Scripts
-
-**Windows:**
+### 1. Start All Services
 ```bash
 cd sitl-demo
-scripts\quick_start.bat
-```
-
-**Linux/macOS:**
-```bash
-cd sitl-demo
-chmod +x scripts/quick_start.sh
-./scripts/quick_start.sh
-```
-
-### Option 2: Using Python Scripts
-
-```bash
-cd sitl-demo
-
-# Install dependencies
-pip install -r scripts/requirements.txt
-
-# Start all services
-python scripts/start_demo.py start
-
-# Check status
-python scripts/start_demo.py status
-
-# Run automated demo
-python scripts/demo_automation.py --demo full
-```
-
-### Option 3: Using Docker Compose Directly
-
-```bash
-cd sitl-demo
-
-# Start all services
 docker-compose up -d
-
-# Start specific vehicle
-docker-compose up -d sitl-copter
-
-# View logs
-docker-compose logs -f sitl-copter
-
-# Stop all services
-docker-compose down
 ```
 
-## 🌐 Web Management Interface
+### 2. Connect QGroundControl
+- Open QGroundControl
+- Connect to SITL: **UDP 127.0.0.1:14550**
 
-The SITL demo includes a web-based management interface:
+### 3. Access Web Interfaces
+- **SITL Manager**: http://localhost:8082
+- **AreaPlanner Integration**: http://localhost:8084
+- **QGC Bridge**: http://localhost:8085
+- **Complete Demo**: http://localhost:8086
+- **MAVProxy**: http://localhost:8080
+- **Performance Monitor**: http://localhost:8083
 
-1. **Start the web manager:**
+## 🎯 AreaPlanner Integration
+
+### Using AreaPlanner with SITL
+
+1. **Start SITL Environment:**
    ```bash
    cd sitl-demo
-   python manager/app.py
+   docker-compose up -d
    ```
 
-2. **Access the interface:**
-   - Main Dashboard: http://localhost:8082
-   - Service Logs: http://localhost:8082/logs
-   - Configuration: http://localhost:8082/config
+2. **Open QGroundControl and Connect:**
+   - Open QGroundControl
+   - Connect to SITL using UDP: `127.0.0.1:14550`
 
-3. **Features:**
-   - Start/stop/restart services
-   - View real-time logs
-   - Monitor service status
-   - View configuration files
+3. **Use AreaPlanner:**
+   - Go to **Plan View**
+   - Click on **Area Plan** tab
+   - Configure area parameters:
+     - Area Width: 100m
+     - Area Height: 100m
+     - Line Spacing: 10m
+     - Mission Altitude: 30m
+   - Position area on map
+   - Click **Generate Mission**
 
-## 🔗 Connecting QGroundControl
+4. **Upload and Execute:**
+   - Review waypoints on map
+   - Click **Upload to Vehicle**
+   - Switch to **Fly view**
+   - Click **Start Mission**
 
-1. **Open QGroundControl**
-2. **Go to Settings → Comm Links**
-3. **Add a new UDP connection:**
-   - **Name**: SITL Demo
-   - **Host**: `127.0.0.1`
-   - **Port**: `14550` (copter), `14552` (plane), `14554` (rover)
-   - **AutoConnect**: Checked
-4. **Click 'Add' and then 'Connect'**
+5. **Monitor Execution:**
+   - Watch vehicle follow waypoints
+   - Monitor progress in Fly view
+   - Vehicle will return to launch when complete
 
 ## 🎬 Demo Scenarios
 
-### 1. Basic Flight Demo
+### 1. Basic SITL Demo
 ```bash
+# Start basic SITL services
+docker-compose up sitl-copter -d
+
+# Run basic automation
 python scripts/demo_automation.py --demo basic
 ```
 
-### 2. Mission Planning Demo
+### 2. Multi-Vehicle Demo
 ```bash
+# Start all vehicle types
+docker-compose up sitl-copter sitl-plane sitl-rover -d
+
+# Run multi-vehicle demo
+python scripts/demo_automation.py --demo multi
+```
+
+### 3. Mission Planning Demo
+```bash
+# Start with mission planning
+docker-compose up sitl-copter mavproxy -d
+
+# Run mission planning demo
 python scripts/demo_automation.py --demo mission
 ```
 
-### 3. Advanced Features Demo
+### 4. Advanced Features Demo
 ```bash
+# Start all services
+docker-compose up -d
+
+# Run advanced demo
 python scripts/demo_automation.py --demo advanced
 ```
 
-### 4. Full Demo Sequence
+### 5. Full Demo
 ```bash
+# Start complete environment
+docker-compose up -d
+
+# Run complete demo
 python scripts/demo_automation.py --demo full
+```
+
+### 6. AreaPlanner Integration Demo
+```bash
+# Run AreaPlanner workflow demo
+docker-compose up area-planner-integration -d
+
+# Interactive AreaPlanner demo
+docker-compose up qgc-area-planner-bridge -d
+
+# Complete AreaPlanner demo
+docker-compose up complete-area-planner-demo -d
 ```
 
 ## 🛠️ Management Commands
@@ -144,204 +122,214 @@ python scripts/demo_automation.py --demo full
 ### Service Management
 ```bash
 # Start all services
-python scripts/start_demo.py start
+docker-compose up -d
 
-# Start specific vehicle
-python scripts/start_demo.py start --vehicle copter
+# Start specific service
+docker-compose up sitl-copter -d
 
 # Stop all services
-python scripts/start_demo.py stop
+docker-compose down
 
 # Restart services
-python scripts/start_demo.py restart
+docker-compose restart
 
-# Show status
-python scripts/start_demo.py status
+# View logs
+docker-compose logs -f sitl-copter
 ```
 
-### Logging and Monitoring
+### Quick Scripts
 ```bash
+# Start demo environment
+python scripts/start_demo.py start
+
+# Stop demo environment
+python scripts/start_demo.py stop
+
+# Check status
+python scripts/start_demo.py status
+
 # View logs
-python scripts/start_demo.py logs --service sitl-copter --lines 100
+python scripts/start_demo.py logs
 
 # Check connection
 python scripts/start_demo.py check
 
-# Create demo mission
-python scripts/start_demo.py mission
-```
-
-### Help and Instructions
-```bash
 # Show QGroundControl connection instructions
 python scripts/start_demo.py help
+
+# Show AreaPlanner integration guide
+python scripts/qgc_area_planner_bridge.py --demo guide
 ```
 
 ## 🔧 Configuration
 
 ### Vehicle Parameters
+- **Copter**: `configs/copter_demo.parm`
+- **Plane**: `configs/plane_demo.parm`
+- **Rover**: `configs/rover_demo.parm`
 
-The demo includes pre-configured parameter files for different vehicle types:
-
-- **`configs/copter_demo.parm`** - Multi-rotor vehicle configuration
-- **`configs/plane_demo.parm`** - Fixed-wing aircraft configuration  
-- **`configs/rover_demo.parm`** - Ground vehicle configuration
-
-### Key Parameters
-
+### Environment Variables
 ```bash
-# GPS Simulation
-SIM_GPS_ENABLE 1
-SIM_GPS_LAT 47.397742
-SIM_GPS_LON 8.545594
-SIM_GPS_ALT 488
+# MAVLink Configuration
+MAVLINK_HOST=sitl-copter
+MAVLINK_PORT=14550
+VEHICLE_TYPE=copter
 
-# Vehicle Configuration
-FRAME_CLASS 1  # Quadcopter
-FRAME_TYPE 0   # Plus frame
-
-# Flight Modes
-FLTMODE1 3     # Manual
-FLTMODE2 4     # Stabilize
-FLTMODE3 6     # Loiter
-
-# Safety Features
-FENCE_ENABLE 1
-FENCE_ALT_MAX 100
-FENCE_RADIUS 100
+# Logging
+LOG_LEVEL=INFO
+DATA_DIR=/app/data
 ```
 
-## 🐛 Troubleshooting
+## 📁 Directory Structure
+```
+sitl-demo/
+├── docker-compose.yml          # Docker services configuration
+├── configs/                    # Vehicle parameter files
+│   ├── copter_demo.parm
+│   ├── plane_demo.parm
+│   └── rover_demo.parm
+├── scripts/                    # Python automation scripts
+│   ├── start_demo.py
+│   ├── demo_automation.py
+│   ├── area_planner_integration.py
+│   ├── qgc_area_planner_bridge.py
+│   ├── demo_area_planner_complete.py
+│   ├── quick_start.bat
+│   └── quick_start.sh
+├── manager/                    # Web management interface
+│   ├── app.py
+│   └── templates/
+├── missions/                   # Generated mission files
+├── logs/                       # SITL and application logs
+└── data/                       # Data logging and analysis
+```
+
+## 🌐 Available Services
+
+### Core Services
+- **sitl-copter**: ArduPilot Copter SITL (UDP:14550)
+- **sitl-plane**: ArduPilot Plane SITL (UDP:14552)
+- **sitl-rover**: ArduPilot Rover SITL (UDP:14554)
+- **mavproxy**: MAVProxy for advanced control (Web:8080)
+
+### Management Services
+- **sitl-manager**: Web interface for SITL management (Web:8082)
+- **data-logger**: Telemetry and mission data logging
+- **performance-monitor**: System resource monitoring (Web:8083)
+
+### AreaPlanner Integration Services
+- **area-planner-integration**: AreaPlanner workflow demo (Web:8084)
+- **qgc-area-planner-bridge**: QGC mission bridge (Web:8085)
+- **complete-area-planner-demo**: Complete demo orchestration (Web:8086)
+
+## 🔍 Troubleshooting
 
 ### Common Issues
-
-#### 1. Connection Problems
-```bash
-# Check if SITL is running
-python scripts/start_demo.py status
-
-# Check connection
-python scripts/start_demo.py check
-
-# Restart services
-python scripts/start_demo.py restart
-```
-
-#### 2. No GPS Signal
-- Verify `SIM_GPS_ENABLE 1` in parameter files
-- Check GPS position parameters
-- Restart SITL services
-
-#### 3. Vehicle Not Responding
-- Check flight mode settings
-- Verify RC input simulation
-- Check parameter configuration
-
-#### 4. Performance Issues
-- Reduce simulation speed: `SIM_SPEEDUP 0.5`
-- Disable unnecessary features
-- Monitor system resources
+1. **Port conflicts**: Ensure ports 14550-14555, 8080-8086 are available
+2. **Docker not running**: Start Docker Desktop/daemon
+3. **Permission issues**: Run with appropriate Docker permissions
+4. **Network issues**: Check Docker network configuration
 
 ### Debug Commands
-
 ```bash
-# View service logs
-docker-compose logs sitl-copter
-
-# Check container status
+# Check service status
 docker-compose ps
 
-# Monitor system resources
-docker stats
+# View service logs
+docker-compose logs -f [service-name]
+
+# Check network connectivity
+docker-compose exec sitl-copter ping sitl-plane
+
+# Test MAVLink connection
+python scripts/start_demo.py check
 ```
 
-## 📊 Available Services
+## 📊 Monitoring
 
-| Service | Port | Description |
-|---------|------|-------------|
-| SITL Copter | 14550 | Multi-rotor simulation |
-| SITL Plane | 14552 | Fixed-wing simulation |
-| SITL Rover | 14554 | Ground vehicle simulation |
-| MAVProxy | 8080 | MAVLink proxy and web interface |
-| Mission Planner | 8081 | Mission planning interface |
-| SITL Manager | 8082 | Web-based management interface |
-| Performance Monitor | 8083 | System resource monitoring |
+### Web Interfaces
+- **SITL Manager**: Service status and control
+- **MAVProxy**: Real-time telemetry and control
+- **Performance Monitor**: System resource usage
+- **AreaPlanner Integration**: Mission generation and execution
 
-## 🔄 Advanced Usage
+### Log Files
+- **SITL Logs**: `logs/sitl-*.log`
+- **Application Logs**: `logs/app-*.log`
+- **Mission Files**: `missions/*.json`, `missions/*.plan`
 
-### Custom Vehicle Models
+## 🚀 Advanced Usage
 
-Create custom parameter files:
-
+### Custom Missions
 ```bash
-# Create custom configuration
-cat > configs/custom_vehicle.parm << EOF
-FRAME_CLASS 1
-FRAME_TYPE 0
-MOT_PWM_TYPE 1
-MOT_PWM_RATE 490
-SIM_GPS_ENABLE 1
-SIM_GPS_LAT 47.397742
-SIM_GPS_LON 8.545594
-EOF
+# Create custom mission
+python scripts/area_planner_integration.py --demo interactive
 
-# Start with custom parameters
-docker-compose up -d sitl-copter
+# Upload QGC mission
+python scripts/qgc_area_planner_bridge.py --demo workflow
 ```
 
 ### Multi-Vehicle Operations
-
 ```bash
 # Start multiple vehicles
-docker-compose up -d sitl-copter sitl-plane
+docker-compose up sitl-copter sitl-plane -d
 
-# Connect to different ports in QGroundControl
-# Copter: 127.0.0.1:14550
-# Plane: 127.0.0.1:14552
+# Coordinate missions
+python scripts/demo_automation.py --demo multi
 ```
 
-### Integration with CI/CD
+### Performance Testing
+```bash
+# Monitor system resources
+docker-compose up performance-monitor -d
 
-```yaml
-# .github/workflows/sitl-test.yml
-name: SITL Tests
-on: [push, pull_request]
-
-jobs:
-  sitl-test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Start SITL
-        run: |
-          cd sitl-demo
-          docker-compose up -d sitl-copter
-          sleep 30
-      - name: Run Tests
-        run: |
-          python scripts/demo_automation.py --demo basic
-      - name: Cleanup
-        run: docker-compose down
+# Analyze mission data
+python scripts/demo_automation.py --demo performance
 ```
 
-## 📚 Additional Resources
+## 📚 Documentation
 
-- [ArduPilot Documentation](https://ardupilot.org/)
-- [QGroundControl Documentation](https://docs.qgroundcontrol.com/)
-- [MAVProxy Documentation](https://ardupilot.org/mavproxy/)
-- [Docker Compose Documentation](https://docs.docker.com/compose/)
+### AreaPlanner Integration
+- **Mission Generation**: Grid-based waypoint generation
+- **QGC Compatibility**: Parse and upload QGC mission files
+- **Real-time Monitoring**: Mission progress tracking
+- **Automated Workflows**: Complete demo orchestration
+
+### SITL Configuration
+- **Vehicle Types**: Copter, Plane, Rover support
+- **Parameter Files**: Optimized for demonstration
+- **Network Configuration**: MAVLink UDP/TCP support
+- **Logging**: Comprehensive telemetry logging
+
+### Web Management
+- **Service Control**: Start/stop/restart services
+- **Log Viewing**: Real-time log monitoring
+- **Configuration**: Parameter file management
+- **Status Monitoring**: Service health checks
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+### Development Setup
+```bash
+# Install dependencies
+pip install -r scripts/requirements.txt
+
+# Run tests
+python -m pytest scripts/tests/
+
+# Format code
+black scripts/
+```
+
+### Adding New Features
+1. Create new script in `scripts/`
+2. Add service to `docker-compose.yml`
+3. Update documentation
+4. Test with different vehicle types
 
 ## 📄 License
 
-This project is licensed under the same terms as QGroundControl.
+This project is licensed under the same terms as ArduPilot and QGroundControl.
 
 ---
 

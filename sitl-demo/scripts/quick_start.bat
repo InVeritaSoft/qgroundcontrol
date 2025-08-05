@@ -17,12 +17,13 @@ echo 3. Stop all services
 echo 4. Show status
 echo 5. Check connection
 echo 6. Run demo automation
-echo 7. Open web manager
-echo 8. View logs
-echo 9. Exit
+echo 7. Run AreaPlanner demo
+echo 8. Open web manager
+echo 9. View logs
+echo 10. Exit
 echo.
 
-set /p choice="Enter your choice (1-9): "
+set /p choice="Enter your choice (1-10): "
 
 if "%choice%"=="1" goto start_all
 if "%choice%"=="2" goto start_specific
@@ -30,9 +31,10 @@ if "%choice%"=="3" goto stop_all
 if "%choice%"=="4" goto show_status
 if "%choice%"=="5" goto check_connection
 if "%choice%"=="6" goto run_demo
-if "%choice%"=="7" goto open_web
-if "%choice%"=="8" goto view_logs
-if "%choice%"=="9" goto exit
+if "%choice%"=="7" goto run_area_planner
+if "%choice%"=="8" goto open_web
+if "%choice%"=="9" goto view_logs
+if "%choice%"=="10" goto exit
 goto menu
 
 :start_all
@@ -80,6 +82,14 @@ goto menu
 echo.
 echo Running demo automation...
 python scripts\demo_automation.py --demo full
+echo.
+pause
+goto menu
+
+:run_area_planner
+echo.
+echo Running AreaPlanner demo...
+python scripts\area_planner_integration.py --demo workflow
 echo.
 pause
 goto menu

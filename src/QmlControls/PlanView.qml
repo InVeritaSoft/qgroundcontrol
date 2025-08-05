@@ -99,6 +99,16 @@ Item {
             }
         }
     }
+    
+    Connections {
+        target: layerTabBar
+        function onCurrentIndexChanged() {
+            console.log("PlanView: Tab changed to index:", layerTabBar.currentIndex)
+            console.log("  _editingLayer:", _editingLayer)
+            console.log("  _layerAreaPlan:", _layerAreaPlan)
+            console.log("  Area plan should be visible:", _editingLayer == _layerAreaPlan)
+        }
+    }
 
     Connections {
         target: _appSettings ? _appSettings.defaultMissionItemAltitude : null
@@ -558,10 +568,28 @@ Item {
                 id: areaPlanMapVisuals
                 mapControl:             editorMap
                 areaPlanEditor:         QGroundControl.areaPlanEditor
-                interactive:            true
+                interactive:            _editingLayer == _layerAreaPlan
                 opacity:                _editingLayer == _layerAreaPlan ? 1 : 0
                 visible:                _editingLayer == _layerAreaPlan
                 isDrawingMode:          QGroundControl.areaPlanEditor.isDrawingMode
+                
+                Component.onCompleted: {
+                    console.log("AreaPlanMapVisuals: Component completed")
+                    console.log("  _editingLayer:", _editingLayer)
+                    console.log("  _layerAreaPlan:", _layerAreaPlan)
+                    console.log("  visible:", _editingLayer == _layerAreaPlan)
+                    console.log("  opacity:", _editingLayer == _layerAreaPlan ? 1 : 0)
+                    console.log("  interactive:", _editingLayer == _layerAreaPlan)
+                }
+                
+                // Force removal of map items when not on Area tab
+                onVisibleChanged: {
+                    console.log("AreaPlanMapVisuals: Visibility changed in PlanView to:", visible)
+                    if (!visible) {
+                        console.log("AreaPlanMapVisuals: Forcing removal of map items due to visibility change")
+                        removeMapItems()
+                    }
+                }
             }
 
             Connections {
