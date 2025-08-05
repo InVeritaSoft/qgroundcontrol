@@ -429,9 +429,9 @@ Item {
                             
                             // Set default area size if not already set
                             if (QGroundControl.areaPlanEditor.areaWidth <= 0 || QGroundControl.areaPlanEditor.areaHeight <= 0) {
-                                QGroundControl.areaPlanEditor.setAreaWidth(100.0)
-                                QGroundControl.areaPlanEditor.setAreaHeight(100.0)
-                                console.log("Set default area size: 100x100 meters")
+                                QGroundControl.areaPlanEditor.setAreaWidth(10.0)
+                                QGroundControl.areaPlanEditor.setAreaHeight(10.0)
+                                console.log("Set default area size: 10x10 meters")
                             }
                         } else {
                             // Not in drawing mode, ignore clicks

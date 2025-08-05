@@ -34,7 +34,7 @@ private slots:
         AreaPlanEditor editor;
         
         // Test area width setter
-        editor.setAreaWidth(100.0);
+        editor.setAreaWidth(10.0);
         QCOMPARE(editor.areaWidth(), 100.0);
         
         // Test area height setter
@@ -159,8 +159,8 @@ private slots:
         AreaPlanEditor editor;
         
         // Set up a simple area
-        editor.setAreaWidth(100.0);
-        editor.setAreaHeight(100.0);
+        editor.setAreaWidth(10.0);
+        editor.setAreaHeight(10.0);
         editor.setLineSpacing(20.0);
         editor.setNumPoints(3);
         editor.setAreaCenter(QGeoCoordinate(37.0, -122.0));
@@ -179,8 +179,8 @@ private slots:
         AreaPlanEditor editor;
         
         // Set up a simple area
-        editor.setAreaWidth(100.0);
-        editor.setAreaHeight(100.0);
+        editor.setAreaWidth(10.0);
+        editor.setAreaHeight(10.0);
         editor.setLineSpacing(50.0);
         editor.setNumPoints(2);
         editor.setAreaCenter(QGeoCoordinate(37.0, -122.0));

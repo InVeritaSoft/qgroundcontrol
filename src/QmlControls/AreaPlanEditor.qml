@@ -54,7 +54,7 @@ Item {
 				
 				// Header
 				QGCLabel {
-					text: qsTr("Area Plan Mission Editor")
+					text: qsTr("Area Planning Mission Editor")
 					font.pointSize: ScreenTools.largeFontPointSize
 					font.bold: true
 					width: parent.width
@@ -80,7 +80,7 @@ Item {
 						spacing: 16
 
 						QGCLabel {
-							text: qsTr("Area Configuration")
+							text: qsTr("Area Configuration Parameters")
 							font.pointSize: ScreenTools.mediumFontPointSize
 							font.bold: true
 							width: parent.width
@@ -95,60 +95,60 @@ Item {
 							columnSpacing: 20
 
 							QGCLabel { 
-								text: qsTr("Area Width (m):")
+								text: qsTr("Area Width (Meters):")
 								width: parent.width * 0.4
 								height: 32
 								verticalAlignment: Text.AlignVCenter
 							}
 							QGCTextField {
 								id: widthTextField
-								text: areaPlanEditor ? (areaPlanEditor.areaWidth * 10).toString() : "300"
+								text: areaPlanEditor ? areaPlanEditor.areaWidth.toString() : "10"
 								width: parent.width * 0.5
 								height: 32
 								validator: DoubleValidator {
-									bottom: 10
-									top: 10000
+									bottom: 1
+									top: 1000
 									decimals: 1
 								}
 								onEditingFinished: {
 									if (areaPlanEditor && text !== "") {
-										areaPlanEditor.areaWidth = parseFloat(text) / 10
+										areaPlanEditor.areaWidth = parseFloat(text)
 									}
 								}
 							}
 
 							QGCLabel { 
-								text: qsTr("Area Height (m):")
+								text: qsTr("Area Height (Meters):")
 								width: parent.width * 0.4
 								height: 32
 								verticalAlignment: Text.AlignVCenter
 							}
 							QGCTextField {
 								id: heightTextField
-								text: areaPlanEditor ? (areaPlanEditor.areaHeight * 10).toString() : "900"
+								text: areaPlanEditor ? areaPlanEditor.areaHeight.toString() : "10"
 								width: parent.width * 0.5
 								height: 32
 								validator: DoubleValidator {
-									bottom: 10
-									top: 10000
+									bottom: 1
+									top: 1000
 									decimals: 1
 								}
 								onEditingFinished: {
 									if (areaPlanEditor && text !== "") {
-										areaPlanEditor.areaHeight = parseFloat(text) / 10
+										areaPlanEditor.areaHeight = parseFloat(text)
 									}
 								}
 							}
 
 							QGCLabel { 
-								text: qsTr("Line Spacing (m):")
+								text: qsTr("Line Spacing (Meters):")
 								width: parent.width * 0.4
 								height: 32
 								verticalAlignment: Text.AlignVCenter
 							}
 							QGCTextField {
 								id: lineSpacingTextField
-								text: areaPlanEditor ? (areaPlanEditor.lineSpacing * 10).toString() : "30"
+								text: areaPlanEditor ? areaPlanEditor.lineSpacing.toString() : "10"
 								width: parent.width * 0.5
 								height: 32
 								validator: DoubleValidator {
@@ -158,13 +158,13 @@ Item {
 								}
 								onEditingFinished: {
 									if (areaPlanEditor && text !== "") {
-										areaPlanEditor.lineSpacing = parseFloat(text) / 10
+										areaPlanEditor.lineSpacing = parseFloat(text)
 									}
 								}
 							}
 
 							QGCLabel { 
-								text: qsTr("Points per Line:")
+								text: qsTr("Waypoints Per Line:")
 								width: parent.width * 0.4
 								height: 32
 								verticalAlignment: Text.AlignVCenter
@@ -186,7 +186,7 @@ Item {
 							}
 
 							QGCLabel { 
-								text: qsTr("Mission Altitude (m):")
+								text: qsTr("Mission Altitude (Meters):")
 								width: parent.width * 0.4
 								height: 32
 								verticalAlignment: Text.AlignVCenter
@@ -215,7 +215,7 @@ Item {
 							}
 
 							QGCLabel { 
-								text: qsTr("Loiter Time (s):")
+								text: qsTr("Loiter Duration (Seconds):")
 								width: parent.width * 0.4
 								height: 32
 								verticalAlignment: Text.AlignVCenter
@@ -262,7 +262,7 @@ Item {
 						spacing: 16
 
 						QGCLabel {
-							text: qsTr("Interactive Drawing")
+							text: qsTr("Interactive Area Definition")
 							font.pointSize: ScreenTools.mediumFontPointSize
 							font.bold: true
 							width: parent.width
@@ -273,8 +273,8 @@ Item {
 						QGCButton {
 							id: drawingModeButton
 							text: {
-								if (!areaPlanEditor) return qsTr("Start Drawing Mode")
-								return areaPlanEditor.isDrawingMode ? qsTr("Stop Drawing Mode") : qsTr("Start Drawing Mode")
+								if (!areaPlanEditor) return qsTr("Activate Area Definition Mode")
+								return areaPlanEditor.isDrawingMode ? qsTr("Deactivate Area Definition Mode") : qsTr("Activate Area Definition Mode")
 							}
 							width: parent.width
 							height: 44
@@ -296,7 +296,7 @@ Item {
 						
 						// Test button to verify C++ backend is working
 						QGCButton {
-							text: qsTr("Test C++ Backend")
+							text: qsTr("Verify System Integration")
 							width: parent.width
 							height: 30
 							onClicked: {
@@ -309,12 +309,12 @@ Item {
 									
 									// Set reasonable defaults if they're 0
 									if (areaPlanEditor.areaWidth <= 0) {
-										areaPlanEditor.setAreaWidth(100.0)
-										console.log("Set default areaWidth to 100")
+										areaPlanEditor.setAreaWidth(10.0)
+										console.log("Set default areaWidth to 10")
 									}
 									if (areaPlanEditor.areaHeight <= 0) {
-										areaPlanEditor.setAreaHeight(100.0)
-										console.log("Set default areaHeight to 100")
+										areaPlanEditor.setAreaHeight(10.0)
+										console.log("Set default areaHeight to 10")
 									}
 									if (areaPlanEditor.lineSpacing <= 0) {
 										areaPlanEditor.setLineSpacing(20.0)
@@ -338,7 +338,7 @@ Item {
 						
 						// Test mission generation
 						QGCButton {
-							text: qsTr("Test Mission Generation")
+							text: qsTr("Validate Mission Generation")
 							width: parent.width
 							height: 30
 							onClicked: {
@@ -368,7 +368,7 @@ Item {
 
 						// Debug button to force map item creation
 						QGCButton {
-							text: qsTr("Debug: Force Map Items")
+							text: qsTr("Refresh Map Display")
 							width: parent.width
 							height: 30
 							onClicked: {
@@ -399,7 +399,7 @@ Item {
 
 						// Test re-centering functionality
 						QGCButton {
-							text: qsTr("Test Re-centering")
+							text: qsTr("Validate Area Centering")
 							width: parent.width
 							height: 30
 							onClicked: {
@@ -424,7 +424,7 @@ Item {
 
 						// Reset button
 						QGCButton {
-							text: qsTr("Reset Area")
+							text: qsTr("Reset to Default Parameters")
 							width: parent.width
 							height: 30
 							onClicked: {
@@ -440,7 +440,7 @@ Item {
 						}
 
 						QGCLabel {
-							text: qsTr("Instructions:")
+							text: qsTr("Operating Instructions")
 							font.pointSize: ScreenTools.smallFontPointSize
 							font.bold: true
 							width: parent.width
@@ -449,7 +449,7 @@ Item {
 						}
 
 						QGCLabel {
-							text: qsTr("1. Click 'Start Drawing Mode'\n2. Click on map to set center\n3. Drag to resize area\n4. Double-click to finish")
+							text: qsTr("Step 1: Activate Area Definition Mode\nStep 2: Select Center Point on Map\nStep 3: Define Area Boundaries by Dragging\nStep 4: Complete Area Definition with Double-Click")
 							font.pointSize: ScreenTools.smallFontPointSize
 							width: parent.width
 							height: 60
@@ -468,7 +468,7 @@ Item {
 							
 							QGCLabel {
 								anchors.centerIn: parent
-								text: areaPlanEditor && areaPlanEditor.isDrawingMode ? qsTr("DRAWING MODE ACTIVE") : qsTr("Drawing mode ready")
+								text: areaPlanEditor && areaPlanEditor.isDrawingMode ? qsTr("Area Definition Mode Active") : qsTr("Area Definition Mode Ready")
 								font.pointSize: ScreenTools.smallFontPointSize
 								font.bold: areaPlanEditor && areaPlanEditor.isDrawingMode
 								color: areaPlanEditor && areaPlanEditor.isDrawingMode ? "#FF0000" : "#00FF00"
@@ -493,7 +493,7 @@ Item {
 								spacing: 8
 								
 								QGCLabel {
-									text: qsTr("Step-by-Step Flow:")
+									text: qsTr("Mission Planning Workflow")
 									font.pointSize: ScreenTools.smallFontPointSize
 									font.bold: true
 									color: qgcPal.text
@@ -515,7 +515,7 @@ Item {
 									}
 									
 									QGCLabel {
-										text: qsTr("1. Set Center Point")
+										text: qsTr("Step 1: Define Area Center Point")
 										font.pointSize: ScreenTools.smallFontPointSize
 										color: areaPlanEditor && areaPlanEditor.areaCenter.isValid ? "#00FF00" : "#808080"
 										anchors.verticalCenter: parent.verticalCenter
@@ -538,7 +538,7 @@ Item {
 									}
 									
 									QGCLabel {
-										text: qsTr("2. Define Area Size")
+										text: qsTr("Step 2: Configure Area Dimensions")
 										font.pointSize: ScreenTools.smallFontPointSize
 										color: areaPlanEditor && areaPlanEditor.areaWidth > 0 && areaPlanEditor.areaHeight > 0 ? "#00FF00" : "#808080"
 										anchors.verticalCenter: parent.verticalCenter
@@ -561,7 +561,7 @@ Item {
 									}
 									
 									QGCLabel {
-										text: qsTr("3. Generate Mission")
+										text: qsTr("Step 3: Generate Mission Waypoints")
 										font.pointSize: ScreenTools.smallFontPointSize
 										color: areaPlanEditor && areaPlanEditor.numPoints > 0 ? "#00FF00" : "#808080"
 										anchors.verticalCenter: parent.verticalCenter
@@ -584,7 +584,7 @@ Item {
 									}
 									
 									QGCLabel {
-										text: qsTr("4. Upload to Vehicle (Optional)")
+										text: qsTr("Step 4: Transfer Mission to Vehicle (Optional)")
 										font.pointSize: ScreenTools.smallFontPointSize
 										color: "#808080"
 										anchors.verticalCenter: parent.verticalCenter
@@ -611,7 +611,7 @@ Item {
 						spacing: 16
 
 						QGCLabel {
-							text: qsTr("Area Position")
+							text: qsTr("Area Position Controls")
 							font.pointSize: ScreenTools.mediumFontPointSize
 							font.bold: true
 							width: parent.width
@@ -645,7 +645,7 @@ Item {
 									onClicked: if (areaPlanEditor) areaPlanEditor.moveAreaWest()
 								}
 								QGCButton {
-									text: qsTr("Center")
+									text: qsTr("Center Area")
 									width: 100
 									height: 40
 									onClicked: if (areaPlanEditor) areaPlanEditor.centerArea()
@@ -701,7 +701,7 @@ Item {
 							spacing: 10
 
 							QGCLabel {
-								text: qsTr("Current Rotation:")
+								text: qsTr("Current Rotation")
 								width: parent.width * 0.4
 								height: parent.height
 								verticalAlignment: Text.AlignVCenter
@@ -732,7 +732,7 @@ Item {
 							spacing: 10
 
 							QGCLabel {
-								text: qsTr("Set Rotation:")
+								text: qsTr("Set Rotation")
 								width: parent.width * 0.4
 								height: parent.height
 								verticalAlignment: Text.AlignVCenter
@@ -762,7 +762,7 @@ Item {
 							}
 
 							QGCLabel {
-								text: qsTr("degrees")
+								text: qsTr("Degrees")
 								width: parent.width * 0.3
 								height: parent.height
 								verticalAlignment: Text.AlignVCenter
@@ -777,21 +777,21 @@ Item {
 							spacing: 10
 
 							QGCButton {
-								text: qsTr("↺ -15°")
+								text: qsTr("Rotate Counterclockwise (-15°)")
 								width: parent.width * 0.3
 								height: parent.height
 								onClicked: if (areaPlanEditor) areaPlanEditor.rotateAreaCounterClockwise()
 							}
 
 							QGCButton {
-								text: qsTr("Reset to 0°")
+								text: qsTr("Reset Rotation to 0°")
 								width: parent.width * 0.4
 								height: parent.height
 								onClicked: if (areaPlanEditor) areaPlanEditor.setAreaRotation(0.0)
 							}
 
 							QGCButton {
-								text: qsTr("+15° ↻")
+								text: qsTr("Rotate Clockwise (+15°)")
 								width: parent.width * 0.3
 								height: parent.height
 								onClicked: if (areaPlanEditor) areaPlanEditor.rotateAreaClockwise()
@@ -825,7 +825,7 @@ Item {
 						}
 
 						QGCLabel {
-							text: qsTr("Generate waypoints from the current area plan and add them to the Mission Tab. Works with or without a connected vehicle.")
+							text: qsTr("Generate waypoints from the current area plan and add them to the Mission Tab. This function works with or without a connected vehicle.")
 							width: parent.width
 							height: 40
 							wrapMode: Text.WordWrap
@@ -835,7 +835,7 @@ Item {
 						}
 
 						QGCButton {
-							text: qsTr("Generate Mission & Add to Mission Tab")
+							text: qsTr("Generate Mission and Add to Mission Tab")
 							width: parent.width
 							height: 44
 							onClicked: {
@@ -896,35 +896,35 @@ Item {
 						}
 
 						QGCLabel {
-							text: qsTr("Area Size: %1m x %2m").arg(areaPlanEditor ? areaPlanEditor.areaWidth : 30).arg(areaPlanEditor ? areaPlanEditor.areaHeight : 90)
+							text: qsTr("Area Size: %1 m × %2 m").arg(areaPlanEditor ? areaPlanEditor.areaWidth : 30).arg(areaPlanEditor ? areaPlanEditor.areaHeight : 90)
 							width: parent.width
 							height: 20
 							verticalAlignment: Text.AlignVCenter
 						}
 
 						QGCLabel {
-							text: qsTr("Total Waypoints: %1").arg(areaPlanEditor ? areaPlanEditor.calculateTotalWaypoints() : 0)
+							text: qsTr("Total Number of Waypoints: %1").arg(areaPlanEditor ? areaPlanEditor.calculateTotalWaypoints() : 0)
 							width: parent.width
 							height: 20
 							verticalAlignment: Text.AlignVCenter
 						}
 
 						QGCLabel {
-							text: qsTr("Estimated Flight Time: %1 min").arg(areaPlanEditor ? areaPlanEditor.calculateFlightTime() : 0)
+							text: qsTr("Estimated Flight Time: %1 Minutes").arg(areaPlanEditor ? areaPlanEditor.calculateFlightTime() : 0)
 							width: parent.width
 							height: 20
 							verticalAlignment: Text.AlignVCenter
 						}
 
 						QGCLabel {
-							text: qsTr("Loiter Time per Waypoint: %1 s").arg(areaPlanEditor ? areaPlanEditor.loiterTime : 10)
+							text: qsTr("Loiter Time per Waypoint: %1 Seconds").arg(areaPlanEditor ? areaPlanEditor.loiterTime : 10)
 							width: parent.width
 							height: 20
 							verticalAlignment: Text.AlignVCenter
 						}
 
 						QGCLabel {
-							text: qsTr("Area Center: %1, %2").arg(areaPlanEditor && areaPlanEditor.areaCenter ? areaPlanEditor.areaCenter.latitude.toFixed(6) : "0.000000").arg(areaPlanEditor && areaPlanEditor.areaCenter ? areaPlanEditor.areaCenter.longitude.toFixed(6) : "0.000000")
+							text: qsTr("Area Center Coordinates: %1, %2").arg(areaPlanEditor && areaPlanEditor.areaCenter ? areaPlanEditor.areaCenter.latitude.toFixed(6) : "0.000000").arg(areaPlanEditor && areaPlanEditor.areaCenter ? areaPlanEditor.areaCenter.longitude.toFixed(6) : "0.000000")
 							width: parent.width
 							height: 40
 							wrapMode: Text.WordWrap
@@ -959,7 +959,7 @@ Item {
 
 						QGCLabel {
 							id: statusLabel
-							text: qsTr("Ready to generate mission")
+							text: qsTr("Ready to Generate Mission")
 							color: qgcPal ? qgcPal.text : "white"
 							width: parent.width
 							height: 40
@@ -1030,12 +1030,12 @@ Item {
 						
 						// Set reasonable defaults if values are zero
 						if (areaPlanEditor.areaWidth <= 0) {
-							areaPlanEditor.setAreaWidth(100.0)
-							console.log("Set areaWidth to 100.0")
+							areaPlanEditor.setAreaWidth(10.0)
+							console.log("Set areaWidth to 10.0")
 						}
 						if (areaPlanEditor.areaHeight <= 0) {
-							areaPlanEditor.setAreaHeight(100.0)
-							console.log("Set areaHeight to 100.0")
+							areaPlanEditor.setAreaHeight(10.0)
+							console.log("Set areaHeight to 10.0")
 						}
 						if (areaPlanEditor.lineSpacing <= 0) {
 							areaPlanEditor.setLineSpacing(10.0)

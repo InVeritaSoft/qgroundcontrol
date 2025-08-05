@@ -167,8 +167,8 @@ signals:
 private:
 
     // Default values
-    static constexpr qreal _defaultAreaWidth = 100.0;  // Increased from 30.0
-    static constexpr qreal _defaultAreaHeight = 100.0; // Changed from 90.0 to make it square
+    static constexpr qreal _defaultAreaWidth = 10.0;   // Changed from 100.0 to 10.0
+    static constexpr qreal _defaultAreaHeight = 10.0;  // Changed from 100.0 to 10.0
     static constexpr qreal _defaultLineSpacing = 10.0; // Increased from 3.0
     static constexpr int _defaultNumPoints = 1;
     static constexpr qreal _defaultAltitude = 10.0;
