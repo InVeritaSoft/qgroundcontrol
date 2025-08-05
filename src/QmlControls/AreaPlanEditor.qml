@@ -22,8 +22,17 @@ Item {
 	// Reference to the C++ backend
 	property var areaPlanEditor: null
 
+
 	Component.onCompleted: {
+		console.log("AreaPlanEditor: Component completed")
 		areaPlanEditor = QGroundControl.areaPlanEditor
+		console.log("AreaPlanEditor backend:", !!areaPlanEditor)
+		if (areaPlanEditor) {
+			console.log("AreaPlanEditor properties:")
+			console.log("  areaWidth:", areaPlanEditor.areaWidth)
+			console.log("  areaHeight:", areaPlanEditor.areaHeight)
+			console.log("  isDrawingMode:", areaPlanEditor.isDrawingMode)
+		}
 	}
 
 	Rectangle {
@@ -91,15 +100,21 @@ Item {
 								height: 32
 								verticalAlignment: Text.AlignVCenter
 							}
-							SpinBox {
-								id: widthSpinBox
-								from: 10
-								to: 10000
-								value: areaPlanEditor ? areaPlanEditor.areaWidth * 10 : 300
-								stepSize: 1
+							QGCTextField {
+								id: widthTextField
+								text: areaPlanEditor ? (areaPlanEditor.areaWidth * 10).toString() : "300"
 								width: parent.width * 0.5
 								height: 32
-								onValueChanged: if (areaPlanEditor) areaPlanEditor.areaWidth = value / 10
+								validator: DoubleValidator {
+									bottom: 10
+									top: 10000
+									decimals: 1
+								}
+								onEditingFinished: {
+									if (areaPlanEditor && text !== "") {
+										areaPlanEditor.areaWidth = parseFloat(text) / 10
+									}
+								}
 							}
 
 							QGCLabel { 
@@ -108,15 +123,21 @@ Item {
 								height: 32
 								verticalAlignment: Text.AlignVCenter
 							}
-							SpinBox {
-								id: heightSpinBox
-								from: 10
-								to: 10000
-								value: areaPlanEditor ? areaPlanEditor.areaHeight * 10 : 900
-								stepSize: 1
+							QGCTextField {
+								id: heightTextField
+								text: areaPlanEditor ? (areaPlanEditor.areaHeight * 10).toString() : "900"
 								width: parent.width * 0.5
 								height: 32
-								onValueChanged: if (areaPlanEditor) areaPlanEditor.areaHeight = value / 10
+								validator: DoubleValidator {
+									bottom: 10
+									top: 10000
+									decimals: 1
+								}
+								onEditingFinished: {
+									if (areaPlanEditor && text !== "") {
+										areaPlanEditor.areaHeight = parseFloat(text) / 10
+									}
+								}
 							}
 
 							QGCLabel { 
@@ -125,15 +146,21 @@ Item {
 								height: 32
 								verticalAlignment: Text.AlignVCenter
 							}
-							SpinBox {
-								id: lineSpacingSpinBox
-								from: 1
-								to: 500
-								value: areaPlanEditor ? areaPlanEditor.lineSpacing * 10 : 30
-								stepSize: 1
+							QGCTextField {
+								id: lineSpacingTextField
+								text: areaPlanEditor ? (areaPlanEditor.lineSpacing * 10).toString() : "30"
 								width: parent.width * 0.5
 								height: 32
-								onValueChanged: if (areaPlanEditor) areaPlanEditor.lineSpacing = value / 10
+								validator: DoubleValidator {
+									bottom: 1
+									top: 500
+									decimals: 1
+								}
+								onEditingFinished: {
+									if (areaPlanEditor && text !== "") {
+										areaPlanEditor.lineSpacing = parseFloat(text) / 10
+									}
+								}
 							}
 
 							QGCLabel { 
@@ -142,14 +169,20 @@ Item {
 								height: 32
 								verticalAlignment: Text.AlignVCenter
 							}
-							SpinBox {
-								id: numPointsSpinBox
-								from: 1
-								to: 50
-								value: areaPlanEditor ? areaPlanEditor.numPoints : 1
+							QGCTextField {
+								id: numPointsTextField
+								text: areaPlanEditor ? areaPlanEditor.numPoints.toString() : "1"
 								width: parent.width * 0.5
 								height: 32
-								onValueChanged: if (areaPlanEditor) areaPlanEditor.numPoints = value
+								validator: IntValidator {
+									bottom: 1
+									top: 50
+								}
+								onEditingFinished: {
+									if (areaPlanEditor && text !== "") {
+										areaPlanEditor.numPoints = parseInt(text)
+									}
+								}
 							}
 
 							QGCLabel { 
@@ -158,15 +191,345 @@ Item {
 								height: 32
 								verticalAlignment: Text.AlignVCenter
 							}
-							SpinBox {
-								id: altitudeSpinBox
-								from: 10
-								to: 1000
-								value: areaPlanEditor ? areaPlanEditor.missionAltitude * 10 : 100
-								stepSize: 5
+							QGCTextField {
+								id: altitudeTextField
+								text: areaPlanEditor ? (areaPlanEditor.missionAltitude * 10).toString() : "100"
 								width: parent.width * 0.5
 								height: 32
-								onValueChanged: if (areaPlanEditor) areaPlanEditor.missionAltitude = value / 10
+								validator: DoubleValidator {
+									bottom: 10
+									top: 1000
+									decimals: 1
+								}
+								onEditingFinished: {
+									if (areaPlanEditor && text !== "") {
+										areaPlanEditor.missionAltitude = parseFloat(text) / 10
+									}
+								}
+							}
+						}
+					}
+				}
+
+				// Interactive Drawing Controls
+				Rectangle {
+					width: parent.width
+					height: drawingColumn.height + 40
+					color: qgcPal.windowShade
+					radius: 8
+					
+					Column {
+						id: drawingColumn
+						anchors.left: parent.left
+						anchors.right: parent.right
+						anchors.top: parent.top
+						anchors.margins: 20
+						spacing: 16
+
+						QGCLabel {
+							text: qsTr("Interactive Drawing")
+							font.pointSize: ScreenTools.mediumFontPointSize
+							font.bold: true
+							width: parent.width
+							height: 24
+							verticalAlignment: Text.AlignVCenter
+						}
+
+						QGCButton {
+							id: drawingModeButton
+							text: {
+								if (!areaPlanEditor) return qsTr("Start Drawing Mode")
+								return areaPlanEditor.isDrawingMode ? qsTr("Stop Drawing Mode") : qsTr("Start Drawing Mode")
+							}
+							width: parent.width
+							height: 44
+							onClicked: {
+								// Toggle drawing mode using C++ backend
+								console.log("Drawing mode button clicked")
+								console.log("areaPlanEditor valid:", !!areaPlanEditor)
+								if (areaPlanEditor) {
+									console.log("Current isDrawingMode:", areaPlanEditor.isDrawingMode)
+									var newMode = !areaPlanEditor.isDrawingMode
+									console.log("Setting new mode to:", newMode)
+									areaPlanEditor.setIsDrawingMode(newMode)
+									console.log("After setIsDrawingMode, isDrawingMode:", areaPlanEditor.isDrawingMode)
+								} else {
+									console.log("ERROR: areaPlanEditor is null!")
+								}
+							}
+						}
+						
+						// Test button to verify C++ backend is working
+						QGCButton {
+							text: qsTr("Test C++ Backend")
+							width: parent.width
+							height: 30
+							onClicked: {
+								console.log("Test button clicked")
+								if (areaPlanEditor) {
+									console.log("areaPlanEditor is valid")
+									console.log("areaWidth:", areaPlanEditor.areaWidth)
+									console.log("areaHeight:", areaPlanEditor.areaHeight)
+									console.log("isDrawingMode:", areaPlanEditor.isDrawingMode)
+									
+									// Set reasonable defaults if they're 0
+									if (areaPlanEditor.areaWidth <= 0) {
+										areaPlanEditor.setAreaWidth(100.0)
+										console.log("Set default areaWidth to 100")
+									}
+									if (areaPlanEditor.areaHeight <= 0) {
+										areaPlanEditor.setAreaHeight(100.0)
+										console.log("Set default areaHeight to 100")
+									}
+									if (areaPlanEditor.lineSpacing <= 0) {
+										areaPlanEditor.setLineSpacing(20.0)
+										console.log("Set default lineSpacing to 20")
+									}
+									if (areaPlanEditor.numPoints <= 0) {
+										areaPlanEditor.setNumPoints(5)
+										console.log("Set default numPoints to 5")
+									}
+									
+									console.log("After setting defaults:")
+									console.log("  areaWidth:", areaPlanEditor.areaWidth)
+									console.log("  areaHeight:", areaPlanEditor.areaHeight)
+									console.log("  lineSpacing:", areaPlanEditor.lineSpacing)
+									console.log("  numPoints:", areaPlanEditor.numPoints)
+								} else {
+									console.log("ERROR: areaPlanEditor is null!")
+								}
+							}
+						}
+						
+						// Test mission generation
+						QGCButton {
+							text: qsTr("Test Mission Generation")
+							width: parent.width
+							height: 30
+							onClicked: {
+								console.log("Mission generation test clicked")
+								if (areaPlanEditor) {
+									console.log("Testing mission generation...")
+									console.log("Current parameters:")
+									console.log("  areaWidth:", areaPlanEditor.areaWidth)
+									console.log("  areaHeight:", areaPlanEditor.areaHeight)
+									console.log("  lineSpacing:", areaPlanEditor.lineSpacing)
+									console.log("  numPoints:", areaPlanEditor.numPoints)
+									console.log("  areaCenter:", areaPlanEditor.areaCenter.latitude, areaPlanEditor.areaCenter.longitude)
+									console.log("  areaCenter valid:", areaPlanEditor.areaCenter.isValid)
+									
+									var waypoints = areaPlanEditor.generateWaypoints()
+									console.log("Generated waypoints:", waypoints.length)
+									if (waypoints.length > 0) {
+										console.log("First waypoint:", waypoints[0])
+									}
+									// Test saving mission
+									areaPlanEditor.saveMissionFile()
+								} else {
+									console.log("ERROR: areaPlanEditor is null!")
+								}
+							}
+						}
+
+						// Debug button to force map item creation
+						QGCButton {
+							text: qsTr("Debug: Force Map Items")
+							width: parent.width
+							height: 30
+							onClicked: {
+								console.log("Debug: Force map items clicked")
+								if (areaPlanEditor) {
+									console.log("Current area state:")
+									console.log("  areaWidth:", areaPlanEditor.areaWidth)
+									console.log("  areaHeight:", areaPlanEditor.areaHeight)
+									console.log("  areaCenter:", areaPlanEditor.areaCenter.latitude, areaPlanEditor.areaCenter.longitude)
+									console.log("  areaCenter valid:", areaPlanEditor.areaCenter.isValid)
+									
+									// Force property changes to trigger map updates
+									var currentWidth = areaPlanEditor.areaWidth
+									var currentHeight = areaPlanEditor.areaHeight
+									
+									// Temporarily change and restore to trigger signals
+									areaPlanEditor.setAreaWidth(currentWidth + 0.1)
+									areaPlanEditor.setAreaWidth(currentWidth)
+									areaPlanEditor.setAreaHeight(currentHeight + 0.1)
+									areaPlanEditor.setAreaHeight(currentHeight)
+									
+									console.log("Forced property updates completed")
+								} else {
+									console.log("ERROR: areaPlanEditor is null!")
+								}
+							}
+						}
+
+						// Reset button
+						QGCButton {
+							text: qsTr("Reset Area")
+							width: parent.width
+							height: 30
+							onClicked: {
+								console.log("Reset button clicked")
+								if (areaPlanEditor) {
+									console.log("Resetting area to default values...")
+									areaPlanEditor.resetArea()
+									console.log("Area reset completed")
+								} else {
+									console.log("ERROR: areaPlanEditor is null!")
+								}
+							}
+						}
+
+						QGCLabel {
+							text: qsTr("Instructions:")
+							font.pointSize: ScreenTools.smallFontPointSize
+							font.bold: true
+							width: parent.width
+							height: 20
+							verticalAlignment: Text.AlignVCenter
+						}
+
+						QGCLabel {
+							text: qsTr("1. Click 'Start Drawing Mode'\n2. Click on map to set center\n3. Drag to resize area\n4. Double-click to finish")
+							font.pointSize: ScreenTools.smallFontPointSize
+							width: parent.width
+							height: 60
+							wrapMode: Text.WordWrap
+							verticalAlignment: Text.AlignTop
+						}
+						
+						// Status indicator
+						Rectangle {
+							width: parent.width
+							height: 30
+							color: areaPlanEditor && areaPlanEditor.isDrawingMode ? "#40FF0000" : "#4000FF00"
+							radius: 4
+							border.color: areaPlanEditor && areaPlanEditor.isDrawingMode ? "#FF0000" : "#00FF00"
+							border.width: 1
+							
+							QGCLabel {
+								anchors.centerIn: parent
+								text: areaPlanEditor && areaPlanEditor.isDrawingMode ? qsTr("DRAWING MODE ACTIVE") : qsTr("Drawing mode ready")
+								font.pointSize: ScreenTools.smallFontPointSize
+								font.bold: areaPlanEditor && areaPlanEditor.isDrawingMode
+								color: areaPlanEditor && areaPlanEditor.isDrawingMode ? "#FF0000" : "#00FF00"
+							}
+						}
+						
+						// Step-by-step flow indicator
+						Rectangle {
+							width: parent.width
+							height: stepFlowColumn.height + 20
+							color: qgcPal.windowShadeDark
+							radius: 4
+							border.color: qgcPal.colorGrey
+							border.width: 1
+							
+							Column {
+								id: stepFlowColumn
+								anchors.left: parent.left
+								anchors.right: parent.right
+								anchors.top: parent.top
+								anchors.margins: 10
+								spacing: 8
+								
+								QGCLabel {
+									text: qsTr("Step-by-Step Flow:")
+									font.pointSize: ScreenTools.smallFontPointSize
+									font.bold: true
+									color: qgcPal.text
+								}
+								
+								// Step 1: Set Center
+								Row {
+									width: parent.width
+									height: 20
+									spacing: 8
+									
+									Rectangle {
+										width: 16
+										height: 16
+										radius: 8
+										color: areaPlanEditor && areaPlanEditor.areaCenter.isValid ? "#00FF00" : "#808080"
+										border.color: "#FFFFFF"
+										border.width: 1
+									}
+									
+									QGCLabel {
+										text: qsTr("1. Set Center Point")
+										font.pointSize: ScreenTools.smallFontPointSize
+										color: areaPlanEditor && areaPlanEditor.areaCenter.isValid ? "#00FF00" : "#808080"
+										anchors.verticalCenter: parent.verticalCenter
+									}
+								}
+								
+								// Step 2: Define Area
+								Row {
+									width: parent.width
+									height: 20
+									spacing: 8
+									
+									Rectangle {
+										width: 16
+										height: 16
+										radius: 8
+										color: areaPlanEditor && areaPlanEditor.areaWidth > 0 && areaPlanEditor.areaHeight > 0 ? "#00FF00" : "#808080"
+										border.color: "#FFFFFF"
+										border.width: 1
+									}
+									
+									QGCLabel {
+										text: qsTr("2. Define Area Size")
+										font.pointSize: ScreenTools.smallFontPointSize
+										color: areaPlanEditor && areaPlanEditor.areaWidth > 0 && areaPlanEditor.areaHeight > 0 ? "#00FF00" : "#808080"
+										anchors.verticalCenter: parent.verticalCenter
+									}
+								}
+								
+								// Step 3: Generate Waypoints
+								Row {
+									width: parent.width
+									height: 20
+									spacing: 8
+									
+									Rectangle {
+										width: 16
+										height: 16
+										radius: 8
+										color: areaPlanEditor && areaPlanEditor.numPoints > 0 ? "#00FF00" : "#808080"
+										border.color: "#FFFFFF"
+										border.width: 1
+									}
+									
+									QGCLabel {
+										text: qsTr("3. Generate Waypoints")
+										font.pointSize: ScreenTools.smallFontPointSize
+										color: areaPlanEditor && areaPlanEditor.numPoints > 0 ? "#00FF00" : "#808080"
+										anchors.verticalCenter: parent.verticalCenter
+									}
+								}
+								
+								// Step 4: Save Mission
+								Row {
+									width: parent.width
+									height: 20
+									spacing: 8
+									
+									Rectangle {
+										width: 16
+										height: 16
+										radius: 8
+										color: "#808080"  // Always grey for now
+										border.color: "#FFFFFF"
+										border.width: 1
+									}
+									
+									QGCLabel {
+										text: qsTr("4. Save Mission")
+										font.pointSize: ScreenTools.smallFontPointSize
+										color: "#808080"
+										anchors.verticalCenter: parent.verticalCenter
+									}
+								}
 							}
 						}
 					}
@@ -275,7 +638,12 @@ Item {
 							text: qsTr("Generate Waypoints")
 							width: parent.width
 							height: 44
-							onClicked: if (areaPlanEditor) areaPlanEditor.generateWaypoints()
+							onClicked: {
+								if (areaPlanEditor) {
+									console.log("Generate Waypoints button clicked")
+									areaPlanEditor.addWaypointsToMission()
+								}
+							}
 						}
 
 						QGCButton {
@@ -401,6 +769,143 @@ Item {
 		target: areaPlanEditor
 		function onStatusChanged(message) {
 			if (statusLabel) statusLabel.text = message
+		}
+		
+		function onIsDrawingModeChanged() {
+			console.log("AreaPlanEditor: C++ backend isDrawingMode changed to:", areaPlanEditor.isDrawingMode)
+			// Force button text update
+			drawingModeButton.text = areaPlanEditor.isDrawingMode ? qsTr("Stop Drawing Mode") : qsTr("Start Drawing Mode")
+		}
+	}
+
+	// Debug Section
+	Rectangle {
+		anchors.bottom: parent.bottom
+		anchors.left: parent.left
+		anchors.right: parent.right
+		height: debugColumn.height + 40
+		color: qgcPal.windowShade
+		radius: 8
+		
+		Column {
+			id: debugColumn
+			anchors.left: parent.left
+			anchors.right: parent.right
+			anchors.top: parent.top
+			anchors.margins: 20
+			spacing: 10
+
+			QGCLabel {
+				text: qsTr("Debug Tools")
+				font.pointSize: ScreenTools.mediumFontPointSize
+				font.bold: true
+				width: parent.width
+				height: 24
+				verticalAlignment: Text.AlignVCenter
+			}
+
+			// Test C++ Backend
+			QGCButton {
+				text: qsTr("Test C++ Backend")
+				width: parent.width
+				height: 30
+				onClicked: {
+					console.log("Test C++ Backend clicked")
+					if (areaPlanEditor) {
+						console.log("C++ Backend is accessible!")
+						console.log("Current properties:")
+						console.log("  areaWidth:", areaPlanEditor.areaWidth)
+						console.log("  areaHeight:", areaPlanEditor.areaHeight)
+						console.log("  lineSpacing:", areaPlanEditor.lineSpacing)
+						console.log("  numPoints:", areaPlanEditor.numPoints)
+						console.log("  areaCenter:", areaPlanEditor.areaCenter.latitude, areaPlanEditor.areaCenter.longitude)
+						console.log("  isDrawingMode:", areaPlanEditor.isDrawingMode)
+						
+						// Set reasonable defaults if values are zero
+						if (areaPlanEditor.areaWidth <= 0) {
+							areaPlanEditor.setAreaWidth(100.0)
+							console.log("Set areaWidth to 100.0")
+						}
+						if (areaPlanEditor.areaHeight <= 0) {
+							areaPlanEditor.setAreaHeight(100.0)
+							console.log("Set areaHeight to 100.0")
+						}
+						if (areaPlanEditor.lineSpacing <= 0) {
+							areaPlanEditor.setLineSpacing(10.0)
+							console.log("Set lineSpacing to 10.0")
+						}
+						if (areaPlanEditor.numPoints <= 0) {
+							areaPlanEditor.setNumPoints(1)
+							console.log("Set numPoints to 1")
+						}
+						
+						console.log("Updated properties:")
+						console.log("  areaWidth:", areaPlanEditor.areaWidth)
+						console.log("  areaHeight:", areaPlanEditor.areaHeight)
+						console.log("  lineSpacing:", areaPlanEditor.lineSpacing)
+						console.log("  numPoints:", areaPlanEditor.numPoints)
+					} else {
+						console.log("ERROR: areaPlanEditor is null!")
+					}
+				}
+			}
+
+			// Test Mission Generation
+			QGCButton {
+				text: qsTr("Test Mission Generation")
+				width: parent.width
+				height: 30
+				onClicked: {
+					console.log("Test Mission Generation clicked")
+					if (areaPlanEditor) {
+						console.log("Current parameters:")
+						console.log("  areaWidth:", areaPlanEditor.areaWidth)
+						console.log("  areaHeight:", areaPlanEditor.areaHeight)
+						console.log("  lineSpacing:", areaPlanEditor.lineSpacing)
+						console.log("  numPoints:", areaPlanEditor.numPoints)
+						console.log("  areaCenter:", areaPlanEditor.areaCenter.latitude, areaPlanEditor.areaCenter.longitude)
+						
+						var waypoints = areaPlanEditor.generateWaypoints()
+						console.log("Generated waypoints:", waypoints.length)
+						
+						areaPlanEditor.saveMissionFile()
+						console.log("Mission file saved")
+					} else {
+						console.log("ERROR: areaPlanEditor is null!")
+					}
+				}
+			}
+
+			// Debug: Force Map Items
+			QGCButton {
+				text: qsTr("Debug: Force Map Items")
+				width: parent.width
+				height: 30
+				onClicked: {
+					console.log("Debug: Force map items clicked")
+					if (areaPlanEditor) {
+						console.log("Current area state:")
+						console.log("  areaWidth:", areaPlanEditor.areaWidth)
+						console.log("  areaHeight:", areaPlanEditor.areaHeight)
+						console.log("  areaCenter:", areaPlanEditor.areaCenter.latitude, areaPlanEditor.areaCenter.longitude)
+						console.log("  areaCenter valid:", areaPlanEditor.areaCenter.isValid)
+						
+						// Force property changes to trigger signals
+						var currentWidth = areaPlanEditor.areaWidth
+						var currentHeight = areaPlanEditor.areaHeight
+						
+						// Temporarily change and restore to trigger signals
+						areaPlanEditor.setAreaWidth(currentWidth + 0.1)
+						areaPlanEditor.setAreaWidth(currentWidth)
+						areaPlanEditor.setAreaHeight(currentHeight + 0.1)
+						areaPlanEditor.setAreaHeight(currentHeight)
+						
+						console.log("Forced property updates completed")
+					} else {
+						console.log("ERROR: areaPlanEditor is null!")
+					}
+				}
+			}
 		}
 	}
 }

@@ -406,6 +406,49 @@ Item {
                         _addROIOnClick = false
                     }
                     break
+                    
+                case _layerAreaPlan:
+                    // Handle Area Plan interactions
+                    if (QGroundControl.areaPlanEditor && QGroundControl.areaPlanEditor.isDrawingMode) {
+                        console.log("Area Plan: Map clicked at", coordinate.latitude, coordinate.longitude)
+                        console.log("Current area center:", QGroundControl.areaPlanEditor.areaCenter.latitude, QGroundControl.areaPlanEditor.areaCenter.longitude)
+                        console.log("Area center valid:", QGroundControl.areaPlanEditor.areaCenter.isValid)
+                        console.log("Current area dimensions:", QGroundControl.areaPlanEditor.areaWidth, "x", QGroundControl.areaPlanEditor.areaHeight)
+                        
+                        // Set center point on first click or if center is not valid
+                        if (!QGroundControl.areaPlanEditor.areaCenter.isValid || 
+                            (Math.abs(QGroundControl.areaPlanEditor.areaCenter.latitude) < 0.001 && Math.abs(QGroundControl.areaPlanEditor.areaCenter.longitude) < 0.001) ||
+                            QGroundControl.areaPlanEditor.areaWidth <= 0 || QGroundControl.areaPlanEditor.areaHeight <= 0) {
+                            
+                            QGroundControl.areaPlanEditor.setAreaCenter(coordinate)
+                            console.log("Area center set to:", coordinate.latitude, coordinate.longitude)
+                            console.log("New area center valid:", QGroundControl.areaPlanEditor.areaCenter.isValid)
+                            
+                            // Set default area size if not already set
+                            if (QGroundControl.areaPlanEditor.areaWidth <= 0 || QGroundControl.areaPlanEditor.areaHeight <= 0) {
+                                QGroundControl.areaPlanEditor.setAreaWidth(100.0)
+                                QGroundControl.areaPlanEditor.setAreaHeight(100.0)
+                                console.log("Set default area size: 100x100 meters")
+                            }
+                        } else {
+                            // Calculate new area size based on distance from center
+                            var center = QGroundControl.areaPlanEditor.areaCenter
+                            var distance = center.distanceTo(coordinate)
+                            var newWidth = Math.max(distance * 2, 10)
+                            var newHeight = Math.max(distance * 2, 10)
+                            
+                            // Limit maximum size
+                            newWidth = Math.min(newWidth, 1000)
+                            newHeight = Math.min(newHeight, 1000)
+                            
+                            QGroundControl.areaPlanEditor.setAreaWidth(newWidth)
+                            QGroundControl.areaPlanEditor.setAreaHeight(newHeight)
+                            console.log("Updated area size:", newWidth, "x", newHeight, "meters")
+                        }
+                    } else {
+                        console.log("Area Plan: Drawing mode not active, ignoring click")
+                    }
+                    break
                 }
             }
 
@@ -529,6 +572,16 @@ Item {
                 planView:               true
                 opacity:                _editingLayer != _layerUTMSP ? editorMap._nonInteractiveOpacity : 1
                 resetCheck:             _resetGeofencePolygon
+            }
+
+            AreaPlanMapVisuals {
+                id: areaPlanMapVisuals
+                mapControl:             editorMap
+                areaPlanEditor:         QGroundControl.areaPlanEditor
+                interactive:            true
+                opacity:                _editingLayer == _layerAreaPlan ? 1 : 0
+                visible:                _editingLayer == _layerAreaPlan
+                isDrawingMode:          QGroundControl.areaPlanEditor.isDrawingMode
             }
 
             Connections {

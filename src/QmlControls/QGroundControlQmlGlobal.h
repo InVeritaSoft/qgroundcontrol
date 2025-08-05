@@ -92,6 +92,7 @@ public:
     Q_PROPERTY(bool                 airlinkSupported        READ    airlinkSupported        CONSTANT)
     Q_PROPERTY(QGCPalette*          globalPalette           MEMBER  _globalPalette          CONSTANT)   ///< This palette will always return enabled colors
     Q_PROPERTY(AreaPlanEditor*      areaPlanEditor          READ    areaPlanEditor          CONSTANT)
+    Q_PROPERTY(QObject*             areaPlanMapVisuals      READ    areaPlanMapVisuals      CONSTANT)
     Q_PROPERTY(QmlUnitsConversion*  unitsConversion         READ    unitsConversion         CONSTANT)
     Q_PROPERTY(bool                 singleFirmwareSupport   READ    singleFirmwareSupport   CONSTANT)
     Q_PROPERTY(bool                 singleVehicleSupport    READ    singleVehicleSupport    CONSTANT)
@@ -166,6 +167,7 @@ public:
 
     static QString appName();
     AreaPlanEditor*         areaPlanEditor      ()  { return _areaPlanEditor; }
+    QObject*                areaPlanMapVisuals  ()  { return _areaPlanMapVisuals; }
     LinkManager*            linkManager         ()  { return _linkManager; }
     MultiVehicleManager*    multiVehicleManager ()  { return _multiVehicleManager; }
     QGCMapEngineManager*    mapEngineManager    ()  { return _mapEngineManager; }
@@ -243,6 +245,7 @@ private:
     QGCMapEngineManager*    _mapEngineManager       = nullptr;
     ADSBVehicleManager*     _adsbVehicleManager     = nullptr;
     AreaPlanEditor*         _areaPlanEditor         = nullptr;
+    QObject*                _areaPlanMapVisuals     = nullptr;
     QGCPositionManager*     _qgcPositionManager     = nullptr;
     MissionCommandTree*     _missionCommandTree     = nullptr;
     VideoManager*           _videoManager           = nullptr;

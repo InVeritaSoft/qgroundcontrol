@@ -1,0 +1,10 @@
+---
+description: 
+globs: **/*.qml
+alwaysApply: true
+---
+
+Always use explicit mathematical calculations for all distances, widths, heights, paddings, and margins when positioning elements.
+For coordinates and layout, apply direct mathematical reasoning—prefer formulas and expressions over hardcoded values.
+Use geometric, geodesic, and linear math principles for all spatial computations and positioning logic.
+Ensure all layout and positioning is derived from clear, maintainable mathematical relationships.

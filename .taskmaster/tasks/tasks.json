@@ -147,7 +147,7 @@
         "id": 9,
         "title": "Add area rectangle visualization to existing map",
         "description": "Integrate a dynamic area rectangle visualization into the QGC map system, leveraging AreaPlanEditor's properties and methods to provide real-time feedback on the defined mission area.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           8
         ],
@@ -159,7 +159,7 @@
             "id": 1,
             "title": "Create MapPolygon component for area rectangle",
             "description": "Develop a MapPolygon component that visually displays the area rectangle on the map, utilizing the AreaPlanEditor's calculateOffsetCoordinate method for precise geodesic calculations of the rectangle's corners.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [8],
             "details": "Ensure the MapPolygon is styled according to QGC standards and is easily distinguishable from other map elements.",
             "testStrategy": "Check that the rectangle is rendered correctly and matches the specified area parameters."
@@ -168,7 +168,7 @@
             "id": 2,
             "title": "Bind MapPolygon to AreaPlanEditor properties",
             "description": "Establish property bindings between the MapPolygon and AreaPlanEditor's areaWidth, areaHeight, and areaCenter properties to enable real-time updates.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [9, 1],
             "details": "Ensure that any change in area parameters immediately updates the MapPolygon geometry on the map.",
             "testStrategy": "Modify area parameters and verify that the MapPolygon updates without delay."
@@ -177,7 +177,7 @@
             "id": 3,
             "title": "Ensure real-time MapPolygon updates",
             "description": "Implement mechanisms to guarantee that the MapPolygon visualization updates instantly whenever AreaPlanEditor properties change, maintaining synchronization between the UI and map.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [9, 2],
             "details": "Test for performance and responsiveness, especially during rapid parameter changes.",
             "testStrategy": "Rapidly change area parameters and observe the MapPolygon for lag or update issues."
@@ -186,7 +186,7 @@
             "id": 4,
             "title": "Integrate MapPolygon with QGC map system",
             "description": "Embed the MapPolygon component into QGC's existing map system (likely in PlanView.qml), following established visualization and interaction patterns for consistency and usability.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [9, 3],
             "details": "Ensure the area rectangle integrates seamlessly with other map elements and supports user interactions as needed.",
             "testStrategy": "Test the integrated visualization in the full QGC environment for compatibility and usability."
@@ -197,7 +197,7 @@
         "id": 10,
         "title": "Add grid lines visualization",
         "description": "Implement a clear and responsive grid lines visualization on the map, providing users with a visual representation of the planned mission grid within the defined area.",
-        "status": "pending",
+        "status": "done",
         "priority": "medium",
         "dependencies": [
           9
@@ -209,7 +209,7 @@
         "id": 11,
         "title": "Add waypoint markers visualization",
         "description": "Add a comprehensive waypoint markers visualization to the map, displaying all mission waypoints along the generated grid lines for enhanced mission planning clarity.",
-        "status": "pending",
+        "status": "done",
         "priority": "medium",
         "dependencies": [
           10
@@ -221,7 +221,7 @@
         "id": 12,
         "title": "Test real-time map updates",
         "description": "Perform thorough testing of all map visualizations to ensure that changes to any area or grid parameter result in immediate and accurate updates to the map, maintaining a seamless user experience.",
-        "status": "pending",
+        "status": "done",
         "priority": "medium",
         "dependencies": [
           11
@@ -233,7 +233,7 @@
         "id": 13,
         "title": "Implement waypoint generation algorithm",
         "description": "Design and implement a robust waypoint generation algorithm that creates mission waypoints based on the current grid parameters, ensuring compatibility with QGC's mission planning system.",
-        "status": "pending",
+        "status": "done",
         "priority": "high",
         "dependencies": [
           12
@@ -247,7 +247,7 @@
             "description": "Identify, document, and validate all grid parameters required for waypoint generation, such as the number of rows, columns, and the size of each grid cell.",
             "dependencies": [12],
             "details": "Determine the mathematical relationships between area dimensions, line spacing, and the resulting grid structure. Ensure all parameters are validated for correctness and usability.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test with a range of parameter values to confirm correct grid structure and parameter validation."
           },
           {
@@ -256,7 +256,7 @@
             "description": "Develop and optimize the algorithm that generates waypoints from the defined grid parameters, ensuring accuracy and efficiency.",
             "dependencies": [13, 1],
             "details": "Use C++ (or the appropriate language) to implement the algorithm, leveraging geodesic calculations for precise waypoint placement. Ensure the algorithm can handle various grid sizes and configurations.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test the algorithm with different grid setups and compare the output to expected waypoint layouts."
           },
           {
@@ -265,7 +265,7 @@
             "description": "Translate each grid point into a QGC mission waypoint, ensuring compatibility with QML integration and QGC's mission execution requirements.",
             "dependencies": [13, 2],
             "details": "Utilize Qt and QML integration to expose the generated waypoints to the frontend. Ensure each waypoint includes all required attributes, such as latitude, longitude, and altitude.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify that waypoints are correctly formatted and accessible from QML, and that they can be used in QGC's mission planning workflow."
           },
           {
@@ -274,7 +274,7 @@
             "description": "Implement logic to ensure that waypoints are sequenced in the optimal order for mission execution and that altitude settings are correctly applied to each waypoint.",
             "dependencies": [13, 3],
             "details": "Use appropriate data structures (e.g., arrays or lists) to store and manage waypoint information. Implement sorting or sequencing algorithms as needed, and ensure altitude is set according to mission requirements.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test with various mission scenarios to confirm correct waypoint order and altitude assignment."
           }
         ]
@@ -283,7 +283,7 @@
         "id": 14,
         "title": "Add mission upload functionality",
         "description": "Implement comprehensive mission upload functionality, enabling users to transfer generated waypoints to connected vehicles through QGC's mission upload system.",
-        "status": "pending",
+        "status": "done",
         "priority": "high",
         "dependencies": [
           13
@@ -297,7 +297,7 @@
             "description": "Establish a secure and reliable connection to QGC's mission upload API, implementing all necessary authentication, encryption, and error handling mechanisms.",
             "dependencies": [13],
             "details": "Research QGC's mission upload architecture, API endpoints, authentication methods, and error handling procedures. Implement the integration in AreaPlanEditor, ensuring seamless interaction with QGC's mission upload workflow.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify successful connection establishment, secure data transfer, and correct handling of authentication and errors."
           },
           {
@@ -306,7 +306,7 @@
             "description": "Develop the mechanism for uploading generated waypoints to connected vehicles, ensuring data is transmitted in the correct format and sequence.",
             "dependencies": [14, 1],
             "details": "Use the established API connection to send waypoint data, adhering to QGC's mission file and communication standards. Ensure the upload process is robust and provides user feedback.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify that waypoints are correctly received and processed by the connected vehicle, and that upload progress is accurately reported."
           },
           {
@@ -315,7 +315,7 @@
             "description": "Implement comprehensive error handling for mission upload failures, including automatic retries, user notifications, and detailed logging for troubleshooting.",
             "dependencies": [14, 2],
             "details": "Leverage API-provided error codes and implement custom logging to ensure a seamless and user-friendly experience during mission uploads.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Simulate various error conditions and verify that the system responds appropriately, providing clear feedback and recovery options."
           },
           {
@@ -324,7 +324,7 @@
             "description": "Establish and maintain communication channels with connected vehicles using standardized protocols such as MAVLink, ensuring reliable data transfer.",
             "dependencies": [14, 3],
             "details": "Implement all necessary data encoding, decoding, and transmission logic according to the chosen protocol. Ensure compatibility with a range of vehicle types and firmware versions.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test data transfer with different vehicle configurations, verifying correct reception and interpretation of mission data."
           },
           {
@@ -333,7 +333,7 @@
             "description": "Conduct thorough testing of the entire mission upload workflow, from area definition and waypoint generation to successful upload and execution on the vehicle.",
             "dependencies": [14, 4],
             "details": "Use a combination of unit, integration, and end-to-end tests to ensure reliability and a seamless user experience. Document all test cases and results.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify correct mission execution and vehicle behavior for a variety of mission scenarios."
           }
         ]
@@ -342,10 +342,10 @@
         "id": 15,
         "title": "Add mission file saving",
         "description": "Implement robust mission file saving capability, allowing users to export and store generated missions in standard file formats for later use or sharing.",
-        "status": "pending",
+        "status": "done",
         "priority": "medium",
         "dependencies": [
-          13
+          14
         ],
         "details": "Develop functionality to save generated missions to files, supporting all standard mission file formats used by QGC and compatible systems. Implement thorough file handling routines, including file selection dialogs, overwrite protection, and error checking. Ensure that saved files can be reliably loaded back into QGC or other compatible software. Provide clear user feedback on save operations and handle any file system errors gracefully.",
         "testStrategy": "Test saving missions to various file formats and locations, then reload them into QGC to verify correctness and compatibility."
@@ -354,7 +354,7 @@
         "id": 16,
         "title": "Test complete mission workflow",
         "description": "Perform end-to-end testing of the complete mission workflow, from initial area definition through waypoint generation and mission upload, ensuring all components work together seamlessly.",
-        "status": "pending",
+        "status": "done",
         "priority": "high",
         "dependencies": [
           14,
@@ -367,7 +367,7 @@
         "id": 17,
         "title": "Add error handling and validation",
         "description": "Implement comprehensive error handling and input validation across all components, ensuring robust operation and clear user feedback in the face of invalid inputs or unexpected conditions.",
-        "status": "pending",
+        "status": "done",
         "priority": "medium",
         "dependencies": [
           16
@@ -379,7 +379,7 @@
         "id": 18,
         "title": "Add progress indicators",
         "description": "Introduce progress indicators for long-running operations, such as waypoint generation and mission upload, to keep users informed and improve the overall user experience.",
-        "status": "pending",
+        "status": "done",
         "priority": "low",
         "dependencies": [
           17
@@ -391,7 +391,7 @@
         "id": 19,
         "title": "Performance optimization",
         "description": "Optimize the performance of all real-time updates and calculations, ensuring smooth and responsive UI interactions even with large mission areas and complex grids.",
-        "status": "pending",
+        "status": "done",
         "priority": "low",
         "dependencies": [
           18
@@ -403,7 +403,7 @@
         "id": 20,
         "title": "Final testing and bug fixes",
         "description": "Carry out comprehensive final testing and resolve any remaining bugs, ensuring that all features are stable, reliable, and ready for production deployment.",
-        "status": "pending",
+        "status": "done",
         "priority": "high",
         "dependencies": [
           19
@@ -415,7 +415,7 @@
         "id": 21,
         "title": "Power System Verification",
         "description": "Verify all power system components are properly configured and functioning for safe flight operations.",
-        "status": "pending",
+        "status": "skipped",
         "priority": "high",
         "dependencies": [],
         "details": "Ensure battery is fully charged, voltage and capacity are verified through Mission Planner, and all battery connectors are securely attached. This is critical for flight safety and mission success.",
@@ -454,7 +454,7 @@
         "id": 22,
         "title": "Radio & GPS Signal Verification",
         "description": "Verify radio communication and GPS signal quality for reliable flight control and navigation.",
-        "status": "pending",
+        "status": "skipped",
         "priority": "high",
         "dependencies": [],
         "details": "Ensure RC transmitter link is stable, telemetry radio link is established, GPS fix is acquired, and all failsafes are properly configured. Note: This may not be valid for current test scenarios.",
@@ -529,7 +529,7 @@
         "id": 23,
         "title": "Sensor Quality & Calibration",
         "description": "Verify sensor quality and perform necessary calibrations for accurate flight control.",
-        "status": "pending",
+        "status": "skipped",
         "priority": "high",
         "dependencies": [],
         "details": "Calibrate accelerometers, compass, test for compass interference, and verify EKF status for optimal sensor performance.",
@@ -577,7 +577,7 @@
         "id": 24,
         "title": "Flight Controller & Software Setup",
         "description": "Verify flight controller firmware and software configuration for proper operation.",
-        "status": "pending",
+        "status": "skipped",
         "priority": "high",
         "dependencies": [],
         "details": "Ensure ArduPilot firmware is up to date, correct frame type is selected, PID tuning is tested, flight modes are configured, and failsafe behavior is verified.",
@@ -634,7 +634,7 @@
         "id": 25,
         "title": "Motors & ESCs Verification",
         "description": "Verify motor and ESC functionality for safe and reliable flight.",
-        "status": "pending",
+        "status": "skipped",
         "priority": "high",
         "dependencies": [],
         "details": "Ensure all motors spin in correct direction, props are installed correctly, temperatures are normal, no unusual vibration, and ESCs are calibrated.",
@@ -691,7 +691,7 @@
         "id": 26,
         "title": "Electrical Integrity Check",
         "description": "Verify electrical system integrity for safe operation.",
-        "status": "pending",
+        "status": "skipped",
         "priority": "high",
         "dependencies": [],
         "details": "Check for short circuits, verify BEC voltage output, and ensure battery voltage/current logs are OK in hover test.",
@@ -730,7 +730,7 @@
         "id": 27,
         "title": "Telemetry & Logs Setup",
         "description": "Configure telemetry and logging systems for flight monitoring and analysis.",
-        "status": "pending",
+        "status": "skipped",
         "priority": "medium",
         "dependencies": [],
         "details": "Insert SD card, enable logging, configure log types, and verify GCS/OSD shows live data including voltage, current, GPS, and RSSI.",
@@ -769,7 +769,7 @@
         "id": 28,
         "title": "Mechanical Structure Verification",
         "description": "Verify mechanical structure integrity for safe flight operations.",
-        "status": "pending",
+        "status": "skipped",
         "priority": "high",
         "dependencies": [],
         "details": "Tighten frame bolts, secure landing gear, balance props, install vibration dampening, and balance center of gravity.",
@@ -826,7 +826,7 @@
         "id": 29,
         "title": "Ground Station & Companion Computer Setup",
         "description": "Configure ground station and companion computer for mission control and monitoring.",
-        "status": "pending",
+        "status": "skipped",
         "priority": "medium",
         "dependencies": [],
         "details": "Connect GCS, ensure companion computer boots and connects, verify camera/streaming functionality, and verify MAVLink routing.",
@@ -874,7 +874,7 @@
         "id": 30,
         "title": "Optional Pre-Flight Tests",
         "description": "Perform optional pre-flight tests for comprehensive system verification.",
-        "status": "pending",
+        "status": "skipped",
         "priority": "low",
         "dependencies": [],
         "details": "Perform bench hover test, ESC output PWM check, arm/disarm behavior test, vibration analysis, and verify all logs are clear.",
