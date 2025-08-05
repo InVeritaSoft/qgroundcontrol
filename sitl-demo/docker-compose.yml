@@ -1,15 +1,13 @@
 version: '3.8'
 
 services:
-  # ArduPilot SITL - Copter (Quadcopter)
+  # Simple SITL Copter using Python MAVLink simulation
   sitl-copter:
-    image: ardupilot/ardupilot-sitl:latest
+    image: python:3.9-slim
     container_name: qgc-sitl-copter
     ports:
       - "14550:14550/udp"  # MAVLink UDP
       - "14551:14551/udp"  # MAVLink UDP (secondary)
-      - "5760:5760/tcp"    # MAVLink TCP
-      - "5763:5763/tcp"    # MAVProxy console
     environment:
       - VEHICLE_TYPE=copter
       - FRAME_TYPE=quad
@@ -22,292 +20,76 @@ services:
       - ./configs:/configs:ro
       - ./logs:/logs
       - ./missions:/missions:ro
-    command: >
-      bash -c "
-        cd /ardupilot/ArduCopter &&
-        sim_vehicle.py 
-        -w 
-        --map 
-        --console 
-        --out=127.0.0.1:14550 
-        --out=127.0.0.1:14551 
-        --instance $${INSTANCE}
-        --add-param-file=/configs/copter_demo.parm
-        --logfile=/logs/sitl-copter.log
-      "
-    restart: unless-stopped
-    networks:
-      - qgc-network
-
-  # ArduPilot SITL - Plane (Fixed-wing)
-  sitl-plane:
-    image: ardupilot/ardupilot-sitl:latest
-    container_name: qgc-sitl-plane
-    ports:
-      - "14552:14550/udp"  # MAVLink UDP
-      - "14553:14551/udp"  # MAVLink UDP (secondary)
-      - "5761:5760/tcp"    # MAVLink TCP
-      - "5764:5763/tcp"    # MAVProxy console
-    environment:
-      - VEHICLE_TYPE=plane
-      - FRAME_TYPE=plane
-      - INSTANCE=1
-      - SIM_GPS_LAT=47.397742
-      - SIM_GPS_LON=8.545594
-      - SIM_GPS_ALT=1000
-      - SIM_SPEEDUP=1
-    volumes:
-      - ./configs:/configs:ro
-      - ./logs:/logs
-      - ./missions:/missions:ro
-    command: >
-      bash -c "
-        cd /ardupilot/ArduPlane &&
-        sim_vehicle.py 
-        -w 
-        --map 
-        --console 
-        --out=127.0.0.1:14550 
-        --out=127.0.0.1:14551 
-        --instance $${INSTANCE}
-        --add-param-file=/configs/plane_demo.parm
-        --logfile=/logs/sitl-plane.log
-      "
-    restart: unless-stopped
-    networks:
-      - qgc-network
-
-  # ArduPilot SITL - Rover (Ground vehicle)
-  sitl-rover:
-    image: ardupilot/ardupilot-sitl:latest
-    container_name: qgc-sitl-rover
-    ports:
-      - "14554:14550/udp"  # MAVLink UDP
-      - "14555:14551/udp"  # MAVLink UDP (secondary)
-      - "5762:5760/tcp"    # MAVLink TCP
-      - "5765:5763/tcp"    # MAVProxy console
-    environment:
-      - VEHICLE_TYPE=rover
-      - FRAME_TYPE=rover
-      - INSTANCE=2
-      - SIM_GPS_LAT=47.397742
-      - SIM_GPS_LON=8.545594
-      - SIM_GPS_ALT=488
-      - SIM_SPEEDUP=1
-    volumes:
-      - ./configs:/configs:ro
-      - ./logs:/logs
-      - ./missions:/missions:ro
-    command: >
-      bash -c "
-        cd /ardupilot/APMrover2 &&
-        sim_vehicle.py 
-        -w 
-        --map 
-        --console 
-        --out=127.0.0.1:14550 
-        --out=127.0.0.1:14551 
-        --instance $${INSTANCE}
-        --add-param-file=/configs/rover_demo.parm
-        --logfile=/logs/sitl-rover.log
-      "
-    restart: unless-stopped
-    networks:
-      - qgc-network
-
-  # MAVProxy for advanced control and monitoring
-  mavproxy:
-    image: ardupilot/mavproxy:latest
-    container_name: qgc-mavproxy
-    ports:
-      - "8080:8080/tcp"    # MAVProxy web interface
-      - "14560:14550/udp"  # MAVProxy MAVLink output
-    environment:
-      - MAVLINK_PORT=udp:127.0.0.1:14550
-      - WEB_PORT=8080
-    volumes:
-      - ./configs:/configs:ro
-      - ./logs:/logs
-    command: >
-      bash -c "
-        mavproxy.py 
-        --master=$${MAVLINK_PORT}
-        --out=127.0.0.1:14560
-        --web=$${WEB_PORT}
-        --logfile=/logs/mavproxy.log
-      "
-    depends_on:
-      - sitl-copter
-    restart: unless-stopped
-    networks:
-      - qgc-network
-
-  # Mission Planner (optional - for comparison testing)
-  mission-planner:
-    image: missionplanner/missionplanner:latest
-    container_name: qgc-mission-planner
-    ports:
-      - "8081:8080/tcp"    # Mission Planner web interface
-    environment:
-      - MAVLINK_PORT=udp:127.0.0.1:14550
-    depends_on:
-      - sitl-copter
-    restart: unless-stopped
-    networks:
-      - qgc-network
-
-  # SITL Manager - Web interface for managing SITL instances
-  sitl-manager:
-    image: python:3.9-slim
-    container_name: qgc-sitl-manager
-    ports:
-      - "8082:8080/tcp"    # SITL Manager web interface
-    volumes:
-      - ./manager:/app
-      - /var/run/docker.sock:/var/run/docker.sock
-    working_dir: /app
-    command: >
-      bash -c "
-        pip install flask docker-compose &&
-        python app.py
-      "
-    depends_on:
-      - sitl-copter
-      - sitl-plane
-      - sitl-rover
-    restart: unless-stopped
-    networks:
-      - qgc-network
-
-  # AreaPlanner Integration Service
-  area-planner-integration:
-    image: python:3.9-slim
-    container_name: qgc-area-planner-integration
-    ports:
-      - "8084:8080/tcp"    # AreaPlanner integration web interface
-    volumes:
       - ./scripts:/app/scripts:ro
-      - ./missions:/app/missions
-      - ./logs:/app/logs
-      - ./data:/app/data
-    environment:
-      - MAVLINK_HOST=sitl-copter
-      - MAVLINK_PORT=14550
-      - VEHICLE_TYPE=copter
-      - LOG_LEVEL=INFO
     working_dir: /app
-    command: >
-      bash -c "
-        pip install pymavlink pyserial flask requests numpy matplotlib &&
-        cd /app/scripts &&
-        python area_planner_integration.py --demo workflow
-      "
-    depends_on:
-      - sitl-copter
-    restart: unless-stopped
-    networks:
-      - qgc-network
-
-  # QGC AreaPlanner Bridge Service
-  qgc-area-planner-bridge:
-    image: python:3.9-slim
-    container_name: qgc-area-planner-bridge
-    ports:
-      - "8085:8080/tcp"    # QGC Bridge web interface
-    volumes:
-      - ./scripts:/app/scripts:ro
-      - ./missions:/app/missions
-      - ./logs:/app/logs
-      - ./data:/app/data
-    environment:
-      - MAVLINK_HOST=sitl-copter
-      - MAVLINK_PORT=14550
-      - VEHICLE_TYPE=copter
-      - LOG_LEVEL=INFO
-    working_dir: /app
-    command: >
-      bash -c "
-        pip install pymavlink pyserial flask requests &&
-        cd /app/scripts &&
-        python qgc_area_planner_bridge.py --demo workflow
-      "
-    depends_on:
-      - sitl-copter
-    restart: unless-stopped
-    networks:
-      - qgc-network
-
-  # Complete AreaPlanner Demo Service
-  complete-area-planner-demo:
-    image: python:3.9-slim
-    container_name: qgc-complete-area-planner-demo
-    ports:
-      - "8086:8080/tcp"    # Complete demo web interface
-    volumes:
-      - ./scripts:/app/scripts:ro
-      - ./missions:/app/missions
-      - ./logs:/app/logs
-      - ./data:/app/data
-    environment:
-      - MAVLINK_HOST=sitl-copter
-      - MAVLINK_PORT=14550
-      - VEHICLE_TYPE=copter
-      - LOG_LEVEL=INFO
-    working_dir: /app
-    command: >
-      bash -c "
-        pip install pymavlink pyserial flask requests numpy matplotlib &&
-        cd /app/scripts &&
-        python demo_area_planner_complete.py
-      "
-    depends_on:
-      - sitl-copter
-    restart: unless-stopped
-    networks:
-      - qgc-network
-
-  # Data Logger - For recording telemetry and mission data
-  data-logger:
-    image: python:3.9-slim
-    container_name: qgc-data-logger
-    volumes:
-      - ./logs:/logs
-      - ./data:/data
-    environment:
-      - LOG_LEVEL=INFO
-      - DATA_DIR=/data
     command: >
       bash -c "
         pip install pymavlink pyserial &&
-        python /app/logger.py
+        python scripts/simple_sitl.py --vehicle=copter --port=14550
       "
-    depends_on:
-      - sitl-copter
     restart: unless-stopped
     networks:
       - qgc-network
 
-  # Performance Monitor - Monitor system resources
-  performance-monitor:
-    image: python:3.9-slim
-    container_name: qgc-performance-monitor
-    ports:
-      - "8083:8080/tcp"    # Performance monitor web interface
-    volumes:
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - ./logs:/logs
-    environment:
-      - HOST_PROC=/host/proc
-      - HOST_SYS=/host/sys
-    command: >
-      bash -c "
-        pip install flask psutil &&
-        python /app/monitor.py
-      "
-    restart: unless-stopped
-    networks:
-      - qgc-network
+  # # Simple SITL Plane using Python MAVLink simulation
+  # sitl-plane:
+  #   image: python:3.9-slim
+  #   container_name: qgc-sitl-plane
+  #   ports:
+  #     - "14552:14550/udp"  # MAVLink UDP
+  #     - "14553:14551/udp"  # MAVLink UDP (secondary)
+  #   environment:
+  #     - VEHICLE_TYPE=plane
+  #     - FRAME_TYPE=plane
+  #     - INSTANCE=1
+  #     - SIM_GPS_LAT=47.397742
+  #     - SIM_GPS_LON=8.545594
+  #     - SIM_GPS_ALT=1000
+  #     - SIM_SPEEDUP=1
+  #   volumes:
+  #     - ./configs:/configs:ro
+  #     - ./logs:/logs
+  #     - ./missions:/missions:ro
+  #     - ./scripts:/app/scripts:ro
+  #   working_dir: /app
+  #   command: >
+  #     bash -c "
+  #       pip install pymavlink pyserial &&
+  #       python scripts/simple_sitl.py --vehicle=plane --port=14552
+  #     "
+  #   restart: unless-stopped
+  #   networks:
+  #     - qgc-network
+
+  # # Simple SITL Rover using Python MAVLink simulation
+  # sitl-rover:
+  #   image: python:3.9-slim
+  #   container_name: qgc-sitl-rover
+  #   ports:
+  #     - "14554:14550/udp"  # MAVLink UDP
+  #     - "14555:14551/udp"  # MAVLink UDP (secondary)
+  #   environment:
+  #     - VEHICLE_TYPE=rover
+  #     - FRAME_TYPE=rover
+  #     - INSTANCE=2
+  #     - SIM_GPS_LAT=47.397742
+  #     - SIM_GPS_LON=8.545594
+  #     - SIM_GPS_ALT=488
+  #     - SIM_SPEEDUP=1
+  #   volumes:
+  #     - ./configs:/configs:ro
+  #     - ./logs:/logs
+  #     - ./missions:/missions:ro
+  #     - ./scripts:/app/scripts:ro
+  #   working_dir: /app
+  #   command: >
+  #     bash -c "
+  #       pip install pymavlink pyserial &&
+  #       python scripts/simple_sitl.py --vehicle=rover --port=14554
+  #     "
+  #   restart: unless-stopped
+  #   networks:
+  #     - qgc-network
 
 networks:
   qgc-network:
