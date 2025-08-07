@@ -18,12 +18,28 @@ class SITLDemoManager:
         self.docker_compose_file = self.demo_dir / "docker-compose.yml"
         self.config_dir = self.demo_dir / "configs"
         self.logs_dir = self.demo_dir / "logs"
+        self.compose_cmd = self._detect_compose()
         
+    def _detect_compose(self):
+        """Detect docker compose command ('docker compose' or 'docker-compose')."""
+        try:
+            # Prefer modern docker compose (v2)
+            result = subprocess.run(["docker", "compose", "version"], capture_output=True, text=True)
+            if result.returncode == 0:
+                return ["docker", "compose"]
+        except Exception:
+            pass
+        # Fallback to legacy docker-compose
+        return ["docker-compose"]
+
     def check_prerequisites(self):
         """Check if Docker and Docker Compose are available."""
         try:
             subprocess.run(["docker", "--version"], check=True, capture_output=True)
-            subprocess.run(["docker-compose", "--version"], check=True, capture_output=True)
+            if self.compose_cmd == ["docker", "compose"]:
+                subprocess.run(self.compose_cmd + ["version"], check=True, capture_output=True)
+            else:
+                subprocess.run(self.compose_cmd + ["--version"], check=True, capture_output=True)
             return True
         except (subprocess.CalledProcessError, FileNotFoundError):
             print("❌ Docker or Docker Compose not found. Please install them first.")
@@ -41,9 +57,9 @@ class SITLDemoManager:
         
         # Start services based on vehicle type
         if vehicle_type == "all":
-            cmd = ["docker-compose", "-f", str(self.docker_compose_file), "up", "-d"]
+            cmd = self.compose_cmd + ["-f", str(self.docker_compose_file), "up", "-d"]
         else:
-            cmd = ["docker-compose", "-f", str(self.docker_compose_file), "up", "-d", f"sitl-{vehicle_type}"]
+            cmd = self.compose_cmd + ["-f", str(self.docker_compose_file), "up", "-d", f"sitl-{vehicle_type}"]
         
         try:
             result = subprocess.run(cmd, cwd=self.demo_dir, check=True, capture_output=True, text=True)
@@ -60,7 +76,7 @@ class SITLDemoManager:
         print("🛑 Stopping SITL demo environment...")
         
         try:
-            cmd = ["docker-compose", "-f", str(self.docker_compose_file), "down"]
+            cmd = self.compose_cmd + ["-f", str(self.docker_compose_file), "down"]
             subprocess.run(cmd, cwd=self.demo_dir, check=True, capture_output=True, text=True)
             print("✅ SITL services stopped successfully!")
             return True
@@ -81,7 +97,7 @@ class SITLDemoManager:
         print("=" * 50)
         
         try:
-            cmd = ["docker-compose", "-f", str(self.docker_compose_file), "ps"]
+            cmd = self.compose_cmd + ["-f", str(self.docker_compose_file), "ps"]
             result = subprocess.run(cmd, cwd=self.demo_dir, check=True, capture_output=True, text=True)
             print(result.stdout)
         except subprocess.CalledProcessError as e:
@@ -93,7 +109,7 @@ class SITLDemoManager:
         print("=" * 50)
         
         try:
-            cmd = ["docker-compose", "-f", str(self.docker_compose_file), "logs", "--tail", str(lines), service]
+            cmd = self.compose_cmd + ["-f", str(self.docker_compose_file), "logs", "--tail", str(lines), service]
             result = subprocess.run(cmd, cwd=self.demo_dir, check=True, capture_output=True, text=True)
             print(result.stdout)
         except subprocess.CalledProcessError as e:

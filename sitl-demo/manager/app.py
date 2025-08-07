@@ -17,11 +17,21 @@ class SITLManager:
     def __init__(self, demo_dir="."):
         self.demo_dir = Path(demo_dir)
         self.docker_compose_file = self.demo_dir / "docker-compose.yml"
+        self.compose_cmd = self._detect_compose()
+
+    def _detect_compose(self):
+        try:
+            result = subprocess.run(["docker", "compose", "version"], capture_output=True, text=True)
+            if result.returncode == 0:
+                return ["docker", "compose"]
+        except Exception:
+            pass
+        return ["docker-compose"]
         
     def get_services_status(self):
         """Get status of all SITL services."""
         try:
-            cmd = ["docker-compose", "-f", str(self.docker_compose_file), "ps", "--format", "json"]
+            cmd = self.compose_cmd + ["-f", str(self.docker_compose_file), "ps", "--format", "json"]
             result = subprocess.run(cmd, cwd=self.demo_dir, capture_output=True, text=True)
             
             services = []
@@ -42,7 +52,7 @@ class SITLManager:
     def start_service(self, service_name):
         """Start a specific service."""
         try:
-            cmd = ["docker-compose", "-f", str(self.docker_compose_file), "up", "-d", service_name]
+            cmd = self.compose_cmd + ["-f", str(self.docker_compose_file), "up", "-d", service_name]
             subprocess.run(cmd, cwd=self.demo_dir, check=True)
             return True
         except subprocess.CalledProcessError:
@@ -51,7 +61,7 @@ class SITLManager:
     def stop_service(self, service_name):
         """Stop a specific service."""
         try:
-            cmd = ["docker-compose", "-f", str(self.docker_compose_file), "stop", service_name]
+            cmd = self.compose_cmd + ["-f", str(self.docker_compose_file), "stop", service_name]
             subprocess.run(cmd, cwd=self.demo_dir, check=True)
             return True
         except subprocess.CalledProcessError:
@@ -60,7 +70,7 @@ class SITLManager:
     def restart_service(self, service_name):
         """Restart a specific service."""
         try:
-            cmd = ["docker-compose", "-f", str(self.docker_compose_file), "restart", service_name]
+            cmd = self.compose_cmd + ["-f", str(self.docker_compose_file), "restart", service_name]
             subprocess.run(cmd, cwd=self.demo_dir, check=True)
             return True
         except subprocess.CalledProcessError:
@@ -69,7 +79,7 @@ class SITLManager:
     def get_service_logs(self, service_name, lines=50):
         """Get logs for a specific service."""
         try:
-            cmd = ["docker-compose", "-f", str(self.docker_compose_file), "logs", "--tail", str(lines), service_name]
+            cmd = self.compose_cmd + ["-f", str(self.docker_compose_file), "logs", "--tail", str(lines), service_name]
             result = subprocess.run(cmd, cwd=self.demo_dir, capture_output=True, text=True)
             return result.stdout
         except subprocess.CalledProcessError:
@@ -78,7 +88,7 @@ class SITLManager:
     def start_all_services(self):
         """Start all SITL services."""
         try:
-            cmd = ["docker-compose", "-f", str(self.docker_compose_file), "up", "-d"]
+            cmd = self.compose_cmd + ["-f", str(self.docker_compose_file), "up", "-d"]
             subprocess.run(cmd, cwd=self.demo_dir, check=True)
             return True
         except subprocess.CalledProcessError:
@@ -87,7 +97,7 @@ class SITLManager:
     def stop_all_services(self):
         """Stop all SITL services."""
         try:
-            cmd = ["docker-compose", "-f", str(self.docker_compose_file), "down"]
+            cmd = self.compose_cmd + ["-f", str(self.docker_compose_file), "down"]
             subprocess.run(cmd, cwd=self.demo_dir, check=True)
             return True
         except subprocess.CalledProcessError:

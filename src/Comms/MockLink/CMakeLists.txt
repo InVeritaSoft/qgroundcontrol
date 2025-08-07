@@ -1,6 +1,4 @@
-if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
-    return()
-endif()
+# Always add MockLink sources; use code-level QT_DEBUG guards to enable features.
 
 target_sources(${CMAKE_PROJECT_NAME}
     PRIVATE

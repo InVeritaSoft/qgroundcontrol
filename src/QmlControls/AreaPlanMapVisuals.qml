@@ -24,9 +24,9 @@ Item {
 	property var mapControl                                  ///< Map control to place item in
 	property var areaPlanEditor                              ///< AreaPlanEditor object
 	property bool interactive: true
-	property color interiorColor: "#80FF0000"                ///< More visible red
-	property color borderColor: "#FFFF0000"                  ///< Solid red border
-	property int borderWidth: 5
+    property color interiorColor: qgcPal.windowShadeDark
+    property color borderColor: qgcPal.buttonHighlight
+    property int borderWidth: Math.max(1, Math.round(ScreenTools.defaultFontPixelWidth * 0.4))
 	property real interiorOpacity: 0.7
 
 	// Z-order management following QGC patterns
@@ -48,11 +48,13 @@ Item {
 		console.log("AreaPlanMapVisuals: mapControl:", mapControl)
 	}
 
-	// Object managers following QGC patterns
+    // Object managers following QGC patterns
 	QGCDynamicObjectManager { id: _objMgrRectangle }
 	QGCDynamicObjectManager { id: _objMgrCenterMarker }
 	QGCDynamicObjectManager { id: _objMgrGridLines }
 	QGCDynamicObjectManager { id: _objMgrWaypointMarkers }
+
+    QGCPalette { id: qgcPal; colorGroupEnabled: enabled }
 
 	// Calculate rectangle corners based on area parameters
 	property var rectangleCorners: {
@@ -373,8 +375,8 @@ Item {
 
 		MapPolyline {
 			id: gridLine
-			line.color: "#FF00FF00"  // Green
-			line.width: 3
+			line.color: qgcPal.colorGreen
+			line.width: Math.max(1, Math.round(ScreenTools.defaultFontPixelWidth * 0.5))
 			z: QGroundControl.zOrderMapItems - 1
 		}
 	}
@@ -393,9 +395,9 @@ Item {
 				width: ScreenTools.defaultFontPixelHeight * 1.5
 				height: width
 				radius: width / 2
-				color: "#FF00FF00"  // Green
-				border.color: "#FFFFFFFF"
-				border.width: 3
+				color: qgcPal.colorGreen
+				border.color: qgcPal.text
+				border.width: Math.max(1, Math.round(ScreenTools.defaultFontPixelWidth * 0.5))
 
 				// Add a small dot in the center
 				Rectangle {
@@ -403,7 +405,7 @@ Item {
 					width: parent.width * 0.4
 					height: width
 					radius: width / 2
-					color: "#FFFFFFFF"
+					color: qgcPal.text
 				}
 
 				// Smooth scale animation
