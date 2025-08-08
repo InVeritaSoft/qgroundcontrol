@@ -946,6 +946,40 @@ Item {
 							onClicked: if (areaPlanEditor) areaPlanEditor.saveMissionFile()
 						}
 
+                        // Per-Drone Mission Insertion (non-aggregated)
+                        Row {
+                            width: parent.width
+                            height: _h * 2
+                            spacing: _w
+
+                            QGCLabel {
+                                text: qsTr("Insert Drone # to Mission:")
+                                width: parent.width * 0.45
+                                height: parent.height
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            QGCTextField {
+                                id: droneIndexField
+                                width: parent.width * 0.2
+                                height: parent.height
+                                text: "0"
+                                validator: IntValidator { bottom: 0; top: 99 }
+                            }
+                            QGCButton {
+                                text: qsTr("Insert")
+                                width: parent.width * 0.3
+                                height: parent.height
+                                onClicked: {
+                                    if (areaPlanEditor) {
+                                        var idx = parseInt(droneIndexField.text)
+                                        if (!isNaN(idx)) {
+                                            areaPlanEditor.addPerDroneToMission(idx)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
 						QGCButton {
 							text: qsTr("Upload to Vehicle")
 							width: parent.width
