@@ -112,6 +112,51 @@ void AreaPlanEditorTest::_boundsAndRotation()
     QVERIFY(empty3.empty());
 }
 
+static double dist2(double ax, double ay, double bx, double by) {
+    const double dx = ax - bx;
+    const double dy = ay - by;
+    return dx*dx + dy*dy;
+}
+
+void AreaPlanEditorTest::_rotationHandling()
+{
+    using AreaPlan::splitIntoStripes;
+
+    const double cx = 0.0, cy = 0.0;
+    const double w = 20.0, h = 30.0;
+    const int stripes = 4;
+
+    auto atRot = [&](double deg) { return splitIntoStripes(cx, cy, w, h, stripes, true, deg); };
+
+    auto a0   = atRot(0.0);
+    auto a360 = atRot(360.0);
+    QVERIFY(static_cast<int>(a0.size()) == stripes);
+    QVERIFY(static_cast<int>(a360.size()) == stripes);
+    for (int i = 0; i < stripes; ++i) {
+        QVERIFY(qAbs(a0[static_cast<size_t>(i)].a.x - a360[static_cast<size_t>(i)].a.x) < 1e-9);
+        QVERIFY(qAbs(a0[static_cast<size_t>(i)].a.y - a360[static_cast<size_t>(i)].a.y) < 1e-9);
+        QVERIFY(qAbs(a0[static_cast<size_t>(i)].b.x - a360[static_cast<size_t>(i)].b.x) < 1e-9);
+        QVERIFY(qAbs(a0[static_cast<size_t>(i)].b.y - a360[static_cast<size_t>(i)].b.y) < 1e-9);
+    }
+
+    auto a30   = atRot(30.0);
+    auto a390  = atRot(390.0);
+    for (int i = 0; i < stripes; ++i) {
+        QVERIFY(qAbs(a30[static_cast<size_t>(i)].a.x - a390[static_cast<size_t>(i)].a.x) < 1e-9);
+        QVERIFY(qAbs(a30[static_cast<size_t>(i)].a.y - a390[static_cast<size_t>(i)].a.y) < 1e-9);
+        QVERIFY(qAbs(a30[static_cast<size_t>(i)].b.x - a390[static_cast<size_t>(i)].b.x) < 1e-9);
+        QVERIFY(qAbs(a30[static_cast<size_t>(i)].b.y - a390[static_cast<size_t>(i)].b.y) < 1e-9);
+    }
+
+    // Segment length invariance across rotations
+    auto length2 = [&](const AreaPlan::Line& ln) { return dist2(ln.a.x, ln.a.y, ln.b.x, ln.b.y); };
+    auto a60  = atRot(60.0);
+    auto a120 = atRot(120.0);
+    for (int i = 0; i < stripes; ++i) {
+        QVERIFY(qAbs(length2(a60[static_cast<size_t>(i)]) - length2(a120[static_cast<size_t>(i)])) < 1e-6);
+    }
+}
+
 void AreaPlanEditorTest::_generateWaypointsAndAddToMission()
 {
     // Prepare master/mission controller for offline planning
