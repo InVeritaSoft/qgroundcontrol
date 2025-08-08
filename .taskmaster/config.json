@@ -2,19 +2,19 @@
   "models": {
     "main": {
       "provider": "ollama",
-      "modelId": "devstral:latest",
+      "modelId": "gpt-oss:latest",
       "maxTokens": 64000,
       "temperature": 0.2
     },
     "research": {
       "provider": "ollama",
-      "modelId": "devstral:latest",
+      "modelId": "gpt-oss:latest",
       "maxTokens": 8700,
       "temperature": 0.1
     },
     "fallback": {
       "provider": "ollama",
-      "modelId": "devstral:latest",
+      "modelId": "gpt-oss:latest",
       "maxTokens": 8192,
       "temperature": 0.2
     }

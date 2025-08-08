@@ -562,15 +562,15 @@
           4,
           5
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
             "title": "Refactor for Per-Drone Series",
             "description": "Adapt `AreaPlanMapVisuals.qml` to accept per-drone assignments and render multiple series.",
             "dependencies": [],
-            "details": "Expose an array of {color, gridLines[], waypointPositions[]} and iterate to render per drone.",
-            "status": "pending",
+            "details": "Expose an array of {color, gridLines[], waypointPositions[]} and iterate to render per drone.\n<info added on 2025-08-08T08:43:06.359Z>\nStart: Refactor for per-drone series in AreaPlanMapVisuals.\n\nPlan:\n- Add bindings to AreaPlanEditor.computePerDroneWaypointPreview() to get per-drone waypoints\n- Introduce per-drone color palette and visibility array\n- Render grid lines/waypoints for each drone series via QGCDynamicObjectManager to avoid duplication\n- Add legend showing drone index → color; update on droneCount changes\n- Debounce recompute on param changes to reduce churn\n</info added on 2025-08-08T08:43:06.359Z>",
+            "status": "done",
             "testStrategy": "Visual: N colors and series render without overlap"
           },
           {
@@ -579,7 +579,7 @@
             "description": "Define a palette (e.g., qgcPal greens/blues) and implement a legend with drone index mapping.",
             "dependencies": [],
             "details": "Legend shows drone→color; updates when droneCount changes.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Legend items equal droneCount; colors match markers"
           },
           {
@@ -588,7 +588,7 @@
             "description": "Add per-drone visibility toggles bound to the overlays.",
             "dependencies": [],
             "details": "Boolean array binds to each series' visible property.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Toggling hides/shows the corresponding series"
           },
           {
@@ -598,8 +598,8 @@
             "dependencies": [
               2
             ],
-            "details": "Re-render when assignments or parameters change (Connections handlers).",
-            "status": "pending",
+            "details": "Re-render when assignments or parameters change (Connections handlers).\n<info added on 2025-08-08T08:51:59.799Z>\n- Add a Timer to throttle calls to addPerDroneOverlays and compute previews\n- When area params change, update perDronePreview then restart Timer to rebuild overlays once\n- Ensure legend toggles call only addPerDroneOverlays without recompute\n- Commit after implementing Timer + handler wiring\n</info added on 2025-08-08T08:51:59.799Z>",
+            "status": "done",
             "testStrategy": "Changing params updates overlays without duplicates"
           },
           {
@@ -608,7 +608,7 @@
             "description": "Throttle expensive recomputes and object creation.",
             "dependencies": [],
             "details": "Debounce add/remove cycles; reuse QGCDynamicObjectManager objects.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Logs show reduced churn during rapid drag/resize"
           }
         ]
@@ -730,7 +730,7 @@
           6,
           7
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -738,7 +738,7 @@
             "description": "Add the QML file to the map composition.",
             "dependencies": [],
             "details": "Ensure correct z-order and visibility conditions.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -749,7 +749,7 @@
               "8.1"
             ],
             "details": "Ensure overlays appear above base map but below other controls.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -760,7 +760,7 @@
               "8.1"
             ],
             "details": "Use property bindings to control visibility based on drone selection.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -770,8 +770,8 @@
             "dependencies": [
               "8.1"
             ],
-            "details": "Ensure legend updates dynamically with visibility changes.",
-            "status": "pending",
+            "details": "Ensure legend updates dynamically with visibility changes.\n<info added on 2025-08-08T09:20:52.562Z>\nLegend with per-drone visibility toggles is implemented inside `src/QmlControls/AreaPlanMapVisuals.qml` (Column + Repeater, `QGCSwitch` bound to `droneVisibility[index]` with color chips from `_seriesColors`). Toggles call `addPerDroneOverlays()` to update markers. No additional hooks required in `PlanView.qml`.\n</info added on 2025-08-08T09:20:52.562Z>",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -779,8 +779,8 @@
             "title": "Update CMakeLists.txt for QML Files",
             "description": "Add AreaPlanMapVisuals.qml to the build system.",
             "dependencies": [],
-            "details": "Modify src/QmlControls/CMakeLists.txt to include the new QML file.",
-            "status": "pending",
+            "details": "Modify src/QmlControls/CMakeLists.txt to include the new QML file.\n<info added on 2025-08-08T09:20:08.698Z>\nConfirmed `src/QmlControls/CMakeLists.txt` includes `AreaPlanEditor.cc/.h` in target_sources and registers `AreaPlanEditor.qml` + `AreaPlanMapVisuals.qml` under QGroundControl.Controls via qt_add_qml_module (lines ~58-60, 73-75). No changes required.\n</info added on 2025-08-08T09:20:08.698Z>",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -791,7 +791,7 @@
               "8.3"
             ],
             "details": "Verify that toggling visibility works correctly for each drone.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -802,7 +802,7 @@
               "8.2"
             ],
             "details": "Ensure overlays appear in the correct order relative to other map elements.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -813,7 +813,7 @@
               "8.4"
             ],
             "details": "Check that the legend reflects the current state of visible overlays.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -824,7 +824,7 @@
               "8.1"
             ],
             "details": "Check for responsiveness to property changes affecting visibility and z-order.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -838,7 +838,7 @@
               "8.9"
             ],
             "details": "Ensure all components work together seamlessly.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -1497,103 +1497,111 @@
         "id": 15,
         "title": "Performance & Logging",
         "description": "Optimize overlays and add exhaustive logging.",
-        "details": "Throttle map updates, cache computations, avoid duplicate object creation. Add detailed logs for drawing/mission generation per your logging standard.",
-        "testStrategy": "Profile before/after; verify logs in console.",
-        "priority": "medium",
-        "complexity": 5,
+        "status": "done",
         "dependencies": [
           6
         ],
-        "status": "pending",
+        "priority": "medium",
+        "details": "Extend debounce to throttle grid/waypoint recomputes with the same Timer. Cache last preview by hashing key params (center, width, height, spacing, rotation, numPoints, droneCount) and reuse until changed. Audit logging: ensure AreaPlanMapVisuals logs key actions (create/destroy counts, timing markers). Keep changes minimal to avoid UI regressions; journal and commit per subtask grouping.",
+        "testStrategy": "Profile before/after; verify logs in console.",
         "subtasks": [
           {
             "id": 1,
             "title": "Throttle Map Updates",
             "description": "Implement a mechanism to limit the frequency of map updates.",
+            "status": "done",
             "dependencies": [],
-            "details": "Use a timer or debouncer to control update rate.",
-            "status": "pending",
+            "details": "Use a timer or debouncer to control update rate. Extend debounce to throttle grid/waypoint recomputes with the same Timer.",
             "testStrategy": ""
           },
           {
             "id": 2,
             "title": "Cache Expensive Computations",
             "description": "Identify and cache results of expensive computations in `AreaPlanMapVisuals.qml`.",
+            "status": "done",
             "dependencies": [],
-            "details": "Use a caching mechanism to store and reuse computation results.",
-            "status": "pending",
+            "details": "Use a caching mechanism to store and reuse computation results. Cache last preview by hashing key params (center, width, height, spacing, rotation, numPoints, droneCount) and reuse until changed.",
             "testStrategy": ""
           },
           {
             "id": 3,
             "title": "Avoid Duplicate Object Creation",
             "description": "Refactor code to prevent the creation of duplicate objects.",
+            "status": "done",
             "dependencies": [],
             "details": "Reuse existing objects where possible.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 4,
             "title": "Add Logging for Drawing Operations",
             "description": "Implement detailed logging for all drawing operations in `AreaPlanMapVisuals.qml`.",
+            "status": "done",
             "dependencies": [],
             "details": "Follow the established logging standard.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 5,
             "title": "Add Logging for Mission Generation",
             "description": "Implement detailed logging for mission generation processes.",
+            "status": "done",
             "dependencies": [],
             "details": "Follow the established logging standard.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 6,
             "title": "Profile Performance Before Optimization",
             "description": "Measure and document the current performance of `AreaPlanMapVisuals.qml`.",
+            "status": "done",
             "dependencies": [],
             "details": "Use profiling tools to gather data.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 7,
             "title": "Implement Throttling Mechanism",
             "description": "Develop and integrate a throttling mechanism for map updates.",
+            "status": "done",
             "dependencies": [],
-            "details": "Ensure the mechanism is efficient and does not affect functionality.",
-            "status": "pending",
+            "details": "Ensure the mechanism is efficient and does not affect functionality. Extend debounce to throttle grid/waypoint recomputes with the same Timer.",
             "testStrategy": ""
           },
           {
             "id": 8,
             "title": "Verify Caching Mechanism",
             "description": "Test and validate the caching mechanism for expensive computations.",
+            "status": "done",
             "dependencies": [],
-            "details": "Ensure cached results are accurate and improve performance.",
-            "status": "pending",
+            "details": "Ensure cached results are accurate and improve performance. Cache last preview by hashing key params (center, width, height, spacing, rotation, numPoints, droneCount) and reuse until changed.",
             "testStrategy": ""
           },
           {
             "id": 9,
             "title": "Profile Performance After Optimization",
             "description": "Measure and document the performance of `AreaPlanMapVisuals.qml` after optimizations.",
+            "status": "done",
             "dependencies": [],
             "details": "Compare before and after profiles to assess improvements.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 10,
             "title": "Verify Logging Implementation",
             "description": "Check the logs generated by drawing operations and mission generation.",
+            "status": "done",
             "dependencies": [],
-            "details": "Ensure logs are detailed, accurate, and follow the standard format.",
-            "status": "pending",
+            "details": "Ensure logs are detailed, accurate, and follow the standard format. Audit logging: ensure AreaPlanMapVisuals logs key actions (create/destroy counts, timing markers).",
+            "testStrategy": ""
+          },
+          {
+            "id": 11,
+            "title": "Keep Changes Minimal to Avoid UI Regressions",
+            "description": "Ensure that optimizations do not introduce UI regressions.",
+            "status": "done",
+            "dependencies": [],
+            "details": "Journal and commit per subtask grouping. Keep changes minimal to avoid UI regressions.",
             "testStrategy": ""
           }
         ]
@@ -1726,7 +1734,7 @@
     ],
     "metadata": {
       "created": "2025-08-07T23:48:39.554Z",
-      "updated": "2025-08-08T08:33:29.679Z",
+      "updated": "2025-08-08T09:22:08.027Z",
       "description": "Tasks for master context"
     }
   }
