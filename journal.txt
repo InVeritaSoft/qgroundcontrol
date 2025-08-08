@@ -2,3 +2,4 @@
 2025-08-08T03:05:50.5786878Z [master] (task 1) review ? done; verified QML<->C++ bindings, PlanView exposure, and added tests for new properties
 2025-08-08T03:16:51.9999744Z [master] (task 2.2) in-progress; added AreaPartition header-only helpers; next: integrate into partition flow
 2025-08-08T07:07:03.3888800Z [master] (task 2.3) done; per-drone RR indices + assignments exposed; next: 2.4 rotation handling
+2025-08-08T07:10:44.1787734Z [master] (task 2.4) done; rotation handled via splitIntoStripes + _areaRotation adapter; next: 2.5 uneven divisions
