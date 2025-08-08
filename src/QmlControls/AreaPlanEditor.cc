@@ -372,8 +372,8 @@ QVariantList AreaPlanEditor::computePartitionStripes() const
 QVariantList AreaPlanEditor::computeRoundRobinAssignments() const
 {
     QVariantList groups;
-    const int stripesCount = qMax(1, _droneCount);
-    const auto rr = AreaPlan::assignStripesRoundRobin(_droneCount, stripesCount);
+    const int lineCount = qMax(1, static_cast<int>(qFloor(_areaHeight / _lineSpacing)));
+    const auto rr = AreaPlan::assignStripesRoundRobin(_droneCount, lineCount);
     for (const auto& g : rr) {
         QVariantList idx;
         for (int i : g) idx.append(i);
