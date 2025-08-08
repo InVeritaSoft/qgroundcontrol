@@ -101,6 +101,9 @@ Item {
         onTriggered: addPerDroneOverlays()
     }
 
+    // Reuse cache for per-drone marker objects to avoid churn
+    property var _perDroneMarkerObjects: [] // array of arrays of MapQuickItem
+
     QGCPalette { id: qgcPal; colorGroupEnabled: enabled }
 
 	// Calculate rectangle corners based on area parameters
@@ -678,27 +681,72 @@ Item {
 
     // Per-drone overlays creation
     function addPerDroneOverlays() {
-        _objMgrPerDroneGrid.destroyObjects()
-        _objMgrPerDroneMarkers.destroyObjects()
-        if (!perDronePreview || perDronePreview.length === 0) return
+        var t0 = Date.now()
+        // Initialize object arrays to match drone count
+        if (!_perDroneMarkerObjects || _perDroneMarkerObjects.length !== (perDronePreview ? perDronePreview.length : 0)) {
+            // Clean old
+            removePerDroneOverlays()
+            _perDroneMarkerObjects = []
+            for (var k = 0; k < (perDronePreview ? perDronePreview.length : 0); k++) _perDroneMarkerObjects.push([])
+        }
+
+        var totalCreated = 0, totalUpdated = 0, totalDestroyed = 0
+
+        // For each drone group
+        if (!perDronePreview || perDronePreview.length === 0) {
+            console.log("AreaPlanMapVisuals: no per-drone preview; clearing overlays")
+            removePerDroneOverlays()
+            return
+        }
+
         for (var d = 0; d < perDronePreview.length; d++) {
-            if (!droneVisibility[d]) continue
-            var group = perDronePreview[d]
             var color = _seriesColors[d % _seriesColors.length]
-            var wps = group.waypoints || []
+            var wps = droneVisibility[d] ? (perDronePreview[d].waypoints || []) : []
+            var arr = _perDroneMarkerObjects[d]
+            // Ensure enough objects
             for (var i = 0; i < wps.length; i++) {
-                var item = _objMgrPerDroneMarkers.createObject(waypointMarkerComponent, mapControl, true)
-                if (item) {
-                    item.coordinate = wps[i]
-                    item.sourceItem.color = color
+                var obj
+                if (i < arr.length) {
+                    obj = arr[i]
+                    if (obj) {
+                        obj.coordinate = wps[i]
+                        if (obj.sourceItem) obj.sourceItem.color = color
+                        totalUpdated++
+                    }
+                } else {
+                    obj = _objMgrPerDroneMarkers.createObject(waypointMarkerComponent, mapControl, true)
+                    if (obj) {
+                        obj.coordinate = wps[i]
+                        if (obj.sourceItem) obj.sourceItem.color = color
+                        arr.push(obj)
+                        totalCreated++
+                    }
                 }
             }
+            // Destroy extras
+            for (var j = wps.length; j < arr.length; j++) {
+                if (arr[j] && arr[j].destroy) {
+                    arr[j].destroy()
+                    totalDestroyed++
+                }
+            }
+            if (arr.length > wps.length) arr.length = wps.length
         }
+        console.log("AreaPlanMapVisuals: overlays updated in", (Date.now()-t0), "ms; created:", totalCreated, "updated:", totalUpdated, "destroyed:", totalDestroyed)
     }
 
     function removePerDroneOverlays() {
         _objMgrPerDroneGrid.destroyObjects()
         _objMgrPerDroneMarkers.destroyObjects()
+        if (_perDroneMarkerObjects) {
+            for (var d = 0; d < _perDroneMarkerObjects.length; d++) {
+                var arr = _perDroneMarkerObjects[d]
+                for (var i = 0; i < arr.length; i++) {
+                    if (arr[i] && arr[i].destroy) arr[i].destroy()
+                }
+            }
+            _perDroneMarkerObjects = []
+        }
     }
 
 	function removeMapItems() {
