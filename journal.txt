@@ -13,3 +13,5 @@
 2025-08-08T07:47:11.3942616Z [master] (task 2.9) done; bounds/rotation tests added; next: 2.10 rotation handling tests
 2025-08-08T08:05:09.1943206Z [master] (task 2) done; all subtasks complete; next: 5 policy steps
 2025-08-08T08:07:40.1560489Z [master] (task 5) start: policy steps injection plan (RTL/Loiter after RTL via toggles)
+2025-08-08T08:15:28.2393024Z [master] (task 11) done; added axis selection and minimal area tests; next: 12 waypoint gen tests
+2025-08-08T08:27:19.7269662Z [master] (task 12) done; waypoint generation count/position tests added; next: 13 policy tests

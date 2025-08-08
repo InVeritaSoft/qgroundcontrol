@@ -1078,103 +1078,102 @@
         "id": 11,
         "title": "Unit Tests: Partitioning",
         "description": "C++ tests for area partitioning correctness.",
-        "details": "Edge cases: small areas, uneven splits, rotation.",
-        "testStrategy": "Automated unit tests.",
-        "priority": "high",
-        "complexity": 5,
+        "status": "done",
         "dependencies": [
           2
         ],
-        "status": "pending",
+        "priority": "high",
+        "details": "Edge cases: small areas, uneven splits, rotation.",
+        "testStrategy": "Automated unit tests.",
         "subtasks": [
           {
             "id": 1,
             "title": "Short Axis Selection",
             "description": "Implement logic to select the short axis for partitioning.",
+            "status": "done",
             "dependencies": [],
-            "details": "Consider edge cases where axes are nearly equal in length.",
-            "status": "pending",
+            "details": "Consider edge cases where axes are nearly equal in length. Verify stripe orientation matches alongShortAxis flag for different width/height ratios.",
             "testStrategy": ""
           },
           {
             "id": 2,
             "title": "Long Axis Selection",
             "description": "Implement logic to select the long axis for partitioning.",
+            "status": "done",
             "dependencies": [],
-            "details": "Ensure correct selection when axes are significantly different in length.",
-            "status": "pending",
+            "details": "Ensure correct selection when axes are significantly different in length. Verify stripe orientation matches alongShortAxis flag for different width/height ratios.",
             "testStrategy": ""
           },
           {
             "id": 3,
             "title": "Rotation Handling",
             "description": "Handle rotation of the area before partitioning.",
+            "status": "done",
             "dependencies": [],
             "details": "Ensure correct alignment and partitioning after rotation.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 4,
             "title": "Uneven Line Counts",
             "description": "Implement logic to handle uneven line counts per drone.",
+            "status": "done",
             "dependencies": [],
-            "details": "Ensure balanced partitioning even with uneven line counts.",
-            "status": "pending",
+            "details": "Ensure balanced partitioning even with uneven line counts. Add near-square tolerance test.",
             "testStrategy": ""
           },
           {
             "id": 5,
             "title": "Minimal Area Handling",
             "description": "Handle minimal areas during partitioning.",
+            "status": "done",
             "dependencies": [],
-            "details": "Ensure correct partitioning for very small areas.",
-            "status": "pending",
+            "details": "Ensure correct partitioning for very small areas. Handle zero/negative sizes and stripeCount<=0 return empty; very small non-zero areas still produce count stripes with endpoints within bounds.",
             "testStrategy": ""
           },
           {
             "id": 6,
             "title": "Bounds Verification",
             "description": "Verify that assignments are within the bounds of the area.",
+            "status": "done",
             "dependencies": [],
             "details": "Ensure no assignment exceeds the area boundaries.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 7,
             "title": "Balanced Assignments",
             "description": "Ensure assignments are balanced across drones.",
+            "status": "done",
             "dependencies": [],
             "details": "Avoid overloading any single drone with too many lines.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 8,
             "title": "Edge Case Testing",
             "description": "Test edge cases for area partitioning correctness.",
+            "status": "done",
             "dependencies": [],
-            "details": "Include small areas, uneven splits, and rotations in tests.",
-            "status": "pending",
+            "details": "Include small areas, uneven splits, and rotations in tests. Keep tests in AreaPlanEditorTest; pure helpers via AreaPartition.h.",
             "testStrategy": ""
           },
           {
             "id": 9,
             "title": "Automated Unit Tests",
             "description": "Create automated unit tests for partitioning logic.",
+            "status": "done",
             "dependencies": [],
-            "details": "Ensure comprehensive coverage of all edge cases.",
-            "status": "pending",
+            "details": "Ensure comprehensive coverage of all edge cases. Keep tests in AreaPlanEditorTest; pure helpers via AreaPartition.h.",
             "testStrategy": ""
           },
           {
             "id": 10,
             "title": "Complexity Analysis",
             "description": "Analyze the complexity of the partitioning algorithm.",
+            "status": "done",
             "dependencies": [],
             "details": "Ensure efficient performance even for large areas and many drones.",
-            "status": "pending",
             "testStrategy": ""
           }
         ]
@@ -1190,7 +1189,7 @@
         "dependencies": [
           3
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -1198,7 +1197,7 @@
             "description": "Prepare the test environment with necessary dependencies.",
             "dependencies": [],
             "details": "Ensure all required libraries and tools are installed.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1207,7 +1206,7 @@
             "description": "Create a set of test data for waypoint generation.",
             "dependencies": [],
             "details": "Include various scenarios with different drone counts and line configurations.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1216,7 +1215,7 @@
             "description": "Write tests to validate the number of waypoints generated per line.",
             "dependencies": [],
             "details": "Ensure the counts match expected values based on input parameters.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1225,7 +1224,7 @@
             "description": "Write tests to validate the positions of generated waypoints.",
             "dependencies": [],
             "details": "Check if the positions are correctly spaced and aligned.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1234,7 +1233,7 @@
             "description": "Write tests to validate the rotation math for waypoints.",
             "dependencies": [],
             "details": "Ensure rotations are applied correctly based on input parameters.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1243,7 +1242,7 @@
             "description": "Write tests using golden-coordinate values for fixed seed center and parameters.",
             "dependencies": [],
             "details": "Compare generated waypoints with predefined golden coordinates.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1252,7 +1251,7 @@
             "description": "Write tests to validate the ordering of waypoints.",
             "dependencies": [],
             "details": "Ensure waypoints are ordered correctly per line and drone.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1261,7 +1260,7 @@
             "description": "Write tests for edge cases in waypoint generation.",
             "dependencies": [],
             "details": "Include scenarios with minimal and maximal input values.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1270,7 +1269,7 @@
             "description": "Execute all unit tests to validate waypoint generation.",
             "dependencies": [],
             "details": "Ensure all tests pass without any failures.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1279,7 +1278,7 @@
             "description": "Document the results of the unit tests for future reference.",
             "dependencies": [],
             "details": "Include test logs and any observed issues or anomalies.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -1287,104 +1286,103 @@
       {
         "id": 13,
         "title": "Unit Tests: Policy Injection",
-        "description": "C++ tests for Loiter/RTL sequencing.",
-        "details": "Check correct item order and parameter values.",
-        "testStrategy": "Automated unit tests.",
-        "priority": "high",
-        "complexity": 5,
+        "description": "C++ tests for Loiter/RTL sequencing using PlanMasterController in offline mode.",
+        "status": "done",
         "dependencies": [
           5
         ],
-        "status": "pending",
+        "priority": "high",
+        "details": "Verify correct item order and parameter values by connecting AreaPlanEditor to the controller. Enable rtlAfterEveryWaypoint and optional loiterAfterRtl, set loiterTime. Call addPerDroneToMission(0) on a simple scenario and inspect MissionController::visualItems(). Assert sequences include waypoint → RTL (MAV_CMD_NAV_RETURN_TO_LAUNCH or VTOL land case) and optional Loiter with param1=loiterTime.",
+        "testStrategy": "Automated unit tests. Keep assertions tolerant to firmware (VTOL/FixedWing) via presence of MAV_CMD ids when available.",
         "subtasks": [
           {
             "id": 1,
             "title": "Define MAV_CMD Sequences",
             "description": "Identify the correct sequences for Loiter and RTL commands.",
+            "status": "done",
             "dependencies": [],
             "details": "Research and document the standard sequences for loitering and returning to launch (RTL).",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 2,
             "title": "Determine Parameter Values",
             "description": "Specify the correct parameter values for loiter time, radius, leave-direction, and exit tangent.",
+            "status": "done",
             "dependencies": [],
             "details": "Consult documentation to determine the appropriate values for these parameters in different scenarios.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 3,
             "title": "Create Test Cases for Loiter Command",
             "description": "Develop test cases to verify correct MAV_CMD sequences and parameter values for loiter command.",
+            "status": "done",
             "dependencies": [],
             "details": "Write unit tests that check the order and parameters of loiter commands in various scenarios.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 4,
             "title": "Create Test Cases for RTL Command",
             "description": "Develop test cases to verify correct MAV_CMD sequences and parameter values for RTL command.",
+            "status": "done",
             "dependencies": [],
             "details": "Write unit tests that check the order and parameters of RTL commands in various scenarios.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 5,
             "title": "Create Test Cases for LoiterAfterRTL Command",
             "description": "Develop test cases to verify correct MAV_CMD sequences and parameter values for loiter after RTL command.",
+            "status": "done",
             "dependencies": [],
             "details": "Write unit tests that check the order and parameters of loiter commands following an RTL command.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 6,
             "title": "Create Test Cases for RTL-after-waypoint",
             "description": "Develop test cases to verify correct MAV_CMD sequences and parameter values for RTL after waypoint command.",
+            "status": "done",
             "dependencies": [],
             "details": "Write unit tests that check the order and parameters of RTL commands following a waypoint.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 7,
             "title": "Verify Toggle Combinations",
             "description": "Test different combinations of toggles to ensure correct MAV_CMD sequences and parameter values.",
+            "status": "done",
             "dependencies": [],
             "details": "Write unit tests that verify the correctness of command sequences and parameters for various toggle settings.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 8,
             "title": "Review Test Results",
             "description": "Analyze the results of the unit tests to identify any discrepancies or errors.",
+            "status": "done",
             "dependencies": [],
             "details": "Review test logs and outputs to ensure all test cases pass successfully.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 9,
             "title": "Refine Test Cases",
             "description": "Adjust and refine test cases based on the review of test results.",
+            "status": "done",
             "dependencies": [],
             "details": "Modify existing test cases or add new ones to address any identified issues.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 10,
             "title": "Finalize Unit Tests",
             "description": "Complete and finalize the unit tests for MAV_CMD sequences and parameter values.",
+            "status": "done",
             "dependencies": [],
             "details": "Ensure all test cases are comprehensive, accurate, and ready for integration testing.",
-            "status": "pending",
             "testStrategy": ""
           }
         ]
@@ -1728,7 +1726,7 @@
     ],
     "metadata": {
       "created": "2025-08-07T23:48:39.554Z",
-      "updated": "2025-08-08T08:07:47.001Z",
+      "updated": "2025-08-08T08:31:50.986Z",
       "description": "Tasks for master context"
     }
   }
