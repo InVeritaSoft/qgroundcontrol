@@ -123,6 +123,9 @@ public:
     Q_INVOKABLE QVariantList computeRoundRobinAssignments() const;
     Q_INVOKABLE QVariantList computeDroneAssignments() const;
     Q_INVOKABLE QVariantMap computePerDroneCounts() const;
+    // Preview per-drone waypoints without mutating MissionController
+    // Returns a QVariantList of maps: { droneIndex, altitudeOffsetM, timeOffsetS, waypoints: [QGeoCoordinate, ...] }
+    Q_INVOKABLE QVariantList computePerDroneWaypointPreview() const;
     Q_INVOKABLE void addWaypointsToMission();
     Q_INVOKABLE void saveMissionFile();
     Q_INVOKABLE void uploadToVehicle();

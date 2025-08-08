@@ -413,6 +413,69 @@ QVariantMap AreaPlanEditor::computePerDroneCounts() const
     return counts;
 }
 
+QVariantList AreaPlanEditor::computePerDroneWaypointPreview() const
+{
+    QVariantList result;
+
+    // Basic parameter checks
+    if (_areaWidth <= 0 || _areaHeight <= 0 || _lineSpacing <= 0 || _numPoints <= 0) {
+        return result;
+    }
+
+    // Determine line count and assignments
+    const int lineCount = qMax(1, static_cast<int>(qFloor(_areaHeight / _lineSpacing)));
+    const auto rr = AreaPlan::assignStripesRoundRobin(_droneCount, lineCount);
+
+    // Build local meter-frame stripes along the short axis with rotation
+    const double cx = 0.0;
+    const double cy = 0.0;
+    const bool alongShortAxis = true;
+    // We create as many stripes as lines; spacing derived from _lineSpacing
+    // splitIntoStripes expects a count; use lineCount so stripes map 1:1 to row indices
+    const auto stripes = AreaPlan::splitIntoStripes(cx, cy, _areaWidth, _areaHeight, lineCount, alongShortAxis, _areaRotation);
+
+    // Helper lambdas to convert local (meters) to geo using area center
+    auto offsetMeters = [&](const QGeoCoordinate& origin, qreal meters, qreal bearingDeg) -> QGeoCoordinate {
+        return calculateOffsetCoordinate(origin, meters, bearingDeg);
+    };
+    auto toGeo = [&](double localX, double localY) -> QGeoCoordinate {
+        // localX: + to east, localY: + to north in meters after rotation already applied
+        QGeoCoordinate northShift = offsetMeters(_areaCenter, localY, 0.0);
+        QGeoCoordinate eastShift  = offsetMeters(northShift,   localX, 90.0);
+        return eastShift;
+    };
+
+    for (int d = 0; d < static_cast<int>(rr.size()); ++d) {
+        QVariantMap group;
+        group[QStringLiteral("droneIndex")] = d;
+        const qreal altOffset = _altitudeBandStart + d * _altitudeBandStep;
+        const qreal timeOffset = d * _timeOffsetPerDrone;
+        group[QStringLiteral("altitudeOffsetM")] = altOffset;
+        group[QStringLiteral("timeOffsetS")] = timeOffset;
+
+        QVariantList waypoints;
+        for (int lineIndex : rr[static_cast<size_t>(d)]) {
+            if (lineIndex < 0 || lineIndex >= static_cast<int>(stripes.size())) continue;
+            const auto& ln = stripes[static_cast<size_t>(lineIndex)];
+
+            // Generate _numPoints along the stripe from A to B
+            for (int j = 0; j < _numPoints; ++j) {
+                const qreal t = (j + 0.5) / _numPoints; // centered within segment
+                const double x = ln.a.x + t * (ln.b.x - ln.a.x);
+                const double y = ln.a.y + t * (ln.b.y - ln.a.y);
+                QGeoCoordinate geo = toGeo(x, y);
+                geo.setAltitude(_missionAltitude + altOffset);
+                waypoints.append(QVariant::fromValue(geo));
+            }
+        }
+
+        group[QStringLiteral("waypoints")] = waypoints;
+        result.append(group);
+    }
+
+    return result;
+}
+
 void AreaPlanEditor::addWaypointsToMission()
 {
     qDebug() << "AreaPlanEditor: Starting mission generation";
