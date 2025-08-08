@@ -624,7 +624,7 @@
         "dependencies": [
           1
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -632,7 +632,7 @@
             "description": "Create a new input field for droneCount in AreaPlanEditor.qml and PlanView.qml.",
             "dependencies": [],
             "details": "Bind to the new C++ property and add basic validation feedback.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -641,7 +641,7 @@
             "description": "Create a new input field for altitudeBandStart in AreaPlanEditor.qml and PlanView.qml.",
             "dependencies": [],
             "details": "Bind to the new C++ property and add basic validation feedback.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -650,7 +650,7 @@
             "description": "Create a new input field for altitudeBandStep in AreaPlanEditor.qml and PlanView.qml.",
             "dependencies": [],
             "details": "Bind to the new C++ property and add basic validation feedback.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -659,7 +659,7 @@
             "description": "Create a new input field for timeOffsetPerDrone in AreaPlanEditor.qml and PlanView.qml.",
             "dependencies": [],
             "details": "Bind to the new C++ property and add basic validation feedback.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -668,7 +668,7 @@
             "description": "Create a new input field for loiterTime in AreaPlanEditor.qml and PlanView.qml.",
             "dependencies": [],
             "details": "Bind to the new C++ property and add basic validation feedback.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -677,7 +677,7 @@
             "description": "Create a new toggle for rtlAfterEveryWaypoint in AreaPlanEditor.qml and PlanView.qml.",
             "dependencies": [],
             "details": "Bind to the new C++ property and add basic validation feedback.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -686,7 +686,7 @@
             "description": "Create a new toggle for loiterAfterRtl in AreaPlanEditor.qml and PlanView.qml.",
             "dependencies": [],
             "details": "Bind to the new C++ property and add basic validation feedback.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -695,7 +695,7 @@
             "description": "Ensure all new inputs/toggles are properly bound in AreaPlanEditor.qml.",
             "dependencies": [],
             "details": "Verify that the bindings work correctly and update the UI accordingly.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -704,7 +704,7 @@
             "description": "Ensure all new inputs/toggles are properly bound in PlanView.qml.",
             "dependencies": [],
             "details": "Verify that the bindings work correctly and update the UI accordingly.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -713,7 +713,7 @@
             "description": "Implement basic validation feedback for all new inputs/toggles in AreaPlanEditor.qml and PlanView.qml.",
             "dependencies": [],
             "details": "Ensure that users receive appropriate feedback when invalid values are entered.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -1726,7 +1726,7 @@
     ],
     "metadata": {
       "created": "2025-08-07T23:48:39.554Z",
-      "updated": "2025-08-08T08:31:50.986Z",
+      "updated": "2025-08-08T08:33:29.679Z",
       "description": "Tasks for master context"
     }
   }
