@@ -47,6 +47,35 @@ Item {
         qgcPal.colorGreen, qgcPal.colorRed, qgcPal.colorCyan,
         qgcPal.colorYellow, qgcPal.colorPink
     ]
+    // Cache to avoid unnecessary preview recompute
+    property string _lastPreviewKey: ""
+    property var _lastPreviewData: []
+
+    function _makePreviewKey() {
+        if (!areaPlanEditor) return "";
+        var c = areaPlanEditor.areaCenter || QtPositioning.coordinate();
+        var w = areaPlanEditor.areaWidth || 0;
+        var h = areaPlanEditor.areaHeight || 0;
+        var s = areaPlanEditor.lineSpacing || 0;
+        var r = areaPlanEditor.areaRotation || 0;
+        var n = areaPlanEditor.numPoints || 0;
+        var d = areaPlanEditor.droneCount || 0;
+        return [c.latitude.toFixed(7), c.longitude.toFixed(7), w.toFixed(3), h.toFixed(3), s.toFixed(3), r.toFixed(3), n, d].join("|");
+    }
+
+    function _updatePreviewIfChanged() {
+        if (!(areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview)) return;
+        var key = _makePreviewKey();
+        if (key === _lastPreviewKey && _lastPreviewData && _lastPreviewData.length === perDronePreview.length) {
+            return; // unchanged
+        }
+        var t0 = Date.now();
+        var data = areaPlanEditor.computePerDroneWaypointPreview();
+        _lastPreviewKey = key;
+        _lastPreviewData = data;
+        perDronePreview = data;
+        console.log("AreaPlanMapVisuals: preview recomputed in", (Date.now()-t0), "ms; drones:", perDronePreview.length);
+    }
 
 	Component.onCompleted: {
 		console.log("AreaPlanMapVisuals: Component completed")
@@ -725,7 +754,7 @@ Item {
 			console.log("AreaPlanMapVisuals: Area width changed, updating map items")
 			addMapItems()
             if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) {
-                perDronePreview = areaPlanEditor.computePerDroneWaypointPreview()
+                _updatePreviewIfChanged()
                 _overlayDebounce.restart()
             }
 		}
@@ -734,7 +763,7 @@ Item {
 			console.log("AreaPlanMapVisuals: Area height changed, updating map items")
 			addMapItems()
             if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) {
-                perDronePreview = areaPlanEditor.computePerDroneWaypointPreview()
+                _updatePreviewIfChanged()
                 _overlayDebounce.restart()
             }
 		}
@@ -743,7 +772,7 @@ Item {
 			console.log("AreaPlanMapVisuals: Area center changed, updating map items")
 			addMapItems()
             if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) {
-                perDronePreview = areaPlanEditor.computePerDroneWaypointPreview()
+                _updatePreviewIfChanged()
                 _overlayDebounce.restart()
             }
 		}
@@ -752,7 +781,7 @@ Item {
 			console.log("AreaPlanMapVisuals: Area rotation changed, updating map items")
 			addMapItems()
             if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) {
-                perDronePreview = areaPlanEditor.computePerDroneWaypointPreview()
+                _updatePreviewIfChanged()
                 _overlayDebounce.restart()
             }
 		}
