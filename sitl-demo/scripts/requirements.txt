@@ -3,7 +3,6 @@
 pymavlink>=2.4.37
 pyserial>=3.5
 flask>=2.3.0
-docker-compose>=1.29.0
 
 # Optional dependencies for advanced features
 psutil>=5.9.0

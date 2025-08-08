@@ -1,10 +1,9 @@
-version: '3.8'
-
 services:
   # Simple SITL Copter using Python MAVLink simulation
   sitl-copter:
     image: python:3.11-slim
     container_name: qgc-sitl-copter
+    profiles: ["copters"]
     ports:
       - "14550:14550/udp"  # MAVLink UDP (primary)
     environment:
@@ -30,6 +29,7 @@ services:
   sitl-copter-2:
     image: python:3.11-slim
     container_name: qgc-sitl-copter-2
+    profiles: ["copters"]
     ports:
       - "14552:14552/udp"
     environment:
@@ -59,6 +59,7 @@ services:
   sitl-copter-3:
     image: python:3.11-slim
     container_name: qgc-sitl-copter-3
+    profiles: ["copters"]
     ports:
       - "14554:14554/udp"
     environment:
@@ -81,9 +82,6 @@ services:
         pip install --no-cache-dir -r scripts/requirements.txt &&
         python scripts/simple_sitl.py --vehicle=copter --port=14554 --sysid=3 --auto-start --rate=5 --start-lat 47.397642 --start-lon 8.545394 --start-alt 488
       "
-    restart: unless-stopped
-    networks:
-      - qgc-network
     restart: unless-stopped
     networks:
       - qgc-network

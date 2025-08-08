@@ -24,8 +24,8 @@ Item {
 	property var mapControl                                  ///< Map control to place item in
 	property var areaPlanEditor                              ///< AreaPlanEditor object
 	property bool interactive: true
-    property color interiorColor: qgcPal.windowShadeDark
-    property color borderColor: qgcPal.buttonHighlight
+    property color interiorColor: (qgcPal && qgcPal.windowShadeDark) ? qgcPal.windowShadeDark : "#303030"
+    property color borderColor: (qgcPal && qgcPal.buttonHighlight) ? qgcPal.buttonHighlight : "#2196F3"
     property int borderWidth: Math.max(1, Math.round(ScreenTools.defaultFontPixelWidth * 0.4))
 	property real interiorOpacity: 0.7
 
@@ -42,10 +42,16 @@ Item {
     // Per-drone overlays
     property var perDronePreview: (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) ? areaPlanEditor.computePerDroneWaypointPreview() : []
     property var droneVisibility: new Array(perDronePreview ? perDronePreview.length : 0).fill(true)
+    // Robust color palette (fallback to hex constants to avoid undefined warnings)
     readonly property var _seriesColors: [
-        qgcPal.colorOrange, qgcPal.colorBlue, qgcPal.colorPurple,
-        qgcPal.colorGreen, qgcPal.colorRed, qgcPal.colorCyan,
-        qgcPal.colorYellow, qgcPal.colorPink
+        (qgcPal && qgcPal.buttonHighlight) || "#FF9800",  // orange
+        "#1E88E5",  // blue
+        "#8E24AA",  // purple
+        "#43A047",  // green
+        "#E53935",  // red
+        "#00ACC1",  // cyan
+        "#FDD835",  // yellow
+        "#EC407A"   // pink
     ]
     // Cache to avoid unnecessary preview recompute
     property string _lastPreviewKey: ""
@@ -74,6 +80,13 @@ Item {
         _lastPreviewKey = key;
         _lastPreviewData = data;
         perDronePreview = data;
+        // Ensure droneVisibility matches length and initialize missing entries to true
+        if (!droneVisibility || droneVisibility.length !== (perDronePreview ? perDronePreview.length : 0)) {
+            var n = perDronePreview ? perDronePreview.length : 0;
+            var vis = [];
+            for (var i = 0; i < n; i++) vis.push(true);
+            droneVisibility = vis;
+        }
         console.log("AreaPlanMapVisuals: preview recomputed in", (Date.now()-t0), "ms; drones:", perDronePreview.length);
     }
 
@@ -423,9 +436,9 @@ Item {
 	Component {
 		id: gridLineComponent
 
-		MapPolyline {
+        MapPolyline {
 			id: gridLine
-			line.color: qgcPal.colorGreen
+            line.color: (qgcPal && qgcPal.colorGreen) ? qgcPal.colorGreen : "#43A047"
 			line.width: Math.max(1, Math.round(ScreenTools.defaultFontPixelWidth * 0.5))
 			z: QGroundControl.zOrderMapItems - 1
 		}
@@ -441,12 +454,12 @@ Item {
 			anchorPoint.x: sourceItem.width / 2
 			anchorPoint.y: sourceItem.height / 2
 
-			sourceItem: Rectangle {
+            sourceItem: Rectangle {
 				width: ScreenTools.defaultFontPixelHeight * 1.5
 				height: width
 				radius: width / 2
-				color: qgcPal.colorGreen
-				border.color: qgcPal.text
+                color: (qgcPal && qgcPal.colorGreen) ? qgcPal.colorGreen : "#43A047"
+                border.color: (qgcPal && qgcPal.text) ? qgcPal.text : "#FFFFFF"
 				border.width: Math.max(1, Math.round(ScreenTools.defaultFontPixelWidth * 0.5))
 
 				// Add a small dot in the center
@@ -700,7 +713,7 @@ Item {
         }
 
         for (var d = 0; d < perDronePreview.length; d++) {
-            var color = _seriesColors[d % _seriesColors.length]
+            var color = _seriesColors[(d % _seriesColors.length)] || "#00FF00"
             var wps = droneVisibility[d] ? (perDronePreview[d].waypoints || []) : []
             var arr = _perDroneMarkerObjects[d]
             // Ensure enough objects
@@ -875,7 +888,9 @@ Item {
         anchors.top: parent.top
         anchors.margins: ScreenTools.defaultFontPixelWidth
         spacing: ScreenTools.defaultFontPixelHeight * 0.25
-        visible: perDronePreview && perDronePreview.length > 0
+        visible: (perDronePreview && perDronePreview.length > 0)
+                 && (_seriesColors && _seriesColors.length > 0)
+                 && (droneVisibility && droneVisibility.length === perDronePreview.length)
 
         Repeater {
             model: perDronePreview ? perDronePreview.length : 0
@@ -885,12 +900,19 @@ Item {
                     width: ScreenTools.defaultFontPixelHeight
                     height: width
                     radius: width/2
-                    color: _seriesColors[index % _seriesColors.length]
+                    color: (_seriesColors && _seriesColors.length > 0)
+                           ? (_seriesColors[index % _seriesColors.length] || "#00FF00")
+                           : "#00FF00"
                 }
                 QGCSwitch {
-                    checked: droneVisibility[index]
+                    checked: (droneVisibility && droneVisibility.length > index)
+                             ? (droneVisibility[index] !== false)
+                             : true
                     onToggled: {
-                        droneVisibility[index] = checked
+                        if (droneVisibility) {
+                            while (droneVisibility.length <= index) droneVisibility.push(true)
+                            droneVisibility[index] = checked
+                        }
                         addPerDroneOverlays()
                     }
                 }
@@ -899,14 +921,15 @@ Item {
         }
     }
 
-    // Add a transparent MouseArea for the entire map area when in drawing mode
-	MouseArea {
+    // MouseArea covering the map. Handles recentering on click even when not in drawing mode.
+    MouseArea {
 		id: mapAreaMouseArea
 		anchors.fill: parent
-		enabled: interactive && isDrawingMode
+        enabled: interactive
 		hoverEnabled: true
 		preventStealing: true
 		z: 999  // High z-order but below the rectangle MouseArea
+        acceptedButtons: Qt.LeftButton
 
 		// Add a visible background for debugging (semi-transparent red)
 		Rectangle {
@@ -931,7 +954,7 @@ Item {
 			console.log("Map area MouseArea enabled changed to:", enabled)
 		}
 
-		onPressed: {
+        onPressed: function(mouse) {
 			console.log("Map area pressed - setting isDragging to true")
 			console.log("Map area MouseArea - enabled:", enabled, "interactive:", interactive, "isDrawingMode:", isDrawingMode)
 			console.log("Mouse position:", mouse.x, mouse.y)
@@ -941,39 +964,40 @@ Item {
 			hasMoved = false
 			console.log("Map area isDragging set to:", isDragging)
 			// Get the coordinate at the press position
-			if (mapControl) {
-				startCoordinate = mapControl.toCoordinate(startPos, false)
+            if (mapControl) {
+                var p = mapAreaMouseArea.mapToItem(mapControl, mouse.x, mouse.y)
+                startCoordinate = mapControl.toCoordinate(Qt.point(p.x, p.y), false)
 				console.log("Map area drag started at coordinate:", startCoordinate.latitude, startCoordinate.longitude)
 			} else {
 				console.log("ERROR: mapControl is null!")
-			}
+        }
 		}
 
-		onPositionChanged: {
+        onPositionChanged: function(mouse) {
 			if (pressed && areaPlanEditor && mapControl) {
 				hasMoved = true
 				console.log("Map area dragging - isDragging:", isDragging)
 				// Get current mouse position coordinate
-				var currentPos = Qt.point(mouse.x, mouse.y)
-				var currentCoordinate = mapControl.toCoordinate(currentPos, false)
+                var mapped = mapAreaMouseArea.mapToItem(mapControl, mouse.x, mouse.y)
+                var currentCoordinate = mapControl.toCoordinate(Qt.point(mapped.x, mapped.y), false)
 
 				if (currentCoordinate.isValid) {
 					// Move center directly to current mouse position
 					console.log("Map area dragging to:", currentCoordinate.latitude, currentCoordinate.longitude)
 					areaPlanEditor.setAreaCenter(currentCoordinate)
-				}
+        }
 			}
 		}
 
-		onReleased: {
+        onReleased: function(mouse) {
 			console.log("Map area released - setting isDragging to false")
 			isDragging = false
 			console.log("Map area isDragging set to:", isDragging)
 
 			// If we didn't move, treat as a click
 			if (!hasMoved && areaPlanEditor && mapControl) {
-				var clickPos = Qt.point(mouse.x, mouse.y)
-				var clickCoordinate = mapControl.toCoordinate(clickPos, false)
+                var mappedClick = mapAreaMouseArea.mapToItem(mapControl, mouse.x, mouse.y)
+                var clickCoordinate = mapControl.toCoordinate(Qt.point(mappedClick.x, mappedClick.y), false)
 
 				if (clickCoordinate.isValid) {
 					console.log("Map area clicked at:", clickCoordinate.latitude, clickCoordinate.longitude)
@@ -991,7 +1015,7 @@ Item {
 							areaPlanEditor.setAreaWidth(10.0)
 							areaPlanEditor.setAreaHeight(10.0)
 							console.log("Set default area size: 10x10 meters")
-						}
+        }
 					} else {
 						// Calculate new area size based on distance from center
 						var center = areaPlanEditor.areaCenter

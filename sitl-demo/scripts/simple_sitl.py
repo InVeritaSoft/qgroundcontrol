@@ -39,6 +39,22 @@ class SimpleSITL:
         self.armed: bool = auto_start
         self.mode: str = 'AUTO' if auto_start else 'STABILIZE'
 
+        # Time since boot (monotonic) for MAVLink fields requiring milliseconds since boot
+        self._boot_time_monotonic: float = time.monotonic()
+
+        # Minimal parameter store to satisfy QGC queries
+        # Using common ArduPilot-style failsafe params as placeholders
+        self.parameters: Dict[str, float] = {
+            'FS_OPTIONS': 0.0,
+            'FS_GCS_TIMEOUT': 5.0,
+            'FS_GCS_ENABLE': 0.0,
+        }
+
+        # Home position (lat, lon in deg, alt in meters AMSL)
+        self.home_lat: float = self.lat
+        self.home_lon: float = self.lon
+        self.home_alt: float = self.alt
+
         # MAVLink connections
         # - tx: send to QGC on host
         # - rx: receive commands from QGC (binds on container/all interfaces)
@@ -93,8 +109,10 @@ class SimpleSITL:
     
     def send_attitude(self) -> None:
         """Send attitude information."""
+        # MAVLink expects time since boot in milliseconds (uint32)
+        time_boot_ms = int((time.monotonic() - self._boot_time_monotonic) * 1000)
         self.mav.mav.attitude_send(
-            int(time.time() * 1000),
+            time_boot_ms,
             0.0,
             0.0,
             math.radians(self.heading),
@@ -117,12 +135,16 @@ class SimpleSITL:
     def send_sys_status(self) -> None:
         """Send system status."""
         self.mav.mav.sys_status_send(
-            0, 0, 0,  # onboardsensors present/enabled/health (bitmasks)
-            12000,
-            0,
-            100,
-            0,
-            0, 0, 0, 0,
+            0,  # onboard_control_sensors_present (bitmask)
+            0,  # onboard_control_sensors_enabled (bitmask)
+            0,  # onboard_control_sensors_health  (bitmask)
+            200,      # load (0-1000 -> 0-100%)
+            12000,    # voltage_battery (mV)
+            0,        # current_battery (10 * mA)
+            100,      # battery_remaining (%) or -1 unknown
+            0,        # drop_rate_comm (1/100 %)
+            0,        # errors_comm
+            0, 0, 0, 0  # errors_count1..4
         )
     
     def ensure_connection(self) -> None:
@@ -142,6 +164,21 @@ class SimpleSITL:
                 source_system=self.sysid, source_component=1
             )
             self.rx.wait_heartbeat(timeout=2)
+
+    def _send_param_value(self, name: str, index: int, count: int) -> None:
+        try:
+            value = float(self.parameters.get(name, 0.0))
+            # param_id must be <=16 chars
+            param_id = name[:16].encode('ascii')
+            self.mav.mav.param_value_send(
+                param_id,
+                value,
+                mavutil.mavlink.MAV_PARAM_TYPE_INT32,
+                count,
+                index,
+            )
+        except Exception:
+            pass
     
     def update_position(self) -> None:
         """Update vehicle position based on current state."""
@@ -227,9 +264,100 @@ class SimpleSITL:
                         mtype = msg.get_type()
                         if mtype == 'COMMAND_LONG' and getattr(msg, 'command', None) == mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM:
                             self.armed = (int(getattr(msg, 'param1', 0)) == 1)
+                        elif mtype == 'COMMAND_LONG' and getattr(msg, 'command', None) == mavutil.mavlink.MAV_CMD_DO_SET_HOME:
+                            # QGC expects a COMMAND_ACK in response. Update stored home if provided.
+                            use_current = int(getattr(msg, 'param1', 0)) == 1
+                            if use_current:
+                                self.home_lat, self.home_lon, self.home_alt = self.lat, self.lon, self.alt
+                            else:
+                                # params 5/6/7 are lat/lon/alt
+                                lat = float(getattr(msg, 'param5', self.home_lat) or self.home_lat)
+                                lon = float(getattr(msg, 'param6', self.home_lon) or self.home_lon)
+                                alt = float(getattr(msg, 'param7', self.home_alt) or self.home_alt)
+                                self.home_lat, self.home_lon, self.home_alt = lat, lon, alt
+
+                            # Send ACK (accepted)
+                            try:
+                                self.mav.mav.command_ack_send(
+                                    mavutil.mavlink.MAV_CMD_DO_SET_HOME,
+                                    mavutil.mavlink.MAV_RESULT_ACCEPTED,
+                                    0, 0,
+                                    getattr(msg, 'target_system', 0) or 0,
+                                    getattr(msg, 'target_component', 0) or 0,
+                                )
+                                # Also emit HOME_POSITION to reflect the change
+                                self.mav.mav.home_position_send(
+                                    int(self.home_lat * 1e7),
+                                    int(self.home_lon * 1e7),
+                                    int(self.home_alt * 1000),
+                                    0, 0, 0,  # local NED not modeled
+                                    (1.0, 0.0, 0.0, 0.0),  # quaternion w,x,y,z
+                                    0.0, 0.0, 0.0,
+                                )
+                            except Exception:
+                                pass
+                        elif mtype == 'COMMAND_INT' and getattr(msg, 'command', None) == mavutil.mavlink.MAV_CMD_DO_SET_HOME:
+                            # COMMAND_INT variant: param1=use_current, x=lat*1e7, y=lon*1e7, z=alt
+                            use_current = int(getattr(msg, 'param1', 0)) == 1
+                            if use_current:
+                                self.home_lat, self.home_lon, self.home_alt = self.lat, self.lon, self.alt
+                            else:
+                                lat = getattr(msg, 'x', int(self.home_lat * 1e7))
+                                lon = getattr(msg, 'y', int(self.home_lon * 1e7))
+                                alt = float(getattr(msg, 'z', self.home_alt))
+                                self.home_lat = float(lat) / 1e7
+                                self.home_lon = float(lon) / 1e7
+                                self.home_alt = float(alt)
+
+                            try:
+                                self.mav.mav.command_ack_send(
+                                    mavutil.mavlink.MAV_CMD_DO_SET_HOME,
+                                    mavutil.mavlink.MAV_RESULT_ACCEPTED,
+                                    0, 0,
+                                    getattr(msg, 'target_system', 0) or 0,
+                                    getattr(msg, 'target_component', 0) or 0,
+                                )
+                                self.mav.mav.home_position_send(
+                                    int(self.home_lat * 1e7),
+                                    int(self.home_lon * 1e7),
+                                    int(self.home_alt * 1000),
+                                    0, 0, 0,
+                                    (1.0, 0.0, 0.0, 0.0),
+                                    0.0, 0.0, 0.0,
+                                )
+                            except Exception:
+                                pass
                         elif mtype == 'SET_MODE':
                             # best-effort mode decode
                             self.mode = str(getattr(msg, 'custom_mode', self.mode))
+                        elif mtype == 'PARAM_REQUEST_LIST':
+                            names = list(self.parameters.keys())
+                            total = len(names)
+                            for idx, pname in enumerate(names):
+                                self._send_param_value(pname, idx, total)
+                        elif mtype == 'PARAM_REQUEST_READ':
+                            # QGC may request by name or index
+                            requested_name = getattr(msg, 'param_id', b'')
+                            if isinstance(requested_name, bytes):
+                                requested_name = requested_name.decode('ascii', errors='ignore').strip('\x00')
+                            if requested_name and requested_name in self.parameters:
+                                names = list(self.parameters.keys())
+                                self._send_param_value(requested_name, names.index(requested_name), len(names))
+                            else:
+                                # fallback by index
+                                idx = int(getattr(msg, 'param_index', -1))
+                                names = list(self.parameters.keys())
+                                if 0 <= idx < len(names):
+                                    self._send_param_value(names[idx], idx, len(names))
+                        elif mtype == 'PARAM_SET':
+                            pname = getattr(msg, 'param_id', b'')
+                            if isinstance(pname, bytes):
+                                pname = pname.decode('ascii', errors='ignore').strip('\x00')
+                            pval = float(getattr(msg, 'param_value', 0.0))
+                            if pname:
+                                self.parameters[pname] = pval
+                                names = list(self.parameters.keys())
+                                self._send_param_value(pname, names.index(pname), len(names))
                 except Exception:
                     pass
                 self.send_heartbeat()

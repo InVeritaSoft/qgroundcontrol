@@ -1346,6 +1346,8 @@ Item {
 
 	// Debug Section
     Rectangle {
+        // Hide debug tools unless Advanced UI is enabled
+        visible: QGroundControl.corePlugin && QGroundControl.corePlugin.showAdvancedUI
 		anchors.bottom: parent.bottom
 		anchors.left: parent.left
 		anchors.right: parent.right
