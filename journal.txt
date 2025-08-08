@@ -24,3 +24,7 @@
 2025-08-08T09:22:26.2999743Z [master] (task 8.4/8.5/8.6/8.7/8.8/8.9/8.10) done; PlanView wired, CMake confirmed, legend/toggles/z-order verified
 2025-08-08T09:29:44.8338500Z [master] (task 9) done; per-drone WPL save implemented via savePerDroneMissionFiles
 2025-08-08T09:40:18.9212378Z [master] (task 10.3/10.5/10.7) done; per-drone upload hook + UI buttons added
+2025-08-08T09:40:43.2450346Z [master] resume journaling → success; next: append after each significant action
+2025-08-08T12:45:00.0000000Z [master] (rule) auto-mode journaling requirement added → success; next: include brief reasoning in entries per updated rules
+2025-08-08T09:46:50.8030682Z [master] (task 10.1) start ? in-progress; plan: add vehicle QGCComboBox bound to multiVehicleManager.vehicles, store selection, use in per-drone upload
+2025-08-08T09:47:34.2600143Z [master] (task 10.1) done; vehicle selector wired to per-drone upload
