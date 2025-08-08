@@ -473,6 +473,17 @@ Item {
                 }
             }
 
+            // Area Plan Map Visuals (visible on Area layer)
+            AreaPlanMapVisuals {
+                id: areaPlanVisuals
+                mapControl: editorMap
+                areaPlanEditor: QGroundControl.areaPlanEditor
+                visible: _editingLayer == _layerAreaPlan
+                opacity: _editingLayer == _layerAreaPlan ? 1 : editorMap._nonInteractiveOpacity
+                z: QGroundControl.zOrderMapItems + 5
+                anchors.fill: parent
+            }
+
             // Incomplete segment lines
             MapItemView {
                 model: _missionController.incompleteComplexItemLines
