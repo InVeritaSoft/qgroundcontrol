@@ -980,7 +980,7 @@
               "10.1"
             ],
             "details": "Allow users to assign specific missions to the selected vehicle.",
-            "status": "in-progress",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1002,7 +1002,7 @@
               "10.3"
             ],
             "details": "Provide feedback to the user and retry mechanisms.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1024,7 +1024,7 @@
               "10.5"
             ],
             "details": "Provide clear error messages and retry options to the user.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1069,7 +1069,7 @@
               "10.9"
             ],
             "details": "Include steps, error handling, and troubleshooting tips.",
-            "status": "pending",
+            "status": "in-progress",
             "testStrategy": ""
           }
         ]
@@ -1734,7 +1734,7 @@
     ],
     "metadata": {
       "created": "2025-08-07T23:48:39.554Z",
-      "updated": "2025-08-08T09:48:34.880Z",
+      "updated": "2025-08-08T10:03:20.579Z",
       "description": "Tasks for master context"
     }
   }
