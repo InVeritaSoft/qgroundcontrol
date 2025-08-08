@@ -23,6 +23,8 @@ Item {
 	property var areaPlanEditor: null
     // Selected vehicle (object) for upload
     property var selectedVehicle: QGroundControl.multiVehicleManager.activeVehicle
+    // Mapping: droneIndex -> vehicle object
+    property var vehicleMapping: ({})
     // Per-drone preview data: array of { droneIndex, altitudeOffsetM, timeOffsetS, waypoints[] }
     property var waypointPreview: []
 
@@ -1052,6 +1054,91 @@ Item {
                                                 areaPlanEditor.uploadPerDroneMissionToVehicle(idx, selectedVehicle)
                                             } else {
                                                 areaPlanEditor.uploadPerDroneMissionToVehicle(idx)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Per-Drone Vehicle Mapping
+                        Rectangle {
+                            width: parent.width
+                            height: perDroneMapColumn.height + _h
+                            color: qgcPal.windowShade
+                            radius: _w * 0.25
+                            border.color: qgcPal.colorGrey
+                            border.width: 1
+
+                            Column {
+                                id: perDroneMapColumn
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                anchors.margins: _h * 0.5
+                                spacing: _h * 0.4
+
+                                QGCLabel {
+                                    text: qsTr("Per-Drone Vehicle Mapping")
+                                    font.pointSize: ScreenTools.smallFontPointSize
+                                    font.bold: true
+                                }
+
+                                // Build rows dynamically from preview (one row per drone)
+                                Repeater {
+                                    model: waypointPreview
+                                    delegate: Row {
+                                        width: parent.width
+                                        height: _h * 1.6
+                                        spacing: _w
+
+                                        QGCLabel {
+                                            text: qsTr("Drone %1").arg(modelData.droneIndex)
+                                            width: parent.width * 0.2
+                                            height: parent.height
+                                            verticalAlignment: Text.AlignVCenter
+                                        }
+
+                                        QGCComboBox {
+                                            id: vehicleCombo
+                                            width: parent.width * 0.45
+                                            height: parent.height
+                                            model: QGroundControl.multiVehicleManager.vehicles
+                                            textRole: "id"
+                                            onActivated: {
+                                                var veh = QGroundControl.multiVehicleManager.vehicles.get(currentIndex)
+                                                vehicleMapping[modelData.droneIndex] = veh
+                                            }
+                                        }
+
+                                        QGCButton {
+                                            text: qsTr("Upload")
+                                            width: parent.width * 0.25
+                                            height: parent.height
+                                            onClicked: {
+                                                if (areaPlanEditor) {
+                                                    var veh = vehicleMapping[modelData.droneIndex]
+                                                    if (veh) {
+                                                        areaPlanEditor.uploadPerDroneMissionToVehicle(modelData.droneIndex, veh)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                QGCButton {
+                                    text: qsTr("Upload All Mapped")
+                                    width: parent.width
+                                    height: _h * 2
+                                    onClicked: {
+                                        if (areaPlanEditor && waypointPreview && waypointPreview.length > 0) {
+                                            for (var i = 0; i < waypointPreview.length; i++) {
+                                                var d = waypointPreview[i]
+                                                var veh = vehicleMapping[d.droneIndex]
+                                                if (veh) {
+                                                    areaPlanEditor.uploadPerDroneMissionToVehicle(d.droneIndex, veh)
+                                                }
                                             }
                                         }
                                     }
