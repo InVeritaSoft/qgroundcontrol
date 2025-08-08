@@ -15,3 +15,4 @@
 2025-08-08T08:07:40.1560489Z [master] (task 5) start: policy steps injection plan (RTL/Loiter after RTL via toggles)
 2025-08-08T08:15:28.2393024Z [master] (task 11) done; added axis selection and minimal area tests; next: 12 waypoint gen tests
 2025-08-08T08:27:19.7269662Z [master] (task 12) done; waypoint generation count/position tests added; next: 13 policy tests
+2025-08-08T08:48:18.4238223Z [master] (task 6.1) per-drone overlays + legend/toggles implemented in AreaPlanMapVisuals.qml; next: 6.5 performance throttling

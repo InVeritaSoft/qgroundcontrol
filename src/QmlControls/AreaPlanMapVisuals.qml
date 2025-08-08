@@ -38,7 +38,15 @@ Item {
 	property bool isDrawingMode: areaPlanEditor ? areaPlanEditor.isDrawingMode : false
 	property bool showGridLines: true
 	property bool showWaypoints: true
-	property bool isDragging: false
+    property bool isDragging: false
+    // Per-drone overlays
+    property var perDronePreview: (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) ? areaPlanEditor.computePerDroneWaypointPreview() : []
+    property var droneVisibility: new Array(perDronePreview ? perDronePreview.length : 0).fill(true)
+    readonly property var _seriesColors: [
+        qgcPal.colorOrange, qgcPal.colorBlue, qgcPal.colorPurple,
+        qgcPal.colorGreen, qgcPal.colorRed, qgcPal.colorCyan,
+        qgcPal.colorYellow, qgcPal.colorPink
+    ]
 
 	Component.onCompleted: {
 		console.log("AreaPlanMapVisuals: Component completed")
@@ -52,7 +60,9 @@ Item {
 	QGCDynamicObjectManager { id: _objMgrRectangle }
 	QGCDynamicObjectManager { id: _objMgrCenterMarker }
 	QGCDynamicObjectManager { id: _objMgrGridLines }
-	QGCDynamicObjectManager { id: _objMgrWaypointMarkers }
+    QGCDynamicObjectManager { id: _objMgrWaypointMarkers }
+    QGCDynamicObjectManager { id: _objMgrPerDroneGrid }
+    QGCDynamicObjectManager { id: _objMgrPerDroneMarkers }
 
     QGCPalette { id: qgcPal; colorGroupEnabled: enabled }
 
@@ -567,8 +577,10 @@ Item {
 		// Add grid lines
 		addGridLines()
 
-		// Add waypoint markers
-		addWaypointMarkers()
+        // Add waypoint markers
+        addWaypointMarkers()
+        // Per-drone overlays
+        addPerDroneOverlays()
 		console.log("AreaPlanMapVisuals: Map items added successfully")
 	}
 
@@ -627,6 +639,31 @@ Item {
 		_objMgrWaypointMarkers.destroyObjects()
 	}
 
+    // Per-drone overlays creation
+    function addPerDroneOverlays() {
+        _objMgrPerDroneGrid.destroyObjects()
+        _objMgrPerDroneMarkers.destroyObjects()
+        if (!perDronePreview || perDronePreview.length === 0) return
+        for (var d = 0; d < perDronePreview.length; d++) {
+            if (!droneVisibility[d]) continue
+            var group = perDronePreview[d]
+            var color = _seriesColors[d % _seriesColors.length]
+            var wps = group.waypoints || []
+            for (var i = 0; i < wps.length; i++) {
+                var item = _objMgrPerDroneMarkers.createObject(waypointMarkerComponent, mapControl, true)
+                if (item) {
+                    item.coordinate = wps[i]
+                    item.sourceItem.color = color
+                }
+            }
+        }
+    }
+
+    function removePerDroneOverlays() {
+        _objMgrPerDroneGrid.destroyObjects()
+        _objMgrPerDroneMarkers.destroyObjects()
+    }
+
 	function removeMapItems() {
 		console.log("AreaPlanMapVisuals: Removing all map items")
 		_objMgrRectangle.destroyObjects()
@@ -679,32 +716,44 @@ Item {
 		function onAreaWidthChanged() {
 			console.log("AreaPlanMapVisuals: Area width changed, updating map items")
 			addMapItems()
+            if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) perDronePreview = areaPlanEditor.computePerDroneWaypointPreview()
 		}
 
 		function onAreaHeightChanged() {
 			console.log("AreaPlanMapVisuals: Area height changed, updating map items")
 			addMapItems()
+            if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) perDronePreview = areaPlanEditor.computePerDroneWaypointPreview()
 		}
 
 		function onAreaCenterChanged() {
 			console.log("AreaPlanMapVisuals: Area center changed, updating map items")
 			addMapItems()
+            if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) perDronePreview = areaPlanEditor.computePerDroneWaypointPreview()
 		}
 
 		function onAreaRotationChanged() {
 			console.log("AreaPlanMapVisuals: Area rotation changed, updating map items")
 			addMapItems()
+            if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) perDronePreview = areaPlanEditor.computePerDroneWaypointPreview()
 		}
 
 		function onLineSpacingChanged() {
 			console.log("AreaPlanMapVisuals: Line spacing changed, updating map items")
 			addGridLines()
 			addWaypointMarkers()
+            if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) {
+                perDronePreview = areaPlanEditor.computePerDroneWaypointPreview()
+                addPerDroneOverlays()
+            }
 		}
 
 		function onNumPointsChanged() {
 			console.log("AreaPlanMapVisuals: Number of points changed, updating map items")
 			addWaypointMarkers()
+            if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) {
+                perDronePreview = areaPlanEditor.computePerDroneWaypointPreview()
+                addPerDroneOverlays()
+            }
 		}
 	}
 
@@ -722,7 +771,38 @@ Item {
 		}
 	}
 
-	// Add a transparent MouseArea for the entire map area when in drawing mode
+    // Simple legend + visibility toggles for per-drone overlays
+    Column {
+        id: legend
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.margins: ScreenTools.defaultFontPixelWidth
+        spacing: ScreenTools.defaultFontPixelHeight * 0.25
+        visible: perDronePreview && perDronePreview.length > 0
+
+        Repeater {
+            model: perDronePreview ? perDronePreview.length : 0
+            delegate: Row {
+                spacing: ScreenTools.defaultFontPixelWidth * 0.5
+                Rectangle {
+                    width: ScreenTools.defaultFontPixelHeight
+                    height: width
+                    radius: width/2
+                    color: _seriesColors[index % _seriesColors.length]
+                }
+                QGCSwitch {
+                    checked: droneVisibility[index]
+                    onToggled: {
+                        droneVisibility[index] = checked
+                        addPerDroneOverlays()
+                    }
+                }
+                QGCLabel { text: qsTr("Drone %1").arg(index) }
+            }
+        }
+    }
+
+    // Add a transparent MouseArea for the entire map area when in drawing mode
 	MouseArea {
 		id: mapAreaMouseArea
 		anchors.fill: parent
@@ -835,7 +915,8 @@ Item {
 		}
 	}
 
-	Component.onDestruction: {
-		removeMapItems()
-	}
+    Component.onDestruction: {
+        removeMapItems()
+        removePerDroneOverlays()
+    }
 }
