@@ -29,6 +29,7 @@
 #include "QGCMAVLink.h"
 #include "MissionController.h" // Added for MissionController
 #include "SimpleMissionItem.h"
+#include "MissionManager/AreaPartition.h"
 
 AreaPlanEditor::AreaPlanEditor(QObject* parent)
     : QObject(parent)
@@ -347,6 +348,25 @@ QVariantList AreaPlanEditor::generateWaypoints()
     
     finishProgress(QStringLiteral("Generated %1 waypoints successfully").arg(waypoints.size()));
     return waypoints;
+}
+
+QVariantList AreaPlanEditor::computePartitionStripes() const
+{
+    QVariantList stripes;
+    // Convert current area parameters into local meters frame centered at areaCenter
+    // Using simple rectangle model with width/height and rotation
+    const double cx = 0.0;
+    const double cy = 0.0;
+    const int stripesCount = qMax(1, _droneCount);
+    const bool alongShortAxis = true;
+    auto lines = AreaPlan::splitIntoStripes(cx, cy, _areaWidth, _areaHeight, stripesCount, alongShortAxis, _areaRotation);
+    for (const auto& ln : lines) {
+        QVariantMap m;
+        m["ax"] = ln.a.x; m["ay"] = ln.a.y;
+        m["bx"] = ln.b.x; m["by"] = ln.b.y;
+        stripes.append(m);
+    }
+    return stripes;
 }
 
 void AreaPlanEditor::addWaypointsToMission()
