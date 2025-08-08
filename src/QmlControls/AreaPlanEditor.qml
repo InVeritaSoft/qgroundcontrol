@@ -966,7 +966,7 @@ Item {
                                 id: droneIndexField
                                 width: parent.width * 0.2
                                 height: parent.height
-                                text: "0"
+                                text: qsTr("0")
                                 validator: IntValidator { bottom: 0; top: 99 }
                             }
                             QGCButton {
@@ -1039,7 +1039,7 @@ Item {
                                 id: uploadDroneIndexField
                                 width: parent.width * 0.1
                                 height: parent.height
-                                text: "0"
+                                text: qsTr("0")
                                 validator: IntValidator { bottom: 0; top: 99 }
                             }
                             QGCButton {
