@@ -1399,7 +1399,7 @@
           7,
           8
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -1618,7 +1618,7 @@
           9,
           10
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -1681,7 +1681,7 @@
               "16.5"
             ],
             "details": "Ensure that the drones take off and execute their missions at staggered times if configured.",
-            "status": "in-progress",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1692,7 +1692,7 @@
               "16.2"
             ],
             "details": "Ensure all relevant data is logged for analysis.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1703,7 +1703,7 @@
               "16.2"
             ],
             "details": "Document visual states at critical points in the test.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1715,7 +1715,7 @@
               "16.8"
             ],
             "details": "Include steps taken, observations, and any issues encountered.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1726,7 +1726,7 @@
               "16.9"
             ],
             "details": "Ensure all steps are documented and any issues are noted.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -1734,7 +1734,7 @@
     ],
     "metadata": {
       "created": "2025-08-07T23:48:39.554Z",
-      "updated": "2025-08-08T11:00:37.849Z",
+      "updated": "2025-08-08T11:20:13.203Z",
       "description": "Tasks for master context"
     }
   }

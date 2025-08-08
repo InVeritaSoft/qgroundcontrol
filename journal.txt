@@ -115,3 +115,6 @@ Next steps:
 2025-08-08T10:53:10.1516387Z [master] (task 16.5) start ? in-progress; plan: add altitude band validation checklist (per-drone offsets, non-overlap) with steps
 2025-08-08T10:55:39.8406539Z [master] (task 16.5) done ? committed; next: 16.6 validate time staggering
 2025-08-08T11:00:47.4792147Z [master] (task 16.6) start ? in-progress; plan: add time-stagger validation checklist (pre-start loiter offsets, launch separation) with steps
+2025-08-08T11:02:46.7603600Z [master] (task 16.6) done ? committed; next: 16.7 capture logs
+2025-08-08T11:03:42.3333491Z [master] (task 16.7) start ? in-progress; plan: add logs capture checklist (telemetry logs/MAVLink, QGC app logs) with paths
+2025-08-08T11:07:36.4096233Z [master] (task 16) done; E2E SITL docs/checklists completed; all subtasks done
