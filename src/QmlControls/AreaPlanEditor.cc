@@ -966,17 +966,31 @@ void AreaPlanEditor::uploadToVehicle()
     
     updateProgress(80, QStringLiteral("Creating mission items..."));
     
+    // Connect progress and completion/error
+    QObject::connect(missionManager, &PlanManager::progressPctChanged, this, [this](double pct) {
+        updateProgress(static_cast<int>(pct), QStringLiteral("Uploading to vehicle..."));
+    }, Qt::UniqueConnection);
+
+    QObject::connect(missionManager, &PlanManager::error, this,
+                     [this](int /*code*/, const QString& errorMsg) {
+                         cancelProgress();
+                         handleError(QStringLiteral("Mission upload failed"), errorMsg);
+                     }, Qt::UniqueConnection);
+
+    QObject::connect(missionManager, &PlanManager::sendComplete, this,
+                     [this](bool error) {
+                         if (error) {
+                             cancelProgress();
+                             handleError(QStringLiteral("Mission upload failed"));
+                         } else {
+                             clearValidationError();
+                             finishProgress(QStringLiteral("Mission uploaded to vehicle successfully"));
+                         }
+                     }, Qt::UniqueConnection);
+
     // Upload mission to vehicle
-    try {
-        updateProgress(90, QStringLiteral("Uploading to vehicle..."));
-        missionManager->writeMissionItems(missionItems);
-        clearValidationError();
-        finishProgress(QStringLiteral("Mission uploaded to vehicle successfully"));
-    } catch (const std::exception& e) {
-        cancelProgress();
-        handleError(QStringLiteral("Failed to upload mission to vehicle"), QStringLiteral("Please check vehicle connection and try again"));
-        logError(QStringLiteral("Upload exception: %1").arg(e.what()), "uploadToVehicle");
-    }
+    updateProgress(90, QStringLiteral("Uploading to vehicle..."));
+    missionManager->writeMissionItems(missionItems);
 }
 
 void AreaPlanEditor::uploadPerDroneMissionToVehicle(int droneIndex, QObject* vehicleObject)
@@ -1029,20 +1043,35 @@ void AreaPlanEditor::uploadPerDroneMissionToVehicle(int droneIndex, QObject* veh
         missionItems.append(wp);
     }
 
-    try {
-        MissionManager* missionManager = vehicle->missionManager();
-        if (!missionManager) {
-            cancelProgress();
-            handleError(QStringLiteral("MissionManager unavailable"));
-            qDeleteAll(missionItems);
-            return;
-        }
-        missionManager->writeMissionItems(missionItems);
-        finishProgress(QStringLiteral("Uploaded mission for drone %1").arg(droneIndex));
-    } catch (...) {
+    MissionManager* missionManager = vehicle->missionManager();
+    if (!missionManager) {
         cancelProgress();
-        handleError(QStringLiteral("Mission upload failed"));
+        handleError(QStringLiteral("MissionManager unavailable"));
+        qDeleteAll(missionItems);
+        return;
     }
+
+    QObject::connect(missionManager, &PlanManager::progressPctChanged, this, [this, droneIndex](double pct) {
+        updateProgress(static_cast<int>(pct), QStringLiteral("Uploading drone %1...").arg(droneIndex));
+    }, Qt::UniqueConnection);
+
+    QObject::connect(missionManager, &PlanManager::error, this,
+                     [this, droneIndex](int /*code*/, const QString& errorMsg) {
+                         cancelProgress();
+                         handleError(QStringLiteral("Mission upload failed for drone %1").arg(droneIndex), errorMsg);
+                     }, Qt::UniqueConnection);
+
+    QObject::connect(missionManager, &PlanManager::sendComplete, this,
+                     [this, droneIndex](bool error) {
+                         if (error) {
+                             cancelProgress();
+                             handleError(QStringLiteral("Mission upload failed for drone %1").arg(droneIndex));
+                         } else {
+                             finishProgress(QStringLiteral("Uploaded mission for drone %1").arg(droneIndex));
+                         }
+                     }, Qt::UniqueConnection);
+
+    missionManager->writeMissionItems(missionItems);
 
     qDeleteAll(missionItems);
 }
