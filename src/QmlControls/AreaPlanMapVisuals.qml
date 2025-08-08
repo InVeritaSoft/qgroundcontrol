@@ -64,6 +64,14 @@ Item {
     QGCDynamicObjectManager { id: _objMgrPerDroneGrid }
     QGCDynamicObjectManager { id: _objMgrPerDroneMarkers }
 
+    // Debounce Timer for overlays
+    Timer {
+        id: _overlayDebounce
+        interval: 120
+        repeat: false
+        onTriggered: addPerDroneOverlays()
+    }
+
     QGCPalette { id: qgcPal; colorGroupEnabled: enabled }
 
 	// Calculate rectangle corners based on area parameters
@@ -716,25 +724,37 @@ Item {
 		function onAreaWidthChanged() {
 			console.log("AreaPlanMapVisuals: Area width changed, updating map items")
 			addMapItems()
-            if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) perDronePreview = areaPlanEditor.computePerDroneWaypointPreview()
+            if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) {
+                perDronePreview = areaPlanEditor.computePerDroneWaypointPreview()
+                _overlayDebounce.restart()
+            }
 		}
 
 		function onAreaHeightChanged() {
 			console.log("AreaPlanMapVisuals: Area height changed, updating map items")
 			addMapItems()
-            if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) perDronePreview = areaPlanEditor.computePerDroneWaypointPreview()
+            if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) {
+                perDronePreview = areaPlanEditor.computePerDroneWaypointPreview()
+                _overlayDebounce.restart()
+            }
 		}
 
 		function onAreaCenterChanged() {
 			console.log("AreaPlanMapVisuals: Area center changed, updating map items")
 			addMapItems()
-            if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) perDronePreview = areaPlanEditor.computePerDroneWaypointPreview()
+            if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) {
+                perDronePreview = areaPlanEditor.computePerDroneWaypointPreview()
+                _overlayDebounce.restart()
+            }
 		}
 
 		function onAreaRotationChanged() {
 			console.log("AreaPlanMapVisuals: Area rotation changed, updating map items")
 			addMapItems()
-            if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) perDronePreview = areaPlanEditor.computePerDroneWaypointPreview()
+            if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) {
+                perDronePreview = areaPlanEditor.computePerDroneWaypointPreview()
+                _overlayDebounce.restart()
+            }
 		}
 
 		function onLineSpacingChanged() {
