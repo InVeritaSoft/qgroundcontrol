@@ -29,6 +29,7 @@ private slots:
     void _balancedPartition();
     void _boundsAndRotation();
     void _rotationHandling();
+    void _perDroneGeneratedWaypoints();
 };
 
 

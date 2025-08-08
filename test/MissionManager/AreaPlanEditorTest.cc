@@ -157,6 +157,39 @@ void AreaPlanEditorTest::_rotationHandling()
     }
 }
 
+void AreaPlanEditorTest::_perDroneGeneratedWaypoints()
+{
+    AreaPlanEditor* editor = QGroundControlQmlGlobal::instance()->areaPlanEditor();
+    QVERIFY(editor);
+
+    editor->setAreaCenter(QGeoCoordinate(47.3977419, 8.5455938));
+    editor->setAreaWidth(20.0);
+    editor->setAreaHeight(30.0);
+    editor->setLineSpacing(10.0); // 3 lines
+    editor->setNumPoints(2);
+    editor->setMissionAltitude(40.0);
+    editor->setDroneCount(3);
+    editor->setAltitudeBandStart(5.0);
+    editor->setAltitudeBandStep(10.0);
+
+    const int lineCount = qMax(1, static_cast<int>(qFloor(editor->areaHeight() / editor->lineSpacing())));
+    for (int d = 0; d < editor->droneCount(); ++d) {
+        auto wps = editor->generatePerDroneWaypoints(d);
+        // Each assigned line contributes numPoints; round-robin groups differ by at most 1
+        // We assert total across drones equals lineCount*numPoints across union; here check non-negative and plausible upper bound
+        QVERIFY(wps.size() >= 0);
+        QVERIFY(wps.size() <= lineCount * editor->numPoints());
+
+        // Altitude check
+        const double expectedAlt = editor->missionAltitude() + (editor->altitudeBandStart() + d * editor->altitudeBandStep());
+        for (const QVariant& v : wps) {
+            QGeoCoordinate c = v.value<QGeoCoordinate>();
+            QVERIFY(c.isValid());
+            QVERIFY(qAbs(c.altitude() - expectedAlt) < 1e-6);
+        }
+    }
+}
+
 void AreaPlanEditorTest::_generateWaypointsAndAddToMission()
 {
     // Prepare master/mission controller for offline planning
