@@ -126,6 +126,11 @@ public:
     // Preview per-drone waypoints without mutating MissionController
     // Returns a QVariantList of maps: { droneIndex, altitudeOffsetM, timeOffsetS, waypoints: [QGeoCoordinate, ...] }
     Q_INVOKABLE QVariantList computePerDroneWaypointPreview() const;
+    // Generate only the waypoint coordinates for a specific drone index
+    Q_INVOKABLE QVariantList generatePerDroneWaypoints(int droneIndex) const;
+    // Insert a specific drone's waypoints into the MissionController (non-multi aggregation)
+    Q_INVOKABLE void addPerDroneToMission(int droneIndex);
+    Q_INVOKABLE void addAllDronesToMission();
     Q_INVOKABLE void addWaypointsToMission();
     Q_INVOKABLE void saveMissionFile();
     Q_INVOKABLE void uploadToVehicle();

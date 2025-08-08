@@ -980,6 +980,13 @@ Item {
                             }
                         }
 
+                        QGCButton {
+                            text: qsTr("Insert All Drones")
+                            width: parent.width
+                            height: _h * 2
+                            onClicked: if (areaPlanEditor) areaPlanEditor.addAllDronesToMission()
+                        }
+
 						QGCButton {
 							text: qsTr("Upload to Vehicle")
 							width: parent.width

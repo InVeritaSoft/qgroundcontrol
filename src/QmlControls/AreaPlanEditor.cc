@@ -476,6 +476,91 @@ QVariantList AreaPlanEditor::computePerDroneWaypointPreview() const
     return result;
 }
 
+QVariantList AreaPlanEditor::generatePerDroneWaypoints(int droneIndex) const
+{
+    QVariantList waypoints;
+    if (_areaWidth <= 0 || _areaHeight <= 0 || _lineSpacing <= 0 || _numPoints <= 0) {
+        return waypoints;
+    }
+    const int lineCount = qMax(1, static_cast<int>(qFloor(_areaHeight / _lineSpacing)));
+    const auto rr = AreaPlan::assignStripesRoundRobin(_droneCount, lineCount);
+    if (droneIndex < 0 || droneIndex >= static_cast<int>(rr.size())) return waypoints;
+
+    const double cx = 0.0;
+    const double cy = 0.0;
+    const bool alongShortAxis = true;
+    const auto stripes = AreaPlan::splitIntoStripes(cx, cy, _areaWidth, _areaHeight, lineCount, alongShortAxis, _areaRotation);
+
+    auto toGeo = [&](double localX, double localY) -> QGeoCoordinate {
+        QGeoCoordinate northShift = calculateOffsetCoordinate(_areaCenter, localY, 0.0);
+        QGeoCoordinate eastShift  = calculateOffsetCoordinate(northShift,   localX, 90.0);
+        return eastShift;
+    };
+
+    const qreal altOffset = _altitudeBandStart + droneIndex * _altitudeBandStep;
+    for (int lineIndex : rr[static_cast<size_t>(droneIndex)]) {
+        if (lineIndex < 0 || lineIndex >= static_cast<int>(stripes.size())) continue;
+        const auto& ln = stripes[static_cast<size_t>(lineIndex)];
+        for (int j = 0; j < _numPoints; ++j) {
+            const qreal t = (j + 0.5) / _numPoints;
+            const double x = ln.a.x + t * (ln.b.x - ln.a.x);
+            const double y = ln.a.y + t * (ln.b.y - ln.a.y);
+            QGeoCoordinate geo = toGeo(x, y);
+            geo.setAltitude(_missionAltitude + altOffset);
+            waypoints.append(QVariant::fromValue(geo));
+        }
+    }
+    return waypoints;
+}
+
+void AreaPlanEditor::addPerDroneToMission(int droneIndex)
+{
+    MissionController* missionController = getMissionController();
+    if (!missionController) {
+        handleError(QStringLiteral("Mission controller not available"));
+        return;
+    }
+    // Optional pre-start stagger: loiter at home for d * timeOffsetPerDrone seconds
+    if (_timeOffsetPerDrone > 0.0 && droneIndex >= 0) {
+        const qreal delay = droneIndex * _timeOffsetPerDrone;
+        if (delay > 0.0) {
+            VisualMissionItem* preLoiter = missionController->insertSimpleMissionItem(_homeLocation, -1, false);
+            if (auto* simpleItem = qobject_cast<SimpleMissionItem*>(preLoiter)) {
+                simpleItem->missionItem().setParam1(delay);
+                simpleItem->missionItem().setParam2(1.0);
+                simpleItem->missionItem().setParam3(50.0);
+                simpleItem->missionItem().setParam4(1.0);
+                simpleItem->setCommand(MAV_CMD_NAV_LOITER_TIME);
+            }
+        }
+    }
+    QVariantList wps = generatePerDroneWaypoints(droneIndex);
+    for (const QVariant& v : wps) {
+        QGeoCoordinate c = v.value<QGeoCoordinate>();
+        missionController->insertSimpleMissionItem(c, -1, false);
+        if (_rtlAfterEveryWaypoint) {
+            missionController->insertLandItem(_homeLocation, -1, false);
+            if (_loiterAfterRtl) {
+                VisualMissionItem* loiterItem = missionController->insertSimpleMissionItem(_homeLocation, -1, false);
+                if (auto* simpleItem = qobject_cast<SimpleMissionItem*>(loiterItem)) {
+                    simpleItem->missionItem().setParam1(_loiterTime);
+                    simpleItem->missionItem().setParam2(1.0);
+                    simpleItem->missionItem().setParam3(50.0);
+                    simpleItem->missionItem().setParam4(1.0);
+                    simpleItem->setCommand(MAV_CMD_NAV_LOITER_TIME);
+                }
+            }
+        }
+    }
+}
+
+void AreaPlanEditor::addAllDronesToMission()
+{
+    for (int d = 0; d < _droneCount; ++d) {
+        addPerDroneToMission(d);
+    }
+}
+
 void AreaPlanEditor::addWaypointsToMission()
 {
     qDebug() << "AreaPlanEditor: Starting mission generation";
