@@ -21,6 +21,8 @@ Item {
 
 	// Reference to the C++ backend
 	property var areaPlanEditor: null
+    // Selected vehicle (object) for upload
+    property var selectedVehicle: QGroundControl.multiVehicleManager.activeVehicle
     // Per-drone preview data: array of { droneIndex, altitudeOffsetM, timeOffsetS, waypoints[] }
     property var waypointPreview: []
 
@@ -1000,15 +1002,40 @@ Item {
                             width: parent.width
                             height: _h * 2
                             spacing: _w
+                            // Vehicle selector
+                            QGCComboBox {
+                                id: vehicleSelector
+                                width: parent.width * 0.35
+                                height: parent.height
+                                model: QGroundControl.multiVehicleManager.vehicles
+                                textRole: "id"
+                                onActivated: {
+                                    // model is ListModel of Vehicle QObjects; get(index) returns object wrapper
+                                    var veh = QGroundControl.multiVehicleManager.vehicles.get(currentIndex)
+                                    selectedVehicle = veh
+                                }
+                                Component.onCompleted: {
+                                    if (QGroundControl.multiVehicleManager.activeVehicle) {
+                                        // Try to set currentIndex to active vehicle
+                                        for (var i = 0; i < QGroundControl.multiVehicleManager.vehicles.count; i++) {
+                                            if (QGroundControl.multiVehicleManager.vehicles.get(i) === QGroundControl.multiVehicleManager.activeVehicle) {
+                                                currentIndex = i
+                                                selectedVehicle = QGroundControl.multiVehicleManager.activeVehicle
+                                                break
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                             QGCLabel {
-                                text: qsTr("Upload Drone # to Active Vehicle:")
-                                width: parent.width * 0.6
+                                text: qsTr("Upload Drone # → Vehicle:")
+                                width: parent.width * 0.25
                                 height: parent.height
                                 verticalAlignment: Text.AlignVCenter
                             }
                             QGCTextField {
                                 id: uploadDroneIndexField
-                                width: parent.width * 0.15
+                                width: parent.width * 0.1
                                 height: parent.height
                                 text: "0"
                                 validator: IntValidator { bottom: 0; top: 99 }
@@ -1021,7 +1048,11 @@ Item {
                                     if (areaPlanEditor) {
                                         var idx = parseInt(uploadDroneIndexField.text)
                                         if (!isNaN(idx)) {
-                                            areaPlanEditor.uploadPerDroneMissionToVehicle(idx)
+                                            if (selectedVehicle) {
+                                                areaPlanEditor.uploadPerDroneMissionToVehicle(idx, selectedVehicle)
+                                            } else {
+                                                areaPlanEditor.uploadPerDroneMissionToVehicle(idx)
+                                            }
                                         }
                                     }
                                 }
