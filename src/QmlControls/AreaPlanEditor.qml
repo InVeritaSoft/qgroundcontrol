@@ -987,6 +987,47 @@ Item {
                             onClicked: if (areaPlanEditor) areaPlanEditor.addAllDronesToMission()
                         }
 
+                        // Save per-drone WPL files
+                        QGCButton {
+                            text: qsTr("Save Per-Drone Mission Files")
+                            width: parent.width
+                            height: _h * 2
+                            onClicked: if (areaPlanEditor) areaPlanEditor.savePerDroneMissionFiles()
+                        }
+
+                        // Upload per-drone mission to active vehicle
+                        Row {
+                            width: parent.width
+                            height: _h * 2
+                            spacing: _w
+                            QGCLabel {
+                                text: qsTr("Upload Drone # to Active Vehicle:")
+                                width: parent.width * 0.6
+                                height: parent.height
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            QGCTextField {
+                                id: uploadDroneIndexField
+                                width: parent.width * 0.15
+                                height: parent.height
+                                text: "0"
+                                validator: IntValidator { bottom: 0; top: 99 }
+                            }
+                            QGCButton {
+                                text: qsTr("Upload")
+                                width: parent.width * 0.2
+                                height: parent.height
+                                onClicked: {
+                                    if (areaPlanEditor) {
+                                        var idx = parseInt(uploadDroneIndexField.text)
+                                        if (!isNaN(idx)) {
+                                            areaPlanEditor.uploadPerDroneMissionToVehicle(idx)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
 						QGCButton {
 							text: qsTr("Upload to Vehicle")
 							width: parent.width

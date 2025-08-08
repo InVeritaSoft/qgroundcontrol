@@ -136,6 +136,8 @@ public:
     // Save separate WPL files per-drone using current multi-drone configuration
     Q_INVOKABLE void savePerDroneMissionFiles();
     Q_INVOKABLE void uploadToVehicle();
+    // Upload a specific drone's mission to a selected vehicle (or active vehicle if null)
+    Q_INVOKABLE void uploadPerDroneMissionToVehicle(int droneIndex, QObject* vehicleObject = nullptr);
     Q_INVOKABLE void startMission();
     Q_INVOKABLE void updateStatus(const QString& message);
     Q_INVOKABLE QGeoCoordinate calculateOffsetCoordinate(const QGeoCoordinate& coord, qreal meters, qreal bearing) const;

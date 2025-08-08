@@ -979,6 +979,74 @@ void AreaPlanEditor::uploadToVehicle()
     }
 }
 
+void AreaPlanEditor::uploadPerDroneMissionToVehicle(int droneIndex, QObject* vehicleObject)
+{
+    startProgress(QStringLiteral("Per-Drone Upload"), QStringLiteral("Preparing mission for upload..."));
+
+    if (!validateAreaParameters()) {
+        cancelProgress();
+        handleError(QStringLiteral("Invalid area parameters"), QStringLiteral("Please check parameters and try again"));
+        return;
+    }
+
+    Vehicle* vehicle = nullptr;
+    if (vehicleObject) {
+        vehicle = qobject_cast<Vehicle*>(vehicleObject);
+    }
+    if (!vehicle) {
+        vehicle = getCurrentVehicle();
+    }
+    if (!vehicle) {
+        cancelProgress();
+        handleError(QStringLiteral("No vehicle available"), QStringLiteral("Connect/select a vehicle and try again"));
+        return;
+    }
+
+    QVariantList wps = generatePerDroneWaypoints(droneIndex);
+    if (wps.isEmpty()) {
+        cancelProgress();
+        handleError(QStringLiteral("No waypoints generated for drone"), QStringLiteral("Adjust parameters or index"));
+        return;
+    }
+
+    // Build mission items for this drone
+    QList<MissionItem*> missionItems;
+    int seq = 0;
+    MissionItem* takeoff = new MissionItem(seq++, MAV_CMD_NAV_TAKEOFF, MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                           0, 0, 0, 0,
+                                           _homeLocation.latitude(), _homeLocation.longitude(), _missionAltitude,
+                                           true, false, this);
+    missionItems.append(takeoff);
+
+    const qreal altOffset = _altitudeBandStart + droneIndex * _altitudeBandStep;
+    for (const QVariant& v : wps) {
+        QGeoCoordinate c = v.value<QGeoCoordinate>();
+        c.setAltitude(_missionAltitude + altOffset);
+        MissionItem* wp = new MissionItem(seq++, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                          0, 0, 0, 0,
+                                          c.latitude(), c.longitude(), c.altitude(),
+                                          true, false, this);
+        missionItems.append(wp);
+    }
+
+    try {
+        MissionManager* missionManager = vehicle->missionManager();
+        if (!missionManager) {
+            cancelProgress();
+            handleError(QStringLiteral("MissionManager unavailable"));
+            qDeleteAll(missionItems);
+            return;
+        }
+        missionManager->writeMissionItems(missionItems);
+        finishProgress(QStringLiteral("Uploaded mission for drone %1").arg(droneIndex));
+    } catch (...) {
+        cancelProgress();
+        handleError(QStringLiteral("Mission upload failed"));
+    }
+
+    qDeleteAll(missionItems);
+}
+
 void AreaPlanEditor::startMission()
 {
     Vehicle* vehicle = getCurrentVehicle();
