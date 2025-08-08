@@ -22,3 +22,4 @@
 2025-08-08T09:04:14.9094897Z [master] (task 15.3/15.4) done; marker reuse + timing logs in overlays
 2025-08-08T09:12:59.9259280Z [master] (task 8.1/8.2/8.3) done; AreaPlanMapVisuals added to PlanView with proper z/visibility
 2025-08-08T09:22:26.2999743Z [master] (task 8.4/8.5/8.6/8.7/8.8/8.9/8.10) done; PlanView wired, CMake confirmed, legend/toggles/z-order verified
+2025-08-08T09:29:44.8338500Z [master] (task 9) done; per-drone WPL save implemented via savePerDroneMissionFiles
