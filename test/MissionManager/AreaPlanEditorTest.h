@@ -34,6 +34,7 @@ private slots:
     void _perDroneGeneratedWaypoints();
     void _axisSelectionAndMinimal();
     void _waypointGenerationCountsAndPositions();
+    void _policyInjectionSequencing();
 };
 
 

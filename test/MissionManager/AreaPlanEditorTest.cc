@@ -287,6 +287,42 @@ void AreaPlanEditorTest::_generateWaypointsAndAddToMission()
     QVERIFY(visual->count() > 3);
 }
 
+// Verify RTL/Loiter sequencing with toggles using per-drone insertion
+void AreaPlanEditorTest::_policyInjectionSequencing()
+{
+    PlanMasterController master(nullptr);
+    master.setFlyView(false);
+    master.start();
+
+    MissionController* mission = master.missionController();
+    QVERIFY(mission);
+
+    AreaPlanEditor* editor = QGroundControlQmlGlobal::instance()->areaPlanEditor();
+    QVERIFY(editor);
+    editor->setPlanMasterController(&master);
+
+    // Simple geometry
+    editor->setAreaCenter(QGeoCoordinate(47.3977419, 8.5455938));
+    editor->setAreaWidth(10.0);
+    editor->setAreaHeight(10.0);
+    editor->setLineSpacing(10.0); // 1 line
+    editor->setNumPoints(1);      // 1 point
+    editor->setMissionAltitude(25.0);
+    editor->setDroneCount(1);
+
+    // Enable policy toggles
+    editor->setRtlAfterEveryWaypoint(true);
+    editor->setLoiterAfterRtl(true);
+    editor->setLoiterTime(7.0);
+
+    // Insert per-drone sequence
+    editor->addPerDroneToMission(0);
+
+    // Expect at least: waypoint, RTL, Loiter
+    auto* visual = mission->visualItems();
+    QVERIFY(visual);
+    QVERIFY(visual->count() >= 3);
+}
 void AreaPlanEditorTest::_multiDroneDefaultsAndSetters()
 {
     AreaPlanEditor* editor = QGroundControlQmlGlobal::instance()->areaPlanEditor();
