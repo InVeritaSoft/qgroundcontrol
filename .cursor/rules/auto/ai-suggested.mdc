@@ -1,0 +1,55 @@
+---
+alwaysApply: true
+---
+- **Main Points**
+
+  - **Every rule must have a clear description, globs, and alwaysApply field in the frontmatter.**
+  - **Include DO/DON'T code examples for every rule.**
+  - **Reference real code and cross-link related rules.**
+  - **Explain the rationale ("Why") for each rule.**
+  - **Add a lastUpdated field for maintenance tracking.**
+  - **Deprecate and migrate rules as patterns evolve.**
+
+- **DO:**
+
+  ```typescript
+  // ✅ DO: Provide actionable, real-world examples
+  @Module({
+    providers: [UserService],
+    exports: [UserService],
+  })
+  export class UserModule {}
+  ```
+
+- **DON'T:**
+
+  ```typescript
+  // ❌ DON'T: Omit context or rationale
+  // ❌ DON'T: Leave out code examples
+  // ❌ DON'T: Use vague descriptions
+  ```
+
+- **Why:**
+
+  - Clear, actionable rules improve onboarding, code quality, and consistency.
+  - Code examples help developers understand and apply rules correctly.
+  - Cross-references and rationale make rules easier to maintain and evolve.
+
+- **Rule Review Checklist:**
+
+  - [ ] Description, globs, alwaysApply, lastUpdated present
+  - [ ] DO/DON'T code examples included
+  - [ ] Rationale ("Why") explained
+  - [ ] Cross-references to related rules
+  - [ ] Up-to-date with current codebase patterns
+
+- **Deprecation & Migration:**
+
+  - Mark outdated rules as deprecated at the top.
+  - Link to replacement rules and document migration steps.
+
+- **See also:**
+  [cursor-rules.mdc](mdc:.cursor/rules/cursor-rules.mdc), [self-improve.mdc](mdc:.cursor/rules/self-improve.mdc), [taskmaster/dev-workflow.mdc](mdc:.cursor/rules/taskmaster/dev-workflow.mdc)
+
+- **See also:**
+  [cursor-rules.mdc](mdc:.cursor/rules/cursor-rules.mdc), [self-improve.mdc](mdc:.cursor/rules/self-improve.mdc), [taskmaster/dev-workflow.mdc](mdc:.cursor/rules/taskmaster/dev-workflow.mdc)

@@ -1,0 +1,70 @@
+---
+description: QGroundControl-specific overrides for autonomous rules (Qt/CMake, QML/QRC, journaling, and safety preferences)
+globs: **/*
+alwaysApply: true
+lastUpdated: 2025-08-08
+---
+
+- **Project-Specific Automation Overrides (QGroundControl)**
+  - **Build & Test**
+    - Prefer CMake Presets and Ninja/MSBuild over web tooling.
+    - Do not auto-run builds after edits; leave build execution to the user.
+    - Follow the user's loop: kill app process → build (CMake/Ninja) → fix errors → run/play tests.
+    - Respect Windows PowerShell shell; avoid commands that require interactive input.
+    - Keep build output off the C drive unless explicitly requested by the user.
+  - **Caching & Safety**
+    - Never clear caches without explicit user confirmation.
+  - **Qt/QML Conventions**
+    - Use QRC resources for QML assets (no new QML module packaging here).
+    - Use `QGCPalette`, `ScreenTools`, and `qsTr()` in QML; avoid horizontal scrolling.
+    - Keep sizing relative (ScreenTools) and theming via QGC controls.
+  - **Journaling**
+    - Append status updates, failures/successes, and tricky moments to `journal.txt` in the repo root.
+    - Include timestamp, task/subtask ID (if applicable), action, outcome, and next step.
+
+- **DO**
+
+  ```powershell
+  # ✅ DO: Build with CMake Presets (Windows PowerShell)
+  cmake -S . -B build\qgc-win-rel --preset=windows-release
+  cmake --build build\qgc-win-rel --config Release --parallel
+  ctest --test-dir build\qgc-win-rel -C Release --output-on-failure
+  ```
+
+  ```qml
+  // ✅ DO: Use QGC controls, ScreenTools, qsTr(), and QRC paths
+  import QGroundControl.Controls
+  import QGroundControl.ScreenTools
+
+  QGCLabel {
+      text: qsTr("Mission Controls")
+      font.pointSize: ScreenTools.mediumFontPointSize
+  }
+  ```
+
+- **DON'T**
+
+  ```bash
+  # ❌ DON'T: Use npm/webpack/vite build commands here
+  npm run build
+  ```
+
+  ```qml
+  // ❌ DON'T: Hardcode sizes or bypass QGC palette/theming
+  Rectangle {
+      width: 400  // hardcoded
+      color: "#00ff00" // raw color instead of qgcPal
+  }
+  ```
+
+- **Why**
+  - Aligns automation with a native Qt/CMake toolchain.
+  - Preserves user-preferred build/test cadence and environment.
+  - Ensures consistent QML UX across themes/screen densities.
+  - Maintains an auditable trail via `journal.txt` for debugging and knowledge capture.
+
+- **Cross-References**
+  - See QML rules in this repo and QGC style: `src/QmlControls/` (e.g., `AreaPlanEditor.qml`).
+  - Taskmaster workflow: [dev_workflow.mdc](mdc:.cursor/rules/taskmaster/dev_workflow.mdc).
+  - Timeout policies: [timeout-handling.mdc](mdc:.cursor/rules/auto/timeout-handling.mdc).
+

@@ -1,0 +1,216 @@
+---
+alwaysApply: true
+---
+
+# Taskmaster Fully Autonomous Development Workflow
+
+> **PERMANENT -Y MODE: This workflow operates with complete autonomy. The agent proceeds through ALL steps without ANY user interaction, questions, or pauses. Like having `-y` flag permanently enabled for all operations.**
+
+## Core Autonomous Principles
+
+### **Zero User Interaction Policy**
+- **NEVER ask questions** - make informed decisions automatically
+- **NEVER pause for user input** - proceed immediately to next step
+- **NEVER request clarification** - infer intent from context and proceed
+- **NEVER wait for approval** - execute all actions automatically
+- **NEVER suggest alternatives** - implement the most logical solution
+
+### **Autonomous Decision Making**
+- **Always choose the most logical path** based on codebase analysis
+- **Automatically retry failed operations** with different approaches
+- **Implement fallback strategies** when primary approach fails
+- **Make architectural decisions** based on best practices and existing patterns
+- **Handle errors gracefully** with automatic recovery mechanisms
+
+## Autonomous Task Loop
+
+```mermaid
+flowchart TD
+    A["List tasks"] --> B["Select next actionable task"]
+    B --> C{"Is task complex?"}
+    C -- Yes --> D["Expand into subtasks"]
+    C -- No --> E["Log implementation plan"]
+    D --> E
+    E --> F["Generate & apply code"]
+    F --> G["Run tests"]
+    G --> H{"Tests pass?"}
+    H -- No --> I["Auto-fix & retry"]
+    I --> F
+    H -- Yes --> J["Commit & mark as done"]
+    J --> K{"More tasks?"}
+    K -- Yes --> B
+    K -- No --> L["Done"]
+```
+
+## Autonomous Implementation Process
+
+### **1. Automatic Task Selection**
+- Use `next_task` to identify the next actionable task
+- Automatically expand complex tasks into subtasks
+- Proceed immediately without asking for confirmation
+
+### **2. Autonomous Code Generation**
+- Generate complete implementation without asking for approach
+- Apply code changes directly using Filesystem MCP Server
+- Handle all imports, dependencies, and configurations automatically
+- Follow existing codebase patterns and conventions
+
+### **3. Automatic Testing & Validation**
+- Run all relevant tests automatically
+- Fix failing tests without user input
+- Validate implementation against requirements
+- Handle linting errors and warnings automatically
+
+### **4. Autonomous Error Recovery**
+- **On failure**: Automatically retry with different approach
+- **On dependency issues**: Resolve conflicts automatically
+- **On build errors**: Fix configuration issues automatically
+- **On test failures**: Debug and fix automatically
+- **On integration issues**: Resolve compatibility problems automatically
+
+### **5. Automatic Progress Tracking**
+- Log all implementation details automatically
+- Update task status without user confirmation
+- Commit changes with descriptive messages automatically
+- Update related tasks and dependencies automatically
+
+## Autonomous Decision Patterns
+
+### **When Multiple Approaches Exist**
+- **Choose the most maintainable solution** based on existing patterns
+- **Follow established conventions** in the codebase
+- **Prefer proven technologies** over experimental ones
+- **Select the most performant option** when performance matters
+
+### **When Ambiguity Exists**
+- **Infer intent** from context and requirements
+- **Use reasonable defaults** for unspecified parameters
+- **Follow industry best practices** for unclear requirements
+- **Choose the most flexible approach** for future extensibility
+
+### **When Errors Occur**
+- **Analyze error patterns** and implement fixes automatically
+- **Research solutions** using available tools and documentation
+- **Try alternative approaches** when primary method fails
+- **Implement workarounds** for known issues
+
+## Autonomous Quality Assurance
+
+### **Automatic Code Review**
+- Validate code against all established rules
+- Check for security vulnerabilities automatically
+- Ensure proper error handling is implemented
+- Verify performance considerations are addressed
+
+### **Automatic Testing Strategy**
+- Run unit tests for all modified components
+- Execute integration tests for affected modules
+- Perform end-to-end testing for critical paths
+- Validate accessibility and cross-browser compatibility
+
+### **Automatic Documentation**
+- Update relevant documentation automatically
+- Generate inline code comments where needed
+- Update README files with new features
+- Maintain changelog entries automatically
+
+## Autonomous Rule Management
+
+### **Automatic Rule Updates**
+- **After each implementation**: Analyze new patterns and update rules
+- **When new technologies are used**: Create rules for consistent usage
+- **When bugs are fixed**: Add rules to prevent similar issues
+- **When optimizations are made**: Document performance patterns
+
+### **Automatic Pattern Recognition**
+- **Identify repeated code patterns** and create reusable components
+- **Detect inconsistent implementations** and standardize approaches
+- **Recognize performance bottlenecks** and implement optimizations
+- **Find security vulnerabilities** and apply fixes automatically
+
+## Autonomous Context Management
+
+### **Automatic Tag Switching**
+- **Detect feature branches** and create corresponding tags automatically
+- **Switch contexts** based on current work without user input
+- **Manage task dependencies** across different contexts automatically
+- **Resolve merge conflicts** chronologically (latest wins)
+
+### **Automatic Environment Setup**
+- **Configure development environment** automatically
+- **Install required dependencies** without user confirmation
+- **Set up build tools** and configurations automatically
+- **Initialize testing frameworks** and CI/CD pipelines
+
+## Autonomous Research & Learning
+
+### **Automatic Research Integration**
+- **Research best practices** before implementing new features
+- **Investigate latest technologies** for optimal solutions
+- **Find security updates** and apply them automatically
+- **Discover performance optimizations** and implement them
+
+### **Automatic Knowledge Application**
+- **Apply research findings** to current implementation
+- **Update implementation plans** based on new information
+- **Modify existing code** to incorporate best practices
+- **Create new rules** based on learned patterns
+
+## Exception Handling (Only Pause If)
+
+### **Critical System Failures**
+- **Hardware failures** that prevent code execution
+- **Network outages** that block essential operations
+- **Security breaches** that require immediate attention
+- **Data corruption** that affects system integrity
+
+### **Legal or Compliance Issues**
+- **License violations** that could cause legal problems
+- **Compliance requirements** that need legal review
+- **Security vulnerabilities** that require external assessment
+- **Data privacy issues** that need legal consultation
+
+### **Resource Exhaustion**
+- **Memory limits** that prevent operation continuation
+- **Storage capacity** that blocks file operations
+- **API rate limits** that require waiting periods
+- **Computational limits** that exceed available resources
+
+## Autonomous Success Metrics
+
+### **Implementation Quality**
+- **All tests pass** without manual intervention
+- **Code follows established patterns** and conventions
+- **Performance meets requirements** automatically
+- **Security standards are maintained** without oversight
+
+### **Development Velocity**
+- **Tasks completed** without user interaction delays
+- **Implementation time** reduced through automation
+- **Error resolution** handled automatically
+- **Quality assurance** performed without manual review
+
+### **System Reliability**
+- **Automatic error recovery** prevents system failures
+- **Proactive issue detection** prevents problems
+- **Automatic optimization** maintains performance
+- **Continuous improvement** through rule updates
+
+## Autonomous Communication
+
+### **Progress Reporting**
+- **Log all actions** with detailed timestamps
+- **Report implementation status** automatically
+- **Document decisions made** and reasoning
+- **Track metrics** and performance improvements
+
+### **Issue Notification**
+- **Alert only on critical failures** that require human intervention
+- **Provide detailed error analysis** for debugging
+- **Suggest potential solutions** for manual review if needed
+- **Maintain audit trail** of all autonomous decisions
+
+---
+
+**See also:**  
+[cursor-rules.mdc](mdc:.cursor/rules/cursor-rules.mdc), [self-improve.mdc](mdc:.cursor/rules/self-improve.mdc), [no-questions.mdc](mdc:.cursor/rules/taskmaster/no-questions.mdc), [writes.mdc](mdc:.cursor/rules/writes.mdc)

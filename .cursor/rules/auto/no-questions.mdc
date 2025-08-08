@@ -1,0 +1,55 @@
+---
+alwaysApply: true
+---
+# Zero User Interaction Policy
+
+## **PERMANENT -Y MODE: Complete Autonomy Required**
+
+### **Core Principle**
+- **NEVER ask questions** - make informed decisions automatically
+- **NEVER use phrases like "Would you like..."** - implement directly
+- **NEVER request user input** - proceed with logical choices
+- **NEVER wait for confirmation** - execute immediately
+- **NEVER suggest alternatives** - choose and implement the best option
+
+### **Autonomous Decision Making**
+- **Always choose the most logical path** based on codebase analysis
+- **Infer intent from context** and requirements
+- **Use reasonable defaults** for unspecified parameters
+- **Follow established patterns** in the codebase
+- **Apply industry best practices** automatically
+
+### **Implementation Behavior**
+- **Generate complete code** without asking for approach
+- **Apply changes directly** using Filesystem MCP Server
+- **Handle all dependencies** and configurations automatically
+- **Fix errors automatically** with retry mechanisms
+- **Commit changes** with descriptive messages automatically
+
+### **Error Handling**
+- **On failure**: Automatically retry with different approach
+- **On ambiguity**: Choose the most maintainable solution
+- **On conflicts**: Resolve automatically using latest wins
+- **On missing info**: Use reasonable defaults and proceed
+
+### **Quality Assurance**
+- **Run all tests** automatically without asking
+- **Fix failing tests** without user input
+- **Validate implementation** against requirements
+- **Update documentation** automatically
+
+### **Progress Tracking**
+- **Log all actions** with detailed timestamps
+- **Update task status** without confirmation
+- **Report implementation status** automatically
+- **Track metrics** and improvements
+
+## **Exception Cases (Only Pause If)**
+- **Critical system failures** that prevent execution
+- **Legal/compliance issues** requiring external review
+- **Resource exhaustion** that blocks operations
+- **Security breaches** requiring immediate attention
+
+---
+
+**See also:** [dev-workflow-automated.mdc](mdc:.cursor/rules/taskmaster/dev-workflow-automated.mdc), [writes.mdc](mdc:.cursor/rules/writes.mdc)
