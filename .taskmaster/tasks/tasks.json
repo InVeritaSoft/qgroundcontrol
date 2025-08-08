@@ -961,7 +961,7 @@
         "dependencies": [
           9
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -1047,7 +1047,7 @@
               "10.7"
             ],
             "details": "Verify that missions are uploaded correctly and handle errors gracefully.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1058,7 +1058,7 @@
               "10.8"
             ],
             "details": "Verify that the system handles disconnections and retries correctly.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1069,7 +1069,7 @@
               "10.9"
             ],
             "details": "Include steps, error handling, and troubleshooting tips.",
-            "status": "in-progress",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -1407,7 +1407,7 @@
             "description": "Ensure all user-facing strings in QML files are wrapped with qsTr().",
             "dependencies": [],
             "details": "Review and update each QML file to ensure all translatable strings use qsTr().",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1416,7 +1416,7 @@
             "description": "Add newly created QML files to `src/QmlControls/CMakeLists.txt`.",
             "dependencies": [],
             "details": "Ensure the list of QML_FILES in `CMakeLists.txt` is updated and alphabetized.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1425,7 +1425,7 @@
             "description": "Add new translatable strings to the appropriate TS files.",
             "dependencies": [],
             "details": "Identify any new strings added with qsTr() and ensure they are included in the translation files.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1434,7 +1434,7 @@
             "description": "Check that all user-facing strings in QML files use qsTr().",
             "dependencies": [],
             "details": "Review the codebase to ensure no translatable strings are missed.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1443,7 +1443,7 @@
             "description": "Ensure the QML_FILES list in `CMakeLists.txt` is alphabetized.",
             "dependencies": [],
             "details": "Sort the list of QML files in `src/QmlControls/CMakeLists.txt` alphabetically.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1452,7 +1452,7 @@
             "description": "Add any newly created QML files to the CMake build system.",
             "dependencies": [],
             "details": "Ensure all new QML files are included in the `CMakeLists.txt` file.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1461,7 +1461,7 @@
             "description": "Identify and address any missing translations in TS files.",
             "dependencies": [],
             "details": "Review the translation files to ensure all new strings are included.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1470,7 +1470,7 @@
             "description": "Perform a build-time check to ensure all user-facing strings use qsTr().",
             "dependencies": [],
             "details": "Run the build process and verify that all translatable strings are covered.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1479,7 +1479,7 @@
             "description": "Perform a UI spot-check to ensure translations are correctly applied.",
             "dependencies": [],
             "details": "Manually check the user interface to verify that all strings are translated correctly.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1488,7 +1488,7 @@
             "description": "Conduct a final review of all QML and TS files for completeness and accuracy.",
             "dependencies": [],
             "details": "Ensure all changes are correctly implemented and no issues remain.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -1626,7 +1626,7 @@
             "description": "Prepare the SITL environment with necessary configurations.",
             "dependencies": [],
             "details": "Ensure all dependencies are resolved and the environment is ready for testing.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1637,7 +1637,7 @@
               "16.1"
             ],
             "details": "Use `sitl-demo/` to establish connections with multiple vehicles.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1648,7 +1648,7 @@
               "16.2"
             ],
             "details": "Ensure each vehicle has its own mission plan loaded.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1659,7 +1659,7 @@
               "16.3"
             ],
             "details": "Verify successful upload of missions to each vehicle.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1670,7 +1670,7 @@
               "16.4"
             ],
             "details": "Ensure that the altitude bands do not overlap and are within specified ranges.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1681,7 +1681,7 @@
               "16.5"
             ],
             "details": "Ensure that the drones take off and execute their missions at staggered times if configured.",
-            "status": "pending",
+            "status": "in-progress",
             "testStrategy": ""
           },
           {
@@ -1734,7 +1734,7 @@
     ],
     "metadata": {
       "created": "2025-08-07T23:48:39.554Z",
-      "updated": "2025-08-08T10:03:20.579Z",
+      "updated": "2025-08-08T11:00:37.849Z",
       "description": "Tasks for master context"
     }
   }
