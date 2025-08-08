@@ -133,6 +133,8 @@ public:
     Q_INVOKABLE void addAllDronesToMission();
     Q_INVOKABLE void addWaypointsToMission();
     Q_INVOKABLE void saveMissionFile();
+    // Save separate WPL files per-drone using current multi-drone configuration
+    Q_INVOKABLE void savePerDroneMissionFiles();
     Q_INVOKABLE void uploadToVehicle();
     Q_INVOKABLE void startMission();
     Q_INVOKABLE void updateStatus(const QString& message);

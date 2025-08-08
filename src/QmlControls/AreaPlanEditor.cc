@@ -812,6 +812,97 @@ void AreaPlanEditor::saveMissionFile()
     qDeleteAll(missionItems);
 }
 
+void AreaPlanEditor::savePerDroneMissionFiles()
+{
+    startProgress(QStringLiteral("Save Per-Drone Missions"), QStringLiteral("Generating per-drone waypoint files..."));
+
+    if (!validateAreaParameters()) {
+        cancelProgress();
+        handleError(QStringLiteral("Invalid area parameters"), QStringLiteral("Please check area parameters and try again"));
+        return;
+    }
+
+    const int totalDrones = qMax(1, _droneCount);
+    int filesSaved = 0;
+
+    for (int d = 0; d < totalDrones; ++d) {
+        // Build mission items for this drone
+        QList<MissionItem*> missionItems;
+
+        // Home (required by ArduPilot in some cases)
+        MissionItem* homeItem = new MissionItem(0, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                                0, 0, 0, 0,
+                                                _homeLocation.latitude(), _homeLocation.longitude(), _missionAltitude,
+                                                true, false, this);
+        missionItems.append(homeItem);
+
+        // Optional staggered start: loiter at home for d * timeOffsetPerDrone seconds
+        int seq = 1;
+        if (_timeOffsetPerDrone > 0.0) {
+            MissionItem* loiterStart = new MissionItem(seq++, MAV_CMD_NAV_LOITER_TIME, MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                                       d * _timeOffsetPerDrone, 1.0, 50.0, 1.0,
+                                                       _homeLocation.latitude(), _homeLocation.longitude(), _missionAltitude,
+                                                       true, false, this);
+            missionItems.append(loiterStart);
+        }
+
+        // Takeoff
+        MissionItem* takeoff = new MissionItem(seq++, MAV_CMD_NAV_TAKEOFF, MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                               0, 0, 0, 0,
+                                               _homeLocation.latitude(), _homeLocation.longitude(), _missionAltitude,
+                                               true, false, this);
+        missionItems.append(takeoff);
+
+        // Waypoints for this drone
+        QVariantList wps = generatePerDroneWaypoints(d);
+        const qreal altOffset = _altitudeBandStart + d * _altitudeBandStep;
+        for (const QVariant& v : wps) {
+            QGeoCoordinate c = v.value<QGeoCoordinate>();
+            // Ensure altitude banding is applied
+            c.setAltitude(_missionAltitude + altOffset);
+            MissionItem* wp = new MissionItem(seq++, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                              0, 0, 0, 0,
+                                              c.latitude(), c.longitude(), c.altitude(),
+                                              true, false, this);
+            missionItems.append(wp);
+
+            if (_rtlAfterEveryWaypoint) {
+                MissionItem* rtl = new MissionItem(seq++, MAV_CMD_NAV_RETURN_TO_LAUNCH, MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                                   0, 0, 0, 0,
+                                                   0, 0, 0,
+                                                   true, false, this);
+                missionItems.append(rtl);
+                if (_loiterAfterRtl) {
+                    MissionItem* loiterEnd = new MissionItem(seq++, MAV_CMD_NAV_LOITER_TIME, MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                                             _loiterTime, 1.0, 50.0, 1.0,
+                                                             _homeLocation.latitude(), _homeLocation.longitude(), _missionAltitude,
+                                                             true, false, this);
+                    missionItems.append(loiterEnd);
+                }
+            }
+        }
+
+        // Final RTL when not RTL after every point
+        if (!_rtlAfterEveryWaypoint) {
+            MissionItem* rtlFinal = new MissionItem(seq++, MAV_CMD_NAV_RETURN_TO_LAUNCH, MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                                    0, 0, 0, 0,
+                                                    0, 0, 0,
+                                                    true, false, this);
+            missionItems.append(rtlFinal);
+        }
+
+        // Serialize to file
+        const QString filename = QStringLiteral("area_mission_drone_%1.waypoints").arg(d);
+        saveMissionToFile(missionItems, filename);
+        filesSaved++;
+
+        // Clean up
+        qDeleteAll(missionItems);
+    }
+
+    finishProgress(QStringLiteral("Saved %1 per-drone mission file(s)").arg(filesSaved));
+}
+
 void AreaPlanEditor::uploadToVehicle()
 {
     startProgress(QStringLiteral("Mission Upload"), QStringLiteral("Preparing mission upload..."));
