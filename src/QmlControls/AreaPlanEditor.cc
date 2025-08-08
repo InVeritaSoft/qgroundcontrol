@@ -369,6 +369,19 @@ QVariantList AreaPlanEditor::computePartitionStripes() const
     return stripes;
 }
 
+QVariantList AreaPlanEditor::computeRoundRobinAssignments() const
+{
+    QVariantList groups;
+    const int stripesCount = qMax(1, _droneCount);
+    const auto rr = AreaPlan::assignStripesRoundRobin(_droneCount, stripesCount);
+    for (const auto& g : rr) {
+        QVariantList idx;
+        for (int i : g) idx.append(i);
+        groups.append(idx);
+    }
+    return groups;
+}
+
 void AreaPlanEditor::addWaypointsToMission()
 {
     qDebug() << "AreaPlanEditor: Starting mission generation";

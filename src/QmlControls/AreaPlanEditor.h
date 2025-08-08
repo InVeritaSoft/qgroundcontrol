@@ -120,6 +120,7 @@ public:
     Q_INVOKABLE int calculateFlightTime() const;
     Q_INVOKABLE QVariantList generateWaypoints();
     Q_INVOKABLE QVariantList computePartitionStripes() const;
+    Q_INVOKABLE QVariantList computeRoundRobinAssignments() const;
     Q_INVOKABLE void addWaypointsToMission();
     Q_INVOKABLE void saveMissionFile();
     Q_INVOKABLE void uploadToVehicle();
