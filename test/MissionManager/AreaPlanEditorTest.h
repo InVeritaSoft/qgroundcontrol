@@ -27,6 +27,7 @@ private slots:
     void _multiDroneDefaultsAndSetters();
     void _perDronePreviewCounts();
     void _balancedPartition();
+    void _boundsAndRotation();
 };
 
 

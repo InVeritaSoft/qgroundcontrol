@@ -70,6 +70,48 @@ void AreaPlanEditorTest::_balancedPartition()
     assertFair(4, 17);
 }
 
+void AreaPlanEditorTest::_boundsAndRotation()
+{
+    using AreaPlan::splitIntoStripes;
+
+    const double cx = 0.0, cy = 0.0;
+    const double w = 20.0, h = 10.0;
+    const int stripes = 5;
+
+    auto lines0 = splitIntoStripes(cx, cy, w, h, stripes, /*alongShortAxis=*/true, /*rot=*/0.0);
+    QVERIFY(static_cast<int>(lines0.size()) == stripes);
+    // At rotation 0, endpoints must be within rectangle bounds
+    for (const auto& ln : lines0) {
+        auto check = [&](double x, double y) {
+            QVERIFY(x >= -w/2 - 1e-6 && x <= w/2 + 1e-6);
+            QVERIFY(y >= -h/2 - 1e-6 && y <= h/2 + 1e-6);
+        };
+        check(ln.a.x, ln.a.y);
+        check(ln.b.x, ln.b.y);
+    }
+
+    auto linesR = splitIntoStripes(cx, cy, w, h, stripes, /*alongShortAxis=*/true, /*rot=*/30.0);
+    QVERIFY(static_cast<int>(linesR.size()) == stripes);
+    // Rotation should change endpoints for at least one line
+    bool anyDiff = false;
+    for (int i = 0; i < stripes; ++i) {
+        if (qAbs(linesR[static_cast<size_t>(i)].a.x - lines0[static_cast<size_t>(i)].a.x) > 1e-9 ||
+            qAbs(linesR[static_cast<size_t>(i)].a.y - lines0[static_cast<size_t>(i)].a.y) > 1e-9) {
+            anyDiff = true;
+            break;
+        }
+    }
+    QVERIFY(anyDiff);
+
+    // Edge cases
+    auto empty1 = splitIntoStripes(cx, cy, 0.0, h, stripes, true, 0.0);
+    QVERIFY(empty1.empty());
+    auto empty2 = splitIntoStripes(cx, cy, w, -1.0, stripes, true, 0.0);
+    QVERIFY(empty2.empty());
+    auto empty3 = splitIntoStripes(cx, cy, w, h, 0, true, 0.0);
+    QVERIFY(empty3.empty());
+}
+
 void AreaPlanEditorTest::_generateWaypointsAndAddToMission()
 {
     // Prepare master/mission controller for offline planning
