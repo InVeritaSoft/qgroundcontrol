@@ -30,3 +30,4 @@
 2025-08-08T09:47:34.2600143Z [master] (task 10.1) done; vehicle selector wired to per-drone upload
 2025-08-08T09:48:44.5872224Z [master] (task 10.2) start ? in-progress; plan: per-drone vehicle mapping UI + Upload All mapped
 2025-08-08T09:57:32.9639138Z [master] (task 10.2) done; per-drone vehicle mapping UI + Upload All mapped implemented
+2025-08-08T10:02:05.6759472Z [master] (task 10.4/10.6) done; upload progress/error/sendComplete signals integrated
