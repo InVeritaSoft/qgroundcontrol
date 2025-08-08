@@ -4,3 +4,4 @@
 2025-08-08T07:07:03.3888800Z [master] (task 2.3) done; per-drone RR indices + assignments exposed; next: 2.4 rotation handling
 2025-08-08T07:10:44.1787734Z [master] (task 2.4) done; rotation handled via splitIntoStripes + _areaRotation adapter; next: 2.5 uneven divisions
 2025-08-08T07:13:37.0165482Z [master] (task 2.5) done; uneven division handled (RR doc + per-drone counts API); next: 2.6 unit-testable helpers
+2025-08-08T07:17:08.5951225Z [master] (task 2.6) done; unit-testable helpers ready; next: 2.7 integrate with waypoint generation
