@@ -13,6 +13,7 @@
 #include "PlanMasterController.h"
 #include "MissionController.h"
 #include <QtMath>
+#include "MissionManager/AreaPartition.h"
 
 #include <QtTest/QTest>
 
@@ -39,6 +40,34 @@ void AreaPlanEditorTest::_basicProperties()
     const int expectedLines = qMax(1, static_cast<int>(qFloor(editor->areaHeight() / editor->lineSpacing())));
     const int expectedWp = expectedLines * editor->numPoints();
     QCOMPARE(editor->calculateTotalWaypoints(), expectedWp);
+}
+
+void AreaPlanEditorTest::_balancedPartition()
+{
+    using AreaPlan::assignStripesRoundRobin;
+
+    auto assertFair = [](int drones, int lines) {
+        auto rr = assignStripesRoundRobin(drones, lines);
+        int minC = INT_MAX, maxC = INT_MIN, sum = 0;
+        for (const auto& g : rr) {
+            int c = static_cast<int>(g.size());
+            minC = qMin(minC, c);
+            maxC = qMax(maxC, c);
+            sum += c;
+        }
+        QVERIFY(maxC - minC <= 1);
+        QCOMPARE(sum, lines);
+    };
+
+    // Boundary cases
+    assertFair(1, 1);
+    assertFair(1, 5);
+    assertFair(5, 1); // more drones than lines → some groups 0
+
+    // Typical cases
+    assertFair(2, 3);
+    assertFair(3, 10);
+    assertFair(4, 17);
 }
 
 void AreaPlanEditorTest::_generateWaypointsAndAddToMission()
