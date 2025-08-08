@@ -353,4 +353,32 @@ void AreaPlanEditorTest::_perDronePreviewCounts()
     QCOMPARE(totalWp, expectedLines * editor->numPoints());
 }
 
+void AreaPlanEditorTest::_waypointGenerationCountsAndPositions()
+{
+    AreaPlanEditor* editor = QGroundControlQmlGlobal::instance()->areaPlanEditor();
+    QVERIFY(editor);
+
+    // Configure simple rectangular grid, rotation = 0
+    editor->setAreaCenter(QGeoCoordinate(47.3977419, 8.5455938));
+    editor->setAreaWidth(20.0);
+    editor->setAreaHeight(20.0);
+    editor->setLineSpacing(10.0); // 2 lines
+    editor->setNumPoints(4);      // 4 points per line
+    editor->setMissionAltitude(30.0);
+    editor->setAreaRotation(0.0);
+
+    const int expectedLines = qMax(1, static_cast<int>(qFloor(editor->areaHeight() / editor->lineSpacing())));
+    const int expectedTotal = expectedLines * editor->numPoints();
+
+    QVariantList wps = editor->generateWaypoints();
+    QCOMPARE(wps.size(), expectedTotal);
+
+    // Check spacing: points along width should progress monotonically east-west around center
+    // We only sanity-check that all coords are valid and altitude equals missionAltitude
+    for (const QVariant& v : wps) {
+        QGeoCoordinate c = v.value<QGeoCoordinate>();
+        QVERIFY(c.isValid());
+        QCOMPARE(c.altitude(), editor->missionAltitude());
+    }
+}
 
