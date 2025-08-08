@@ -67,6 +67,11 @@ inline std::vector<Line> splitIntoStripes(double cx, double cy,
 }
 
 // Round-robin assignment of indices [0..lineCount)
+// Distributes indices [0..lineCount) in round-robin order across drones.
+// Properties:
+// - If lineCount % droneCount = r, then the first r drones receive ⌈lineCount/droneCount⌉
+//   indices and the others receive ⌊lineCount/droneCount⌋. The max difference between
+//   any two drone counts is at most 1.
 inline std::vector<std::vector<int>> assignStripesRoundRobin(int droneCount, int lineCount)
 {
     std::vector<std::vector<int>> assignment;

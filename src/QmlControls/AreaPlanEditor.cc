@@ -400,6 +400,19 @@ QVariantList AreaPlanEditor::computeDroneAssignments() const
     return assignments;
 }
 
+QVariantMap AreaPlanEditor::computePerDroneCounts() const
+{
+    QVariantMap counts;
+    const int lineCount = qMax(1, static_cast<int>(qFloor(_areaHeight / _lineSpacing)));
+    const auto rr = AreaPlan::assignStripesRoundRobin(_droneCount, lineCount);
+    for (int d = 0; d < static_cast<int>(rr.size()); ++d) {
+        counts[QString::number(d)] = static_cast<int>(rr[static_cast<size_t>(d)].size());
+    }
+    counts[QStringLiteral("totalLines")] = lineCount;
+    counts[QStringLiteral("droneCount")] = _droneCount;
+    return counts;
+}
+
 void AreaPlanEditor::addWaypointsToMission()
 {
     qDebug() << "AreaPlanEditor: Starting mission generation";
