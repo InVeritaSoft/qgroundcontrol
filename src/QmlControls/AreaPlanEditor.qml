@@ -21,6 +21,8 @@ Item {
 
 	// Reference to the C++ backend
 	property var areaPlanEditor: null
+    // Per-drone preview data: array of { droneIndex, altitudeOffsetM, timeOffsetS, waypoints[] }
+    property var waypointPreview: []
 
     // Sizing helpers (no hardcoded sizes)
     readonly property real _h: ScreenTools.defaultFontPixelHeight
@@ -1021,6 +1023,72 @@ Item {
 							wrapMode: Text.WordWrap
 							verticalAlignment: Text.AlignTop
 						}
+
+                        // Per-Drone Waypoint Preview
+                        Rectangle {
+                            width: parent.width
+                            height: previewColumn.height + _h
+                            color: qgcPal.windowShadeDark
+                            radius: _w * 0.25
+                            border.color: qgcPal.colorGrey
+                            border.width: 1
+
+                            Column {
+                                id: previewColumn
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                anchors.margins: _h * 0.5
+                                spacing: _h * 0.4
+
+                                QGCLabel {
+                                    text: qsTr("Per-Drone Waypoint Preview")
+                                    font.pointSize: ScreenTools.smallFontPointSize
+                                    font.bold: true
+                                    color: qgcPal.text
+                                }
+
+                                QGCButton {
+                                    text: qsTr("Refresh Preview")
+                                    width: parent.width
+                                    height: _h * 1.8
+                                    onClicked: {
+                                        if (areaPlanEditor) {
+                                            waypointPreview = areaPlanEditor.computePerDroneWaypointPreview()
+                                        }
+                                    }
+                                }
+
+                                Repeater {
+                                    model: waypointPreview
+                                    delegate: Row {
+                                        width: parent.width
+                                        height: _h * 1.4
+                                        spacing: _w
+
+                                        QGCLabel {
+                                            text: qsTr("Drone %1").arg(modelData.droneIndex)
+                                            width: parent.width * 0.3
+                                            height: parent.height
+                                            verticalAlignment: Text.AlignVCenter
+                                        }
+                                        QGCLabel {
+                                            text: qsTr("Waypoints: %1").arg(modelData.waypoints ? modelData.waypoints.length : 0)
+                                            width: parent.width * 0.3
+                                            height: parent.height
+                                            verticalAlignment: Text.AlignVCenter
+                                        }
+                                        QGCLabel {
+                                            text: qsTr("Alt +%1 m, T +%2 s").arg(modelData.altitudeOffsetM).arg(modelData.timeOffsetS)
+                                            width: parent.width * 0.4
+                                            height: parent.height
+                                            verticalAlignment: Text.AlignVCenter
+                                            color: qgcPal.colorGrey
+                                        }
+                                    }
+                                }
+                            }
+                        }
 					}
 				}
 
