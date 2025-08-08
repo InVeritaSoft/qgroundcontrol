@@ -28,3 +28,4 @@
 2025-08-08T12:45:00.0000000Z [master] (rule) auto-mode journaling requirement added → success; next: include brief reasoning in entries per updated rules
 2025-08-08T09:46:50.8030682Z [master] (task 10.1) start ? in-progress; plan: add vehicle QGCComboBox bound to multiVehicleManager.vehicles, store selection, use in per-drone upload
 2025-08-08T09:47:34.2600143Z [master] (task 10.1) done; vehicle selector wired to per-drone upload
+2025-08-08T09:48:44.5872224Z [master] (task 10.2) start ? in-progress; plan: per-drone vehicle mapping UI + Upload All mapped

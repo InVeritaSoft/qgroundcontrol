@@ -128,3 +128,16 @@ Only pause for:
 - `resume auto`:
   - If `.taskmaster/state.json` contains a `current` entry, continue with that item (set `in-progress` if not already); otherwise select via `next_task`
   - Journal the resume event
+
+### **Journaling Required (Auto Mode)**
+- **Mandatory**: While auto mode is enabled, append entries to the root-level `journal.txt` after each significant step: start, progress, blocked, resume/stop, and done/commit.
+- **Entry contents**: ISO timestamp, tag/context, task/subtask ID (if applicable), action, outcome, and next step. Include a brief reasoning/thought that influenced the action to aid future context. Do not include secrets.
+- **Format example**:
+
+  ```text
+  2025-08-08T12:40:12Z [master] (task 7.2) start → in-progress; reason: selected by next_task; next: implement helper
+  2025-08-08T12:55:05Z [master] (task 7.2) progress: helper implemented; reason: fixes rounding edge-case; next: verify bounds
+  2025-08-08T13:05:33Z [master] (task 7.2) done → committed; next: select next task
+  ```
+
+- **Cross-reference**: See detailed guidance in [journaling.mdc](mdc:.cursor/rules/taskmaster/journaling.mdc).

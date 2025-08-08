@@ -856,7 +856,7 @@
           4,
           5
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -864,7 +864,7 @@
             "description": "Retrieve drone assignments from the area partitioning algorithm.",
             "dependencies": [],
             "details": "Use the output of Task 2 to get DroneAssignment objects.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -873,7 +873,7 @@
             "description": "Create waypoint lists for each drone based on assignments.",
             "dependencies": [],
             "details": "Use lineSpacing, numPoints, and areaRotation from Task 3.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -882,7 +882,7 @@
             "description": "Adjust waypoints to include altitude banding for each drone.",
             "dependencies": [],
             "details": "Use altitudeBandStart and altitudeBandStep from UI controls.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -891,7 +891,7 @@
             "description": "Add policy-injected steps to the waypoints.",
             "dependencies": [],
             "details": "Include loiterTime, rtlAfterEveryWaypoint, and loiterAfterRtl settings.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -900,7 +900,7 @@
             "description": "Convert waypoint lists to QGC WPL format.",
             "dependencies": [],
             "details": "Ensure compliance with WPL 110 formatting standards.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -909,7 +909,7 @@
             "description": "Create filenames for each drone's mission file.",
             "dependencies": [],
             "details": "Use the format area_mission_drone_<idx>.waypoints.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -918,7 +918,7 @@
             "description": "Save the serialized waypoints to disk with the generated filenames.",
             "dependencies": [],
             "details": "Use the existing single-drone save path logic.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -927,7 +927,7 @@
             "description": "Check that each file is correctly formatted as WPL 110.",
             "dependencies": [],
             "details": "Implement validation checks for the saved files.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -936,7 +936,7 @@
             "description": "Ensure each file is named correctly according to the drone index.",
             "dependencies": [],
             "details": "Check that filenames follow the area_mission_drone_<idx>.waypoints format.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -945,7 +945,7 @@
             "description": "Inform the user of the save status in the AreaPlanEditor UI.",
             "dependencies": [],
             "details": "Provide feedback on successful saves or errors.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -969,7 +969,7 @@
             "description": "Create a user interface element to select the vehicle.",
             "dependencies": [],
             "details": "Include dropdown or list view of available vehicles.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -980,7 +980,7 @@
               "10.1"
             ],
             "details": "Allow users to assign specific missions to the selected vehicle.",
-            "status": "pending",
+            "status": "in-progress",
             "testStrategy": ""
           },
           {
@@ -991,7 +991,7 @@
               "10.2"
             ],
             "details": "Ensure the selected vehicle and mission mapping are passed correctly.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1013,7 +1013,7 @@
               "10.4"
             ],
             "details": "Use existing status/progress signals to update the UI.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1035,7 +1035,7 @@
               "10.5"
             ],
             "details": "Ensure the UI reflects the current state of the upload process.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1734,7 +1734,7 @@
     ],
     "metadata": {
       "created": "2025-08-07T23:48:39.554Z",
-      "updated": "2025-08-08T09:22:08.027Z",
+      "updated": "2025-08-08T09:48:34.880Z",
       "description": "Tasks for master context"
     }
   }

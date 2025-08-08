@@ -21,6 +21,10 @@ lastUpdated: 2025-08-08
   - Log after: generating waypoints, modifying mission items, saving/uploading missions, adding rules, fixing tests.
   - Log tricky QGC-specific details (MAV_CMD params, `MissionController` access, `QGCPalette` theming).
 
+- **Context & Reasoning**
+  - It's helpful to include a brief thought or reasoning that influenced the action (e.g., why a decision was made or which edge-case was targeted). Keep it concise and free of secrets.
+  - Example: "reason: selected by next_task" or "reason: fixes rounding edge-case".
+
 - **DON'T**
   - Overwrite existing entries.
   - Store sensitive credentials.

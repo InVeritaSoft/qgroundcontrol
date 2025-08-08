@@ -9,7 +9,7 @@ lastUpdated: 2025-08-08
   - Always operate in full-auto mode: no questions, no pauses, no confirmations.
   - Select work using the next-task mechanism and proceed task-by-task, subtask-by-subtask.
   - Use MCP tools first; only fall back to CLI if MCP is unavailable.
-  - Maintain journaling and status transitions automatically; commit on done (with Taskmaster ID prefix) when applicable.
+  - Maintain journaling and status transitions automatically. **Journaling is mandatory when auto mode is enabled**: append to `journal.txt` at start/progress/blocked/done/resume/stop and include a brief reasoning/thought for future context. Commit on done (with Taskmaster ID prefix) when applicable.
 
 - **MCP-First Next-Task Flow**
   - Identify the next actionable item using `next_task`.

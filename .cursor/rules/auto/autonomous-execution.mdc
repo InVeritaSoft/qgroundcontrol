@@ -193,3 +193,8 @@ alwaysApply: true
 ---
 
 **See also:** [dev-workflow-automated.mdc](mdc:.cursor/rules/taskmaster/dev-workflow-automated.mdc), [no-questions.mdc](mdc:.cursor/rules/taskmaster/no-questions.mdc), [writes.mdc](mdc:.cursor/rules/writes.mdc), [automation.mdc](mdc:.cursor/rules/taskmaster/automation.mdc)
+
+### **Journaling Required (Auto Mode)**
+- While auto mode is active, journaling to the root-level `journal.txt` is required after each significant step (start, progress, blocked, resume/stop, done/commit).
+- Include: ISO timestamp, tag/context, task/subtask ID if applicable, action, outcome, next step, and a short reasoning/thought that informed the action. Avoid sensitive data.
+- See [journaling.mdc](mdc:.cursor/rules/taskmaster/journaling.mdc) for full format and examples.
