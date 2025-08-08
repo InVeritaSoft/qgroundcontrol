@@ -382,6 +382,24 @@ QVariantList AreaPlanEditor::computeRoundRobinAssignments() const
     return groups;
 }
 
+QVariantList AreaPlanEditor::computeDroneAssignments() const
+{
+    QVariantList assignments;
+    const int lineCount = qMax(1, static_cast<int>(qFloor(_areaHeight / _lineSpacing)));
+    const auto rr = AreaPlan::assignStripesRoundRobin(_droneCount, lineCount);
+    for (int d = 0; d < static_cast<int>(rr.size()); ++d) {
+        QVariantMap m;
+        m["droneIndex"] = d;
+        m["altitudeOffsetM"] = _altitudeBandStart + d * _altitudeBandStep;
+        m["timeOffsetS"] = d * _timeOffsetPerDrone;
+        QVariantList lines;
+        for (int li : rr[static_cast<size_t>(d)]) lines.append(li);
+        m["lineIndices"] = lines;
+        assignments.append(m);
+    }
+    return assignments;
+}
+
 void AreaPlanEditor::addWaypointsToMission()
 {
     qDebug() << "AreaPlanEditor: Starting mission generation";
