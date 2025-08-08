@@ -7,3 +7,5 @@
 2025-08-08T07:17:08.5951225Z [master] (task 2.6) done; unit-testable helpers ready; next: 2.7 integrate with waypoint generation
 2025-08-08T07:26:18.7407477Z [master] (task 2.7) progress: per-drone waypoint preview adapter added; next: expose in QML + tests
 2025-08-08T07:29:22.7573898Z [master] (task 2.7) progress: QML preview added (Refresh Preview, per-drone counts); next: tests + mission wiring
+2025-08-08T07:35:18.4787485Z [master] (task 2.7) progress: per-drone test added; next: mission insertion wiring
+2025-08-08T07:39:08.2737684Z [master] (task 2.7) done; integration to preview/UI/tests complete; next: 2.8 balanced partition tests
