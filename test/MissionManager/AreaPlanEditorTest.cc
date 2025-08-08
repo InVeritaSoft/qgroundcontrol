@@ -110,4 +110,37 @@ void AreaPlanEditorTest::_multiDroneDefaultsAndSetters()
     QCOMPARE(editor->loiterAfterRtl(), true);
 }
 
+void AreaPlanEditorTest::_perDronePreviewCounts()
+{
+    AreaPlanEditor* editor = QGroundControlQmlGlobal::instance()->areaPlanEditor();
+    QVERIFY(editor);
+
+    // Configure a simple scenario
+    editor->setAreaCenter(QGeoCoordinate(47.3977419, 8.5455938));
+    editor->setAreaWidth(20.0);
+    editor->setAreaHeight(30.0);
+    editor->setLineSpacing(10.0); // 3 lines
+    editor->setNumPoints(2);
+    editor->setMissionAltitude(25.0);
+    editor->setDroneCount(2);
+
+    // Preview
+    const QVariantList groups = editor->computePerDroneWaypointPreview();
+    QVERIFY(groups.size() == 2);
+
+    // Each group has waypoints; total waypoints == lines*numPoints
+    int totalWp = 0;
+    for (const QVariant& v : groups) {
+        const QVariantMap m = v.toMap();
+        const QVariantList wps = m.value("waypoints").toList();
+        totalWp += wps.size();
+        for (const QVariant& wv : wps) {
+            QGeoCoordinate c = wv.value<QGeoCoordinate>();
+            QVERIFY(c.isValid());
+        }
+    }
+    const int expectedLines = qMax(1, static_cast<int>(qFloor(editor->areaHeight() / editor->lineSpacing())));
+    QCOMPARE(totalWp, expectedLines * editor->numPoints());
+}
+
 

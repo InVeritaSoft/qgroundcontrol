@@ -25,6 +25,7 @@ private slots:
     void _basicProperties();
     void _generateWaypointsAndAddToMission();
     void _multiDroneDefaultsAndSetters();
+    void _perDronePreviewCounts();
 };
 
 
