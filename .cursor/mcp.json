@@ -7,6 +7,10 @@
 				"OLLAMA_API_KEY": "none",
 				"OLLAMA_BASE_URL": "http://localhost:11434/api"
 			}
-		}
+		},
+		"git": {
+			"command": "uvx",
+			"args": ["mcp-server-git"]
+		  }
     }
 }

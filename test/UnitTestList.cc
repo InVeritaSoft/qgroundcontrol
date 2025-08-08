@@ -71,6 +71,8 @@
 #include "SurveyComplexItemTest.h"
 #include "TransectStyleComplexItemTest.h"
 // #include "VisualMissionItemTest.h"
+// Area plan
+#include "AreaPlanEditorTest.h"
 
 // qgcunittest
 #include "ComponentInformationCacheTest.h"
@@ -176,6 +178,7 @@ int runTests(bool stress, QStringView unitTestOptions)
     UT_REGISTER_TEST(SurveyComplexItemTest)
     UT_REGISTER_TEST(TransectStyleComplexItemTest)
     // UT_REGISTER_TEST(VisualMissionItemTest)
+    UT_REGISTER_TEST(AreaPlanEditorTest)
 
     // qgcunittest
 

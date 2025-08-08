@@ -23,6 +23,7 @@ target_sources(${CMAKE_PROJECT_NAME}
         TransectStyleComplexItemTestBase.cc TransectStyleComplexItemTestBase.h
         TransectStyleComplexItemTest.cc TransectStyleComplexItemTest.h
         VisualMissionItemTest.cc VisualMissionItemTest.h
+        AreaPlanEditorTest.cc AreaPlanEditorTest.h
 )
 
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

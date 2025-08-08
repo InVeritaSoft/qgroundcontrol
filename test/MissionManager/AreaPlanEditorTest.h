@@ -10,8 +10,6 @@
 #pragma once
 
 #include "MissionControllerManagerTest.h"
-#include <QObject>
-#include "test/qgcunittest/UnitTest.h"
 
 class AreaPlanEditor;
 class PlanMasterController;

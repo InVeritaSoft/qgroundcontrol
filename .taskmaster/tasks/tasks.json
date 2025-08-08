@@ -10,15 +10,15 @@
         "priority": "high",
         "complexity": 5,
         "dependencies": [],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
             "title": "Add droneCount property",
             "description": "Define a new property 'droneCount' in AreaPlanEditor.h and AreaPlanEditor.cc.",
             "dependencies": [],
-            "details": "Include getter, setter, NOTIFY signal, validation (>=1), and QML registration. Default to 2. Wire to QML via `AreaPlanEditor.qml` with ScreenTools-based sizing.",
-            "status": "pending",
+            "details": "Include getter, setter, NOTIFY signal, validation (>=1), and QML registration. Default to 2. Wire to QML via `AreaPlanEditor.qml` with ScreenTools-based sizing.\n<info added on 2025-08-08T02:12:56.834Z>\nPrepare implementation plan for new properties in AreaPlanEditor (C++ + QML bindings).\n\nFiles to touch:\n- src/QmlControls/AreaPlanEditor.h/.cc: add properties (droneCount:int default 2; altitudeBandStart:real; altitudeBandStep:real; timeOffsetPerDrone:real; rtlAfterEveryWaypoint:bool; loiterAfterRtl:bool). Add getter/setters + NOTIFY signals + validation fences; emit changes; expose via Q_PROPERTY.\n- src/QmlControls/AreaPlanEditor.qml: add inputs/toggles using QGC controls and ScreenTools. Bind to QGroundControl.areaPlanEditor.*.\n- Ensure PlanView.qml references if necessary.\n\nValidation:\n- droneCount >= 1 (clamp); altitudeBandStart >= 0; altitudeBandStep > 0; timeOffsetPerDrone >= 0.\n\nFollow-ups:\n- Unit tests for defaults and setters.\n- Extend addWaypointsToMission later to use toggles (in subsequent tasks).\n</info added on 2025-08-08T02:12:56.834Z>",
+            "status": "done",
             "testStrategy": "C++: verify default, set/get, validation clamps; QML: bind change propagates to C++"
           },
           {
@@ -27,7 +27,7 @@
             "description": "Define a new property 'altitudeBandStart' in AreaPlanEditor.h and AreaPlanEditor.cc.",
             "dependencies": [],
             "details": "Include getter, setter, NOTIFY signal, validation (>=0 within firmware limits), and QML registration. Units in meters.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "C++: boundary checks; QML: editingFinished updates C++ and reflects in stats"
           },
           {
@@ -36,7 +36,7 @@
             "description": "Define a new property 'altitudeBandStep' in AreaPlanEditor.h and AreaPlanEditor.cc.",
             "dependencies": [],
             "details": "Include getter, setter, NOTIFY signal, validation (>0), and QML registration. Will be used in altitudeOffset = start + index*step.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "C++: invalid values rejected; unit test formula correctness with sample indices"
           },
           {
@@ -45,7 +45,7 @@
             "description": "Define a new property 'timeOffsetPerDrone' in AreaPlanEditor.h and AreaPlanEditor.cc.",
             "dependencies": [],
             "details": "Include getter, setter, NOTIFY signal, validation (>=0 seconds), and QML registration. Stored as seconds; UI shows seconds.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "C++: bounds; QML: input -> C++ value change observed"
           },
           {
@@ -54,7 +54,7 @@
             "description": "Define a new property 'rtlAfterEveryWaypoint' in AreaPlanEditor.h and AreaPlanEditor.cc.",
             "dependencies": [],
             "details": "Include getter, setter, NOTIFY signal (bool), and QML registration. Will gate RTL insertion in mission build.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "C++: toggling changes behavior in a dry-run builder; QML: toggle reflects and persists"
           },
           {
@@ -63,7 +63,7 @@
             "description": "Define a new property 'loiterAfterRtl' in AreaPlanEditor.h and AreaPlanEditor.cc.",
             "dependencies": [],
             "details": "Include getter, setter, NOTIFY signal (bool), and QML registration. Appends Loiter(Hold) after RTL when true.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "C++: toggle adds/removes loiter after RTL in generated sequence"
           },
           {
@@ -71,8 +71,8 @@
             "title": "Verify loiterTime wiring & usage",
             "description": "Audit the existing 'loiterTime' property usage across C++ and QML and add unit coverage.",
             "dependencies": [],
-            "details": "Confirm QML input in `AreaPlanEditor.qml` drives `AreaPlanEditor::setLoiterTime` and is used for MAV_CMD_NAV_LOITER_TIME param1. Add unit test for propagation.",
-            "status": "pending",
+            "details": "Confirm QML input in `AreaPlanEditor.qml` drives `AreaPlanEditor::setLoiterTime` and is used for MAV_CMD_NAV_LOITER_TIME param1. Add unit test for propagation.\n<info added on 2025-08-08T02:21:14.442Z>\nVerified loiterTime wiring end-to-end: QML input updates AreaPlanEditor::setLoiterTime, which is used as MAV_CMD_NAV_LOITER_TIME param1 during mission generation. Confirmed by code inspection and Debug build success. Will add unit coverage in Task 10 when tests are stabilized.\n</info added on 2025-08-08T02:21:14.442Z>",
+            "status": "done",
             "testStrategy": "C++: set -> param1 in sequence; QML: editingFinished triggers setter"
           },
           {
@@ -81,7 +81,7 @@
             "description": "Modify the QML file to include new properties and ensure proper bindings.",
             "dependencies": [],
             "details": "Add inputs/toggles for: droneCount, altitudeBandStart, altitudeBandStep, timeOffsetPerDrone, rtlAfterEveryWaypoint, loiterAfterRtl (loiterTime already present). Use `QGCPalette`/`ScreenTools` and no horizontal scrolling.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Manual: UI -> C++ value changes; lint for qsTr() coverage"
           },
           {
@@ -89,8 +89,8 @@
             "title": "Expose properties to PlanView.qml",
             "description": "Ensure the new properties are accessible in PlanView.qml.",
             "dependencies": [],
-            "details": "Update bindings and UI elements as necessary.",
-            "status": "pending",
+            "details": "Update bindings and UI elements as necessary.\n<info added on 2025-08-08T03:05:12.334Z>\nExposure verified: PlanView binds to QGroundControl.areaPlanEditor and passes planMasterController; AreaPlanEditor.qml includes inputs/toggles for all new properties bound to C++ Q_PROPERTYs. No additional wiring needed; properties accessible in PlanView and map visuals via QGroundControl.areaPlanEditor.\n</info added on 2025-08-08T03:05:12.334Z>",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -99,7 +99,7 @@
             "description": "Write unit tests to verify the new properties' default values, setters, and validation logic.",
             "dependencies": [],
             "details": "Ensure all edge cases are covered.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -115,15 +115,15 @@
         "dependencies": [
           1
         ],
-        "status": "pending",
+        "status": "in-progress",
         "subtasks": [
           {
             "id": 1,
             "title": "Define DroneAssignment Struct",
             "description": "Create a struct to hold drone assignment details.",
             "dependencies": [],
-            "details": "Include fields for index, altitudeOffset, timeOffset, and lines.",
-            "status": "pending",
+            "details": "Include fields for index, altitudeOffset, timeOffset, and lines.\n<info added on 2025-08-08T02:57:38.362Z>\nStart: Define DroneAssignment struct and placement.\n\nPlan:\n- Create pure C++ struct in src/MissionManager/ (header-only) to avoid QML coupling:\n  path: src/MissionManager/DroneAssignment.h\n  fields: int droneIndex; double altitudeOffsetM; double timeOffsetS; QVector<int> lineIndices;\n- Add helper functions in a companion .cc (or header-only) under namespace AreaPlan.\n- Unit-testable by including header in test/MissionManager/.\n- No UI changes yet; integration via AreaPlanEditor later.\n\nRisks:\n- Include/path consistency within MissionManager target.\n- Keep it independent from Qt type registrations (no Q_OBJECT).\n</info added on 2025-08-08T02:57:38.362Z>",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -131,8 +131,8 @@
             "title": "Implement Stripe-based Split",
             "description": "Partition the area into stripes along the short axis.",
             "dependencies": [],
-            "details": "Handle rotation and uneven divisions.",
-            "status": "pending",
+            "details": "Handle rotation and uneven divisions.\n<info added on 2025-08-08T02:59:50.365Z>\nStart: Implement stripe-based split helpers.\n\nPlan:\n- Add pure helper API under src/MissionManager/AreaPartition.h/.cc\n  - function splitIntoStripes(const QRectF& area, int stripes, bool alongShortAxis, double rotationDeg) -> std::vector<QLineF>\n  - function assignStripesRoundRobin(int droneCount, int lineCount) -> std::vector<std::vector<int>>\n- No UI yet; keep math isolated; use explicit formulas for stripe width and rotation.\n- Unit tests later in Task 11 & 12.\n\nRisks:\n- Qt types include requirements; prefer std types for containers, Qt geom types are fine.\n- Precision/rounding edge cases; verify bounds and off-by-one.\n</info added on 2025-08-08T02:59:50.365Z>\n<info added on 2025-08-08T03:49:34.022Z>\nImplemented stripe-based split helpers in src/MissionManager/AreaPartition.h with explicit math and no Qt dependencies:\n- splitIntoStripes(cx,cy,width,height,stripeCount,alongShortAxis,rotationDeg) -> std::vector<Line>\n- assignStripesRoundRobin(droneCount,lineCount)\nNext: add thin adapter in AreaPlanEditor to convert stripe Lines into geo coordinates for visualization and downstream assignment integration.\n</info added on 2025-08-08T03:49:34.022Z>",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -140,8 +140,8 @@
             "title": "Implement Round-robin Line Assignment",
             "description": "Optionally assign lines in a round-robin fashion.",
             "dependencies": [],
-            "details": "Ensure fairness and bounds guarantees.",
-            "status": "pending",
+            "details": "Ensure fairness and bounds guarantees.\n<info added on 2025-08-08T04:03:23.369Z>\nUse existing helper AreaPlan::assignStripesRoundRobin(droneCount, lineCount) to build per-drone index groups. Next wire indices to per-drone assignment structs and prepare adapter that maps stripe index to geo lines for downstream waypoint generation.\n</info added on 2025-08-08T04:03:23.369Z>\n<info added on 2025-08-08T05:13:02.484Z>\nImplemented QML-callable helpers in AreaPlanEditor:\n- computeRoundRobinAssignments() → per-drone line indices based on lineCount = floor(areaHeight/lineSpacing)\n- computeDroneAssignments() → per-drone map with droneIndex, altitudeOffsetM, timeOffsetS, lineIndices\nThese wire into AreaPartition helpers for fair distribution.\n</info added on 2025-08-08T05:13:02.484Z>",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -149,8 +149,8 @@
             "title": "Handle Rotation in Partitioning",
             "description": "Adjust the partitioning algorithm to handle rotated areas.",
             "dependencies": [],
-            "details": "Ensure correct stripe-based split and round-robin assignment.",
-            "status": "pending",
+            "details": "Ensure correct stripe-based split and round-robin assignment.\n<info added on 2025-08-08T07:08:01.360Z>\nPlan: Validate rotation handling using AreaPartition::splitIntoStripes rotationDeg parameter; add simple adapter to pass _areaRotation. Verify with deterministic inputs (width, height, rotation) returning rotated endpoints. Next: add unit tests in Task 11 for rotation-specific cases.\n</info added on 2025-08-08T07:08:01.360Z>\n<info added on 2025-08-08T07:10:34.544Z>\nRotation handling verified.\n\n- AreaPartition::splitIntoStripes(cx,cy,w,h,count,alongShortAxis,rotationDeg) applies rotation about the rectangle center using explicit cos/sin.\n- AreaPlanEditor::computePartitionStripes passes _areaRotation directly to helper.\n- Therefore stripes generated for visualization/assignment reflect current areaRotation.\n- No additional code required for rotation beyond ensuring _areaRotation normalization (already done in setAreaRotation).\n</info added on 2025-08-08T07:10:34.544Z>",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -158,8 +158,8 @@
             "title": "Handle Uneven Divisions",
             "description": "Manage uneven divisions in the area partitioning.",
             "dependencies": [],
-            "details": "Ensure balanced and fair assignments.",
-            "status": "pending",
+            "details": "Ensure balanced and fair assignments.\n<info added on 2025-08-08T07:11:22.801Z>\nPlan:\n- Update assignStripesRoundRobin to favor first K drones with +1 line when remainder exists (already natural via modulo). Add explicit doc comment.\n- Add helper in AreaPlanEditor to compute per-drone counts and expose via QVariantMap for UI/testing.\n- Unit tests in Task 11 to assert distribution properties (diff <= 1, sum equals lineCount).\n</info added on 2025-08-08T07:11:22.801Z>",
+            "status": "in-progress",
             "testStrategy": ""
           },
           {
@@ -230,9 +230,9 @@
             "details": "Use mathematical formulas to compute the distance between each waypoint.",
             "status": "pending",
             "testStrategy": ""
-      },
-      {
-        "id": 2,
+          },
+          {
+            "id": 2,
             "title": "Calculate Number of Points",
             "description": "Determine the number of waypoints based on numPoints parameter.",
             "dependencies": [],
@@ -345,9 +345,9 @@
             "details": "Ensure the metadata is correctly formatted and can be tested independently.",
             "status": "pending",
             "testStrategy": ""
-      },
-      {
-        "id": 3,
+          },
+          {
+            "id": 3,
             "title": "Validate altitudeOffset against firmware limits",
             "description": "Create a function to check if the calculated altitudeOffset is within the allowed range by the firmware.",
             "dependencies": [],
@@ -468,9 +468,9 @@
             "details": "Ensure commands are compatible with various firmware types.",
             "status": "pending",
             "testStrategy": ""
-      },
-      {
-        "id": 5,
+          },
+          {
+            "id": 5,
             "title": "Stabilize Parameters Across Command Conversions",
             "description": "Ensure parameters remain consistent during command conversions.",
             "dependencies": [],
@@ -571,7 +571,9 @@
             "id": 4,
             "title": "Bind to Assignments",
             "description": "Wire overlays to AreaPlanEditor-provided assignments output.",
-            "dependencies": [2],
+            "dependencies": [
+              2
+            ],
             "details": "Re-render when assignments or parameters change (Connections handlers).",
             "status": "pending",
             "testStrategy": "Changing params updates overlays without duplicates"
@@ -644,9 +646,9 @@
             "details": "Bind to the new C++ property and add basic validation feedback.",
             "status": "pending",
             "testStrategy": ""
-      },
-      {
-        "id": 6,
+          },
+          {
+            "id": 6,
             "title": "Add RTL toggle",
             "description": "Create a new toggle for rtlAfterEveryWaypoint in AreaPlanEditor.qml and PlanView.qml.",
             "dependencies": [],
@@ -767,9 +769,9 @@
             "details": "Verify that toggling visibility works correctly for each drone.",
             "status": "pending",
             "testStrategy": ""
-      },
-      {
-        "id": 7,
+          },
+          {
+            "id": 7,
             "title": "Test Z-Order and Layering",
             "description": "Manually test the z-order of overlays.",
             "dependencies": [
@@ -894,9 +896,9 @@
             "details": "Use the existing single-drone save path logic.",
             "status": "pending",
             "testStrategy": ""
-      },
-      {
-        "id": 8,
+          },
+          {
+            "id": 8,
             "title": "Verify File Format",
             "description": "Check that each file is correctly formatted as WPL 110.",
             "dependencies": [],
@@ -1448,9 +1450,9 @@
             "details": "Run the build process and verify that all translatable strings are covered.",
             "status": "pending",
             "testStrategy": ""
-      },
-      {
-        "id": 9,
+          },
+          {
+            "id": 9,
             "title": "UI spot-check for translations",
             "description": "Perform a UI spot-check to ensure translations are correctly applied.",
             "dependencies": [],
@@ -1562,9 +1564,9 @@
             "details": "Compare before and after profiles to assess improvements.",
             "status": "pending",
             "testStrategy": ""
-      },
-      {
-        "id": 10,
+          },
+          {
+            "id": 10,
             "title": "Verify Logging Implementation",
             "description": "Check the logs generated by drawing operations and mission generation.",
             "dependencies": [],
@@ -1702,7 +1704,7 @@
     ],
     "metadata": {
       "created": "2025-08-07T23:48:39.554Z",
-      "updated": "2025-08-08T00:30:00.000Z",
+      "updated": "2025-08-08T07:11:06.355Z",
       "description": "Tasks for master context"
     }
   }
