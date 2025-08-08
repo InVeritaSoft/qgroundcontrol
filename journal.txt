@@ -16,3 +16,4 @@
 2025-08-08T08:15:28.2393024Z [master] (task 11) done; added axis selection and minimal area tests; next: 12 waypoint gen tests
 2025-08-08T08:27:19.7269662Z [master] (task 12) done; waypoint generation count/position tests added; next: 13 policy tests
 2025-08-08T08:48:18.4238223Z [master] (task 6.1) per-drone overlays + legend/toggles implemented in AreaPlanMapVisuals.qml; next: 6.5 performance throttling
+2025-08-08T08:53:34.4474783Z [master] (task 6) done; overlays + legend + toggles + debounce complete; next: 15 perf/logging
