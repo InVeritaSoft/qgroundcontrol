@@ -41,6 +41,13 @@ public:
     Q_PROPERTY(QGeoCoordinate homeLocation READ homeLocation WRITE setHomeLocation NOTIFY homeLocationChanged)
     Q_PROPERTY(qreal areaRotation READ areaRotation WRITE setAreaRotation NOTIFY areaRotationChanged)
     Q_PROPERTY(qreal loiterTime READ loiterTime WRITE setLoiterTime NOTIFY loiterTimeChanged)
+    // Multi-drone planning properties
+    Q_PROPERTY(int   droneCount           READ droneCount           WRITE setDroneCount           NOTIFY droneCountChanged)
+    Q_PROPERTY(qreal altitudeBandStart    READ altitudeBandStart    WRITE setAltitudeBandStart    NOTIFY altitudeBandStartChanged)
+    Q_PROPERTY(qreal altitudeBandStep     READ altitudeBandStep     WRITE setAltitudeBandStep     NOTIFY altitudeBandStepChanged)
+    Q_PROPERTY(qreal timeOffsetPerDrone   READ timeOffsetPerDrone   WRITE setTimeOffsetPerDrone   NOTIFY timeOffsetPerDroneChanged)
+    Q_PROPERTY(bool  rtlAfterEveryWaypoint READ rtlAfterEveryWaypoint WRITE setRtlAfterEveryWaypoint NOTIFY rtlAfterEveryWaypointChanged)
+    Q_PROPERTY(bool  loiterAfterRtl       READ loiterAfterRtl       WRITE setLoiterAfterRtl       NOTIFY loiterAfterRtlChanged)
     Q_PROPERTY(QString validationError READ validationError NOTIFY validationErrorChanged)
     Q_PROPERTY(bool isProcessing READ isProcessing NOTIFY isProcessingChanged)
     Q_PROPERTY(int progressValue READ progressValue NOTIFY progressValueChanged)
@@ -71,6 +78,14 @@ public:
     bool isDrawingMode() const { return _isDrawingMode; }
     QObject* planMasterController() const { return _planMasterController; }
 
+    // Multi-drone getters
+    int   droneCount() const { return _droneCount; }
+    qreal altitudeBandStart() const { return _altitudeBandStart; }
+    qreal altitudeBandStep() const { return _altitudeBandStep; }
+    qreal timeOffsetPerDrone() const { return _timeOffsetPerDrone; }
+    bool  rtlAfterEveryWaypoint() const { return _rtlAfterEveryWaypoint; }
+    bool  loiterAfterRtl() const { return _loiterAfterRtl; }
+
     // Property setters
     Q_INVOKABLE void setAreaWidth(qreal width);
     Q_INVOKABLE void setAreaHeight(qreal height);
@@ -83,6 +98,14 @@ public:
     Q_INVOKABLE void setLoiterTime(qreal time);
     Q_INVOKABLE void setIsDrawingMode(bool drawingMode);
     Q_INVOKABLE void setPlanMasterController(QObject* controller);
+
+    // Multi-drone setters
+    Q_INVOKABLE void setDroneCount(int count);
+    Q_INVOKABLE void setAltitudeBandStart(qreal startMeters);
+    Q_INVOKABLE void setAltitudeBandStep(qreal stepMeters);
+    Q_INVOKABLE void setTimeOffsetPerDrone(qreal seconds);
+    Q_INVOKABLE void setRtlAfterEveryWaypoint(bool enabled);
+    Q_INVOKABLE void setLoiterAfterRtl(bool enabled);
 
     // Mission planning functions
     Q_INVOKABLE void moveAreaNorth();
@@ -163,6 +186,13 @@ signals:
     void cacheSizeChanged();
     void isDrawingModeChanged();
     void planMasterControllerChanged();
+    // Multi-drone signals
+    void droneCountChanged();
+    void altitudeBandStartChanged();
+    void altitudeBandStepChanged();
+    void timeOffsetPerDroneChanged();
+    void rtlAfterEveryWaypointChanged();
+    void loiterAfterRtlChanged();
 
 private:
 
@@ -172,6 +202,10 @@ private:
     static constexpr qreal _defaultLineSpacing = 10.0; // Increased from 3.0
     static constexpr int _defaultNumPoints = 1;
     static constexpr qreal _defaultAltitude = 10.0;
+    static constexpr int   _defaultDroneCount = 2;
+    static constexpr qreal _defaultAltitudeBandStart = 0.0;
+    static constexpr qreal _defaultAltitudeBandStep  = 10.0;
+    static constexpr qreal _defaultTimeOffsetPerDrone = 0.0; // seconds
 
     // Properties
     qreal _areaWidth = _defaultAreaWidth;
@@ -192,6 +226,13 @@ private:
     int _cacheSize = 0;
     bool _isDrawingMode = false;
     QObject* _planMasterController = nullptr;
+    // Multi-drone fields
+    int   _droneCount = _defaultDroneCount;
+    qreal _altitudeBandStart = _defaultAltitudeBandStart;
+    qreal _altitudeBandStep  = _defaultAltitudeBandStep;
+    qreal _timeOffsetPerDrone = _defaultTimeOffsetPerDrone;
+    bool  _rtlAfterEveryWaypoint = false;
+    bool  _loiterAfterRtl = false;
     
     // Performance optimization members
     QHash<QString, QVariantList> _waypointCache;

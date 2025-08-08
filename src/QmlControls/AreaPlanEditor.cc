@@ -718,6 +718,52 @@ void AreaPlanEditor::setPlanMasterController(QObject* controller)
     }
 }
 
+void AreaPlanEditor::setDroneCount(int count)
+{
+    if (count < 1) count = 1;
+    if (_droneCount == count) return;
+    _droneCount = count;
+    emit droneCountChanged();
+}
+
+void AreaPlanEditor::setAltitudeBandStart(qreal startMeters)
+{
+    if (startMeters < 0.0) startMeters = 0.0;
+    if (qFuzzyCompare(_altitudeBandStart, startMeters)) return;
+    _altitudeBandStart = startMeters;
+    emit altitudeBandStartChanged();
+}
+
+void AreaPlanEditor::setAltitudeBandStep(qreal stepMeters)
+{
+    if (stepMeters <= 0.0) stepMeters = _defaultAltitudeBandStep;
+    if (qFuzzyCompare(_altitudeBandStep, stepMeters)) return;
+    _altitudeBandStep = stepMeters;
+    emit altitudeBandStepChanged();
+}
+
+void AreaPlanEditor::setTimeOffsetPerDrone(qreal seconds)
+{
+    if (seconds < 0.0) seconds = 0.0;
+    if (qFuzzyCompare(_timeOffsetPerDrone, seconds)) return;
+    _timeOffsetPerDrone = seconds;
+    emit timeOffsetPerDroneChanged();
+}
+
+void AreaPlanEditor::setRtlAfterEveryWaypoint(bool enabled)
+{
+    if (_rtlAfterEveryWaypoint == enabled) return;
+    _rtlAfterEveryWaypoint = enabled;
+    emit rtlAfterEveryWaypointChanged();
+}
+
+void AreaPlanEditor::setLoiterAfterRtl(bool enabled)
+{
+    if (_loiterAfterRtl == enabled) return;
+    _loiterAfterRtl = enabled;
+    emit loiterAfterRtlChanged();
+}
+
 MissionController* AreaPlanEditor::getMissionController() const
 {
     if (!_planMasterController) {

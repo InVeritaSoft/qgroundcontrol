@@ -126,6 +126,88 @@ Item {
 								}
 							}
 
+                            // --- Multi-drone parameters ---
+                            QGCLabel {
+                                text: qsTr("Number of Drones:")
+                                width: parent.width * 0.4
+                                height: _h * 1.6
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            QGCTextField {
+                                width: parent.width * 0.5
+                                height: _h * 1.6
+                                text: areaPlanEditor ? areaPlanEditor.droneCount.toString() : "2"
+                                validator: IntValidator { bottom: 1; top: 50 }
+                                onEditingFinished: if (areaPlanEditor && text !== "") areaPlanEditor.setDroneCount(parseInt(text))
+                            }
+
+                            QGCLabel {
+                                text: qsTr("Altitude Band Start (m):")
+                                width: parent.width * 0.4
+                                height: _h * 1.6
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            QGCTextField {
+                                width: parent.width * 0.5
+                                height: _h * 1.6
+                                text: areaPlanEditor ? areaPlanEditor.altitudeBandStart.toString() : "0"
+                                validator: DoubleValidator { bottom: 0; top: 10000; decimals: 1 }
+                                onEditingFinished: if (areaPlanEditor && text !== "") areaPlanEditor.setAltitudeBandStart(parseFloat(text))
+                            }
+
+                            QGCLabel {
+                                text: qsTr("Altitude Band Step (m):")
+                                width: parent.width * 0.4
+                                height: _h * 1.6
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            QGCTextField {
+                                width: parent.width * 0.5
+                                height: _h * 1.6
+                                text: areaPlanEditor ? areaPlanEditor.altitudeBandStep.toString() : "10"
+                                validator: DoubleValidator { bottom: 0.1; top: 10000; decimals: 1 }
+                                onEditingFinished: if (areaPlanEditor && text !== "") areaPlanEditor.setAltitudeBandStep(parseFloat(text))
+                            }
+
+                            QGCLabel {
+                                text: qsTr("Time Offset per Drone (s):")
+                                width: parent.width * 0.4
+                                height: _h * 1.6
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            QGCTextField {
+                                width: parent.width * 0.5
+                                height: _h * 1.6
+                                text: areaPlanEditor ? areaPlanEditor.timeOffsetPerDrone.toString() : "0"
+                                validator: DoubleValidator { bottom: 0; top: 3600; decimals: 1 }
+                                onEditingFinished: if (areaPlanEditor && text !== "") areaPlanEditor.setTimeOffsetPerDrone(parseFloat(text))
+                            }
+
+                            QGCLabel {
+                                text: qsTr("RTL after every waypoint:")
+                                width: parent.width * 0.4
+                                height: _h * 1.6
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            QGCSwitch {
+                                width: parent.width * 0.5
+                                height: _h * 1.6
+                                checked: areaPlanEditor ? areaPlanEditor.rtlAfterEveryWaypoint : false
+                                onClicked: if (areaPlanEditor) areaPlanEditor.setRtlAfterEveryWaypoint(checked)
+                            }
+
+                            QGCLabel {
+                                text: qsTr("Loiter after RTL:")
+                                width: parent.width * 0.4
+                                height: _h * 1.6
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            QGCSwitch {
+                                width: parent.width * 0.5
+                                height: _h * 1.6
+                                checked: areaPlanEditor ? areaPlanEditor.loiterAfterRtl : false
+                                onClicked: if (areaPlanEditor) areaPlanEditor.setLoiterAfterRtl(checked)
+                            }
 							QGCLabel { 
 								text: qsTr("Area Height (Meters):")
 								width: parent.width * 0.4
