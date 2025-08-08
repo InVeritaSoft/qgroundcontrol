@@ -12,6 +12,8 @@
 #include "AreaPlanEditor.h"
 #include "PlanMasterController.h"
 #include "MissionController.h"
+#include <QtMath>
+#include "test/qgcunittest/UnitTest.h"
 
 #include <QtTest/QTest>
 
