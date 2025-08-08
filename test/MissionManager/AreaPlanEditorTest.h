@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include <QObject>
+#include "test/qgcunittest/UnitTest.h"
 #include "MissionControllerManagerTest.h"
 
 class AreaPlanEditor;
@@ -30,6 +32,7 @@ private slots:
     void _boundsAndRotation();
     void _rotationHandling();
     void _perDroneGeneratedWaypoints();
+    void _axisSelectionAndMinimal();
 };
 
 

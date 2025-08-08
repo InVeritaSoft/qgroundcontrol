@@ -8,6 +8,7 @@
  ****************************************************************************/
 
 #include "AreaPlanEditorTest.h"
+#include "test/qgcunittest/UnitTest.h"
 #include "QGroundControlQmlGlobal.h"
 #include "AreaPlanEditor.h"
 #include "PlanMasterController.h"
@@ -157,6 +158,66 @@ void AreaPlanEditorTest::_rotationHandling()
     }
 }
 
+// Verify stripe orientation vs alongShortAxis flag and minimal area behavior
+static bool approxParallelX(const AreaPlan::Line& ln) {
+    // Parallel to Y axis means x nearly constant; we check |dx| << |dy|
+    const double dx = qAbs(ln.a.x - ln.b.x);
+    const double dy = qAbs(ln.a.y - ln.b.y);
+    return dx < dy; // predominantly vertical
+}
+static bool approxParallelY(const AreaPlan::Line& ln) {
+    const double dx = qAbs(ln.a.x - ln.b.x);
+    const double dy = qAbs(ln.a.y - ln.b.y);
+    return dy < dx; // predominantly horizontal
+}
+
+void AreaPlanEditorTest::_axisSelectionAndMinimal()
+{
+    using AreaPlan::splitIntoStripes;
+
+    const double cx = 0.0, cy = 0.0;
+    {
+        // Width < Height → alongShortAxis=true should yield vertical stripes (x constant)
+        auto v = splitIntoStripes(cx, cy, /*w=*/10.0, /*h=*/30.0, /*N=*/4, /*alongShortAxis=*/true, /*rot=*/0.0);
+        QVERIFY(static_cast<int>(v.size()) == 4);
+        for (const auto& ln : v) QVERIFY(approxParallelX(ln));
+
+        // alongShortAxis=false on same dims → horizontal stripes
+        auto h = splitIntoStripes(cx, cy, 10.0, 30.0, 4, /*alongShortAxis=*/false, 0.0);
+        QVERIFY(static_cast<int>(h.size()) == 4);
+        for (const auto& ln : h) QVERIFY(approxParallelY(ln));
+    }
+
+    {
+        // Width > Height → alongShortAxis=true should yield horizontal stripes
+        auto h = splitIntoStripes(cx, cy, /*w=*/40.0, /*h=*/10.0, /*N=*/3, /*alongShortAxis=*/true, /*rot=*/0.0);
+        QVERIFY(static_cast<int>(h.size()) == 3);
+        for (const auto& ln : h) QVERIFY(approxParallelY(ln));
+    }
+
+    {
+        // Minimal area handling
+        auto emptyW = splitIntoStripes(cx, cy, 0.0, 5.0, 3, true, 0.0);
+        QVERIFY(emptyW.empty());
+        auto emptyH = splitIntoStripes(cx, cy, 5.0, 0.0, 3, true, 0.0);
+        QVERIFY(emptyH.empty());
+        auto emptyN = splitIntoStripes(cx, cy, 5.0, 5.0, 0, true, 0.0);
+        QVERIFY(emptyN.empty());
+
+        // Very small but non-zero area still produces stripes within bounds
+        const double w = 0.01, h = 0.02;
+        auto tiny = splitIntoStripes(cx, cy, w, h, 2, true, 0.0);
+        QVERIFY(static_cast<int>(tiny.size()) == 2);
+        for (const auto& ln : tiny) {
+            auto check = [&](double x, double y) {
+                QVERIFY(x >= -w/2 - 1e-9 && x <= w/2 + 1e-9);
+                QVERIFY(y >= -h/2 - 1e-9 && y <= h/2 + 1e-9);
+            };
+            check(ln.a.x, ln.a.y);
+            check(ln.b.x, ln.b.y);
+        }
+    }
+}
 void AreaPlanEditorTest::_perDroneGeneratedWaypoints()
 {
     AreaPlanEditor* editor = QGroundControlQmlGlobal::instance()->areaPlanEditor();
