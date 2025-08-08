@@ -13,10 +13,13 @@ lastUpdated: 2024-12-19
 ## **GOAUTO COMMAND: Complete Automation Trigger**
 
 ### **Command Recognition**
-- **Trigger Word**: `goauto` (case-insensitive)
-- **Activation**: When user types "goauto" in chat, immediately enable full autonomous mode
+- **Trigger Words** (case-insensitive): `goauto`, `start auto`, `resume auto`, `stop auto`
+- **Activation**:
+  - `goauto`, `start auto`: Immediately enable full autonomous mode
+  - `resume auto`: Enable full autonomous mode and resume from last saved current task context if present; otherwise select the next task
+  - `stop auto`: Immediately disable autonomous mode and revert to normal interactive workflow
 - **Scope**: Applies to entire conversation session until manually disabled
-- **Behavior**: Overrides all interactive prompts and enables permanent -y mode
+- **Behavior**: Overrides all interactive prompts and enables permanent -y mode while active
 
 ### **Autonomous Mode Features**
 
@@ -116,3 +119,12 @@ Only pause for:
 ---
 
 **See also:** [autonomous-execution.mdc](mdc:.cursor/rules/taskmaster/autonomous-execution.mdc), [dev-workflow-automated.mdc](mdc:.cursor/rules/taskmaster/dev-workflow-automated.mdc), [no-questions.mdc](mdc:.cursor/rules/taskmaster/no-questions.mdc), [automation.mdc](mdc:.cursor/rules/taskmaste
+
+### **Deactivation & Resume Semantics**
+- `stop auto`:
+  - Stop issuing automatic MCP/CLI commands
+  - Leave `.taskmaster/state.json` `current` pointer intact for later resume
+  - Journal the stop event
+- `resume auto`:
+  - If `.taskmaster/state.json` contains a `current` entry, continue with that item (set `in-progress` if not already); otherwise select via `next_task`
+  - Journal the resume event

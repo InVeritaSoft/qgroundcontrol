@@ -1,0 +1,72 @@
+---
+description: Enforce uninterrupted full-auto task processing using Taskmaster next-task loop (MCP-first), no prompts, sequential task→subtask flow
+globs: **/*
+alwaysApply: true
+lastUpdated: 2025-08-08
+---
+
+- **Full-Auto Processing (Sequential, No Prompts)**
+  - Always operate in full-auto mode: no questions, no pauses, no confirmations.
+  - Select work using the next-task mechanism and proceed task-by-task, subtask-by-subtask.
+  - Use MCP tools first; only fall back to CLI if MCP is unavailable.
+  - Maintain journaling and status transitions automatically; commit on done (with Taskmaster ID prefix) when applicable.
+
+- **MCP-First Next-Task Flow**
+  - Identify the next actionable item using `next_task`.
+  - Immediately set status to `in-progress`.
+  - Append a timestamped plan/update to the subtask via `update_subtask`.
+  - Implement; append progress notes; mark `done` only after verification (per project overrides).
+  - Move to the next item automatically.
+
+- **QGroundControl Overrides (Respect Toolchain)**
+  - Do not auto-run builds/tests; user controls build cadence (see project overrides).
+  - Keep changes focused on source; do not touch caches.
+  - Follow QML/Qt conventions (QGCPalette, ScreenTools, qsTr()).
+
+- **DO**
+
+```json
+{
+  "tool": "next_task",
+  "projectRoot": "<absPath>",
+  "tag": "master"
+}
+```
+
+```json
+{
+  "tool": "set_task_status",
+  "id": "7.2",
+  "status": "in-progress",
+  "projectRoot": "<absPath>",
+  "tag": "master"
+}
+```
+
+```json
+{
+  "tool": "update_subtask",
+  "id": "7.2",
+  "prompt": "Start: implement helper; Files: src/...; Risks: edge-case rounding",
+  "projectRoot": "<absPath>",
+  "tag": "master"
+}
+```
+
+- **DON'T**
+  - Ask the user what to do next or wait for confirmation.
+  - Start arbitrary tasks without selecting via `next_task`.
+  - Run builds/tests automatically for QGC without user initiation.
+
+- **Why**
+  - Ensures deterministic, uninterrupted progress aligned with the planned dependency graph.
+  - Preserves QGC-specific workflow and toolchain constraints.
+  - Maintains an auditable trail via Taskmaster updates and journaling.
+
+- **Cross-References**
+  - [goauto.mdc](mdc:.cursor/rules/auto/goauto.mdc)
+  - [autonomous-execution.mdc](mdc:.cursor/rules/auto/autonomous-execution.mdc)
+  - [dev-workflow-automated.mdc](mdc:.cursor/rules/auto/dev-workflow-automated.mdc)
+  - [qgc-overrides.mdc](mdc:.cursor/rules/auto/qgc-overrides.mdc)
+  - [taskmaster/dev_workflow.mdc](mdc:.cursor/rules/taskmaster/dev_workflow.mdc)
+

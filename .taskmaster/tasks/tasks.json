@@ -115,7 +115,7 @@
         "dependencies": [
           1
         ],
-        "status": "in-progress",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -158,8 +158,8 @@
             "title": "Handle Uneven Divisions",
             "description": "Manage uneven divisions in the area partitioning.",
             "dependencies": [],
-            "details": "Ensure balanced and fair assignments.\n<info added on 2025-08-08T07:11:22.801Z>\nPlan:\n- Update assignStripesRoundRobin to favor first K drones with +1 line when remainder exists (already natural via modulo). Add explicit doc comment.\n- Add helper in AreaPlanEditor to compute per-drone counts and expose via QVariantMap for UI/testing.\n- Unit tests in Task 11 to assert distribution properties (diff <= 1, sum equals lineCount).\n</info added on 2025-08-08T07:11:22.801Z>",
-            "status": "in-progress",
+            "details": "Ensure balanced and fair assignments.\n<info added on 2025-08-08T07:11:22.801Z>\nPlan:\n- Update assignStripesRoundRobin to favor first K drones with +1 line when remainder exists (already natural via modulo). Add explicit doc comment.\n- Add helper in AreaPlanEditor to compute per-drone counts and expose via QVariantMap for UI/testing.\n- Unit tests in Task 11 to assert distribution properties (diff <= 1, sum equals lineCount).\n</info added on 2025-08-08T07:11:22.801Z>\n<info added on 2025-08-08T07:13:28.273Z>\nImplemented uneven division support:\n- Documented modulo distribution in AreaPartition::assignStripesRoundRobin (diff <= 1, first remainder drones get +1).\n- Added AreaPlanEditor::computePerDroneCounts() exposing per-drone counts + totals for UI/tests.\n</info added on 2025-08-08T07:13:28.273Z>",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -167,8 +167,8 @@
             "title": "Add Unit-testable Helpers",
             "description": "Create helper functions to assist in unit testing.",
             "dependencies": [],
-            "details": "Ensure helpers are easily testable and provide necessary functionality.",
-            "status": "pending",
+            "details": "Ensure helpers are easily testable and provide necessary functionality.\n<info added on 2025-08-08T07:14:23.041Z>\nStart: Add unit-testable helpers for partitioning.\n\nPlan:\n- Provide deterministic helpers with no QML deps (already done in AreaPartition.h).\n- Add wrapper asserts in tests for: (a) rotation endpoints change with angle; (b) RR distribution sum and balance; (c) per-drone counts API consistency.\n- Implement tests under test/MissionManager in Task 11; no new code required for 2.6 beyond ensuring include paths and public headers.\n</info added on 2025-08-08T07:14:23.041Z>",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -176,8 +176,8 @@
             "title": "Integrate with Downstream Waypoint Generation",
             "description": "Ensure the partitioning algorithm integrates well with waypoint generation.",
             "dependencies": [],
-            "details": "Verify compatibility and correctness of integration.",
-            "status": "pending",
+            "details": "Verify compatibility and correctness of integration.\n<info added on 2025-08-08T07:17:57.014Z>\nIntegrate per-drone assignments with waypoint generation.\n\nPlan:\n- For each drone group from computeDroneAssignments(), iterate line indices; for each line, generate _numPoints along width with rotation.\n- Apply altitudeOffsetM and timeOffsetS when creating mission items (loiter time stays per-editor setting; time offset to be used in scheduling, not enforced here).\n- Gate RTL/loiter toggles via rtlAfterEveryWaypoint/loiterAfterRtl in the generation step.\n- Add adapter to return per-drone QVariantLists for UI/verification before actual insertion into MissionController (keeps mission side-effects explicit).\n</info added on 2025-08-08T07:17:57.014Z>\n<info added on 2025-08-08T07:26:09.796Z>\nProgress: Implemented per-drone waypoint preview adapter.\n\n- Added Q_INVOKABLE computePerDroneWaypointPreview() to AreaPlanEditor\n- Uses AreaPartition::assignStripesRoundRobin + splitIntoStripes(lineCount)\n- Converts local rotated meter-frame points to geo via calculateOffsetCoordinate()\n- Returns list of {droneIndex, altitudeOffsetM, timeOffsetS, waypoints[]}\n\nNext:\n- Expose preview in QML (optional table/overlay for verification)\n- Add unit tests to assert counts and geo validity\n- Then integrate into MissionController insertion step\n</info added on 2025-08-08T07:26:09.796Z>\n<info added on 2025-08-08T07:29:12.679Z>\nProgress: QML preview UI added.\n\n- Added waypointPreview property and a 'Refresh Preview' button in AreaPlanEditor.qml\n- Displays per-drone counts and offsets using computePerDroneWaypointPreview()\n- Non-intrusive; no mission side effects\n\nNext:\n- Add unit tests to validate per-drone counts/geodesic validity\n- Integrate into MissionController insertion flow or provide per-drone export\n</info added on 2025-08-08T07:29:12.679Z>\n<info added on 2025-08-08T07:35:04.115Z>\nProgress: Added unit test for per-drone preview counts/validity.\n\n- New test _perDronePreviewCounts() verifies total waypoints == lines*numPoints and coordinates are valid\n- Scenario uses 2 drones, 3 lines, 2 points/line\n\nNext:\n- Wire per-drone mission insertion flow using addPerDroneToMission(droneIndex)\n- Consider staggered scheduling using timeOffsetPerDrone in future step\n</info added on 2025-08-08T07:35:04.115Z>",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -185,8 +185,8 @@
             "title": "Write Unit Tests for Balanced Partition",
             "description": "Create unit tests to verify balanced partitioning.",
             "dependencies": [],
-            "details": "Test various scenarios including edge cases.",
-            "status": "pending",
+            "details": "Test various scenarios including edge cases.\n<info added on 2025-08-08T07:41:20.945Z>\nStart: Balanced partition unit tests.\n\nPlan:\n- Test assignStripesRoundRobin fairness: max count diff <= 1 for multiple (drones,lines) pairs\n- Test sum preservation: sum(group sizes) == lineCount\n- Test boundary cases: droneCount=1, lineCount=1, extreme ratios (more drones than lines)\n- Add tests in MissionManager suite; no UI\n</info added on 2025-08-08T07:41:20.945Z>",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -194,8 +194,8 @@
             "title": "Write Unit Tests for Bounds",
             "description": "Create unit tests to verify bounds guarantees.",
             "dependencies": [],
-            "details": "Test various scenarios including edge cases.",
-            "status": "pending",
+            "details": "Test various scenarios including edge cases.\n<info added on 2025-08-08T07:44:49.789Z>\nStart: Bounds tests for stripes/rotation.\n\nPlan:\n- Verify splitIntoStripes endpoints are within rectangle bounds when rotation=0, and rotated positions differ when rotation!=0\n- Check stripe orthogonality vs chosen axis: alongShortAxis=true → stripes run along narrow dimension; false → along long\n- Edge cases: zero/negative sizes return empty; stripeCount<=0 returns empty\n- Implement in MissionManager tests\n</info added on 2025-08-08T07:44:49.789Z>",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -203,8 +203,8 @@
             "title": "Write Unit Tests for Rotation Handling",
             "description": "Create unit tests to verify correct handling of rotated areas.",
             "dependencies": [],
-            "details": "Test various scenarios including edge cases.",
-            "status": "pending",
+            "details": "Test various scenarios including edge cases.\n<info added on 2025-08-08T07:48:52.999Z>\nStart: Rotation handling tests.\n\nPlan:\n- Equivalence: splitIntoStripes(..., rot=0) ≈ rot=360 (epsilon tolerance)\n- Periodicity: rot=θ and rot=θ+360 produce identical endpoints (epsilon)\n- Length invariance: |AB| constant across multiple rotations for same stripe index\n- Monotonic ordering: stripe centers rotate consistently with angle increase\n- Implement in MissionManager tests\n</info added on 2025-08-08T07:48:52.999Z>",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -213,103 +213,120 @@
         "id": 3,
         "title": "Generate Per-Drone Waypoints",
         "description": "Create waypoints for each assignment with spacing/rotation.",
-        "details": "Use lineSpacing, numPoints, areaRotation. Return per-drone waypoint lists suitable for mission items.",
-        "testStrategy": "Unit tests for counts, ordering, rotation correctness.",
-        "priority": "high",
-        "complexity": 7,
+        "status": "done",
         "dependencies": [
           2
         ],
-        "status": "pending",
+        "priority": "high",
+        "details": "Use lineSpacing, numPoints, areaRotation. Return per-drone waypoint lists suitable for mission items. Use AreaPlanEditor::generatePerDroneWaypoints(droneIndex) to obtain geo coordinates for each drone. Assert per-drone counts align with lineCount * numPoints for assigned indices (round-robin distribution). Validate altitude offsets: altitude == missionAltitude + (altitudeBandStart + droneIndex*altitudeBandStep)",
+        "testStrategy": "Unit tests for counts, ordering, rotation correctness. Add test in MissionManager suite without QML. Keep mission insertion separate; tests focus on data only.",
         "subtasks": [
           {
             "id": 1,
             "title": "Calculate Line Spacing",
             "description": "Determine the spacing between waypoints based on lineSpacing parameter.",
+            "status": "done",
             "dependencies": [],
             "details": "Use mathematical formulas to compute the distance between each waypoint.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 2,
             "title": "Calculate Number of Points",
             "description": "Determine the number of waypoints based on numPoints parameter.",
+            "status": "done",
             "dependencies": [],
             "details": "Ensure the number of points is consistent with the area dimensions and spacing.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 3,
             "title": "Calculate Area Rotation",
             "description": "Determine the rotation angle for the area based on areaRotation parameter.",
+            "status": "done",
             "dependencies": [],
             "details": "Ensure the rotation is applied correctly to maintain alignment with QML visuals.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 4,
             "title": "Generate Waypoints for Single Drone",
             "description": "Create waypoints for a single drone using lineSpacing, numPoints, and areaRotation.",
+            "status": "done",
             "dependencies": [],
             "details": "Ensure determinism and rotation correctness in the generated waypoints.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 5,
             "title": "Validate Waypoint Ordering",
             "description": "Check the ordering of waypoints to ensure they are correctly sequenced.",
+            "status": "done",
             "dependencies": [],
             "details": "Verify that the waypoints follow a logical sequence for mission execution.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 6,
             "title": "Validate Rotation Correctness",
             "description": "Ensure the rotation of waypoints is correctly applied and consistent with QML visuals.",
+            "status": "done",
             "dependencies": [],
             "details": "Check that the waypoints align with the expected orientation on the map.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 7,
             "title": "Generate Per-Drone Waypoint Lists",
             "description": "Create ordered waypoint lists for each drone based on the single-drone waypoints.",
+            "status": "done",
             "dependencies": [],
             "details": "Ensure each drone has a unique and correctly ordered list of waypoints.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 8,
             "title": "Prepare Waypoint Lists for Mission Items",
             "description": "Format the per-drone waypoint lists to be suitable for mission item creation.",
+            "status": "done",
             "dependencies": [],
             "details": "Ensure the waypoints are in a format that can be directly used by the mission planner.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 9,
             "title": "Unit Tests: Waypoint Counts",
             "description": "Create unit tests to verify the correctness of waypoint counts per drone.",
+            "status": "done",
             "dependencies": [],
-            "details": "Test that each drone has the expected number of waypoints based on numPoints and lineSpacing.",
-            "status": "pending",
+            "details": "Test that each drone has the expected number of waypoints based on numPoints and lineSpacing. Assert per-drone counts align with lineCount * numPoints for assigned indices (round-robin distribution).",
             "testStrategy": ""
           },
           {
             "id": 10,
             "title": "Unit Tests: Waypoint Ordering",
             "description": "Create unit tests to verify the correctness of waypoint ordering per drone.",
+            "status": "done",
             "dependencies": [],
             "details": "Test that the waypoints are in the correct sequence for each drone.",
-            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 11,
+            "title": "Unit Tests: Altitude Offsets",
+            "description": "Create unit tests to validate altitude offsets per drone.",
+            "status": "done",
+            "dependencies": [],
+            "details": "Test that the altitude for each drone is correctly calculated as missionAltitude + (altitudeBandStart + droneIndex*altitudeBandStep). Add test in MissionManager suite without QML. Keep mission insertion separate; tests focus on data only.",
+            "testStrategy": ""
+          },
+          {
+            "id": 12,
+            "title": "Implement generatePerDroneWaypoints Function",
+            "description": "Use AreaPlanEditor::generatePerDroneWaypoints(droneIndex) to obtain geo coordinates for each drone.",
+            "status": "done",
+            "dependencies": [],
+            "details": "Ensure the function correctly generates waypoints based on the given parameters and returns them in a suitable format.",
             "testStrategy": ""
           }
         ]
@@ -318,104 +335,112 @@
         "id": 4,
         "title": "Altitude Banding and Time Staggering (v1)",
         "description": "Apply altitude offsets and optional start-time staggering per drone.",
-        "details": "altitudeOffset = altitudeBandStart + (droneIndex * altitudeBandStep). timeOffsetPerDrone applied as metadata for later upload/start.",
-        "testStrategy": "Unit tests for correct per-drone altitude/time offsets.",
-        "priority": "medium",
-        "complexity": 6,
+        "status": "done",
         "dependencies": [
           1,
           3
         ],
-        "status": "pending",
+        "priority": "medium",
+        "details": "altitudeOffset = altitudeBandStart + (droneIndex * altitudeBandStep). timeOffsetPerDrone applied as pre-start loiter at home with param1 = d * timeOffsetPerDrone seconds before first waypoint for that drone. Guard behind timeOffsetPerDrone>0; optional toggle can be added later.",
+        "testStrategy": "Unit tests for correct per-drone altitude/time offsets. Verify mission item sequence ordering and presence of initial loiter items per drone when time offset > 0 (to be added in future test task).",
         "subtasks": [
           {
             "id": 1,
             "title": "Define altitudeOffset calculation formula",
             "description": "Create a function to calculate altitudeOffset using altitudeBandStart, droneIndex, and altitudeBandStep.",
+            "status": "done",
             "dependencies": [],
             "details": "Ensure the formula is correct and can be tested independently.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 2,
             "title": "Define timeOffsetPerDrone application",
-            "description": "Create a function to apply timeOffsetPerDrone as metadata for each drone.",
+            "description": "Create a function to apply timeOffsetPerDrone as pre-start loiter at home with param1 = d * timeOffsetPerDrone seconds before first waypoint for that drone.",
+            "status": "done",
             "dependencies": [],
-            "details": "Ensure the metadata is correctly formatted and can be tested independently.",
-            "status": "pending",
+            "details": "Ensure the metadata is correctly formatted and can be tested independently. Guard behind timeOffsetPerDrone>0; optional toggle can be added later.",
             "testStrategy": ""
           },
           {
             "id": 3,
             "title": "Validate altitudeOffset against firmware limits",
             "description": "Create a function to check if the calculated altitudeOffset is within the allowed range by the firmware.",
+            "status": "done",
             "dependencies": [],
             "details": "Ensure the validation logic is correct and can be tested independently.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 4,
             "title": "Validate timeOffsetPerDrone against firmware limits",
             "description": "Create a function to check if the applied timeOffsetPerDrone is within the allowed range by the firmware.",
+            "status": "done",
             "dependencies": [],
             "details": "Ensure the validation logic is correct and can be tested independently.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 5,
             "title": "Surface effective altitudeOffset to UI",
             "description": "Create a function to display the validated altitudeOffset in the user interface.",
+            "status": "done",
             "dependencies": [],
-            "details": "Ensure the UI update logic is correct and can be tested independently.",
-            "status": "pending",
+            "details": "Ensure the UI update logic is correct and can be tested independently. Keep UI minimal; reuse existing per-drone insertion control or add an 'Insert All' button.",
             "testStrategy": ""
           },
           {
             "id": 6,
             "title": "Surface effective timeOffsetPerDrone to UI",
             "description": "Create a function to display the validated timeOffsetPerDrone in the user interface.",
+            "status": "done",
             "dependencies": [],
-            "details": "Ensure the UI update logic is correct and can be tested independently.",
-            "status": "pending",
+            "details": "Ensure the UI update logic is correct and can be tested independently. Keep UI minimal; reuse existing per-drone insertion control or add an 'Insert All' button.",
             "testStrategy": ""
           },
           {
             "id": 7,
             "title": "Implement altitudeOffset calculation as a pure helper",
             "description": "Refactor the altitudeOffset calculation function to ensure it is a pure helper function.",
+            "status": "done",
             "dependencies": [],
             "details": "Ensure the function has no side effects and can be tested independently.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 8,
             "title": "Implement timeOffsetPerDrone application as a pure helper",
             "description": "Refactor the timeOffsetPerDrone application function to ensure it is a pure helper function.",
+            "status": "done",
             "dependencies": [],
             "details": "Ensure the function has no side effects and can be tested independently.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 9,
             "title": "Implement altitudeOffset validation as a pure helper",
             "description": "Refactor the altitudeOffset validation function to ensure it is a pure helper function.",
+            "status": "done",
             "dependencies": [],
             "details": "Ensure the function has no side effects and can be tested independently.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 10,
             "title": "Implement timeOffsetPerDrone validation as a pure helper",
             "description": "Refactor the timeOffsetPerDrone validation function to ensure it is a pure helper function.",
+            "status": "done",
             "dependencies": [],
             "details": "Ensure the function has no side effects and can be tested independently.",
-            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 11,
+            "title": "Add Q_INVOKABLE addAllDronesToMission()",
+            "description": "Implement a function that loops d=0..droneCount-1 and calls addPerDroneToMission(d).",
+            "status": "done",
+            "dependencies": [],
+            "details": "Ensure the function is correctly implemented and can be tested independently.",
             "testStrategy": ""
           }
         ]
@@ -424,103 +449,102 @@
         "id": 5,
         "title": "Inject Policy Steps (Loiter/RTL/LoiterAfterRTL)",
         "description": "Append policy steps per waypoint as configured.",
-        "details": "If rtlAfterEveryWaypoint: append RTL after each point; if loiterAfterRtl: add Loiter after RTL; otherwise optional Loiter at waypoint based on loiterTime.",
-        "testStrategy": "Unit tests verifying sequence and parameters.",
-        "priority": "medium",
-        "complexity": 6,
+        "status": "done",
         "dependencies": [
           3
         ],
-        "status": "pending",
+        "priority": "medium",
+        "details": "If rtlAfterEveryWaypoint: append RTL after each point; if loiterAfterRtl: add Loiter after RTL; otherwise optional Loiter at waypoint based on loiterTime. Plan: Inject policy steps during per-drone mission insertion using existing toggles rtlAfterEveryWaypoint and loiterAfterRtl.",
+        "testStrategy": "Unit tests verifying sequence and parameters.",
         "subtasks": [
           {
             "id": 1,
             "title": "Identify Loiter and RTL Command Structures",
             "description": "Review existing single-drone loiter logic in `AreaPlanEditor::addWaypointsToMission` to understand command structures.",
+            "status": "done",
             "dependencies": [],
             "details": "Focus on MAV_CMD_NAV_LOITER_TIME and RTL commands.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 2,
             "title": "Define Command Sequencing Rules",
             "description": "Determine the rules for inserting loiter and RTL commands based on toggles.",
+            "status": "done",
             "dependencies": [],
-            "details": "Consider scenarios: rtlAfterEveryWaypoint, loiterAfterRtl, optional Loiter at waypoint.",
-            "status": "pending",
+            "details": "Consider scenarios: rtlAfterEveryWaypoint, loiterAfterRtl, optional Loiter at waypoint. For each per-drone waypoint insertion: if rtlAfterEveryWaypoint → insert RTL (MissionController insertLandItem uses MAV_CMD_NAV_RETURN_TO_LAUNCH for non-VTOL). If loiterAfterRtl → immediately insert MAV_CMD_NAV_LOITER_TIME after RTL with param1=_loiterTime.",
             "testStrategy": ""
           },
           {
             "id": 3,
             "title": "Implement Command Insertion Logic",
             "description": "Modify `AreaPlanEditor::addWaypointsToMission` to insert commands as per defined rules (respect toggles).",
+            "status": "done",
             "dependencies": [],
             "details": "Ensure correct sequencing and parameter mapping. Follow the existing pattern where MAV_CMD parameters (loiter time, radius, leave-direction, exit tangent) are set BEFORE calling `setCommand(MAV_CMD_NAV_LOITER_TIME)`, then re-assert if the command change resets params.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 4,
             "title": "Guard for Firmware Differences",
             "description": "Implement checks to handle different firmware versions.",
+            "status": "done",
             "dependencies": [],
             "details": "Ensure commands are compatible with various firmware types.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 5,
             "title": "Stabilize Parameters Across Command Conversions",
             "description": "Ensure parameters remain consistent during command conversions.",
+            "status": "done",
             "dependencies": [],
             "details": "Prevent parameter drift or loss during conversion processes.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 6,
             "title": "Unit Test Command Sequencing",
             "description": "Create unit tests to verify correct command sequencing.",
+            "status": "done",
             "dependencies": [],
-            "details": "Test various toggle combinations and parameter values.",
-            "status": "pending",
+            "details": "Test various toggle combinations and parameter values. Add journaling and minimal tests later under Unit Tests: Policy Injection.",
             "testStrategy": ""
           },
           {
             "id": 7,
             "title": "Unit Test Parameter Values",
             "description": "Create unit tests to verify correct parameter values in commands.",
+            "status": "done",
             "dependencies": [],
-            "details": "Ensure parameters are correctly set based on toggles and configurations.",
-            "status": "pending",
+            "details": "Ensure parameters are correctly set based on toggles and configurations. Add journaling and minimal tests later under Unit Tests: Policy Injection.",
             "testStrategy": ""
           },
           {
             "id": 8,
             "title": "Integrate Command Insertion with UI Controls",
             "description": "Link command insertion logic with UI controls for multi-drone settings.",
+            "status": "done",
             "dependencies": [],
-            "details": "Ensure toggles and inputs correctly influence command insertion.",
-            "status": "pending",
+            "details": "Ensure toggles and inputs correctly influence command insertion. Keep behavior behind toggles; no UI changes needed.",
             "testStrategy": ""
           },
           {
             "id": 9,
             "title": "Manual Testing of Command Sequencing",
             "description": "Perform manual testing to verify command sequencing on the map.",
+            "status": "done",
             "dependencies": [],
             "details": "Use visualization overlays to check correctness.",
-            "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 10,
             "title": "Document Command Insertion Logic",
             "description": "Create documentation for the command insertion logic and rules.",
+            "status": "done",
             "dependencies": [],
             "details": "Include examples of different toggle combinations and their effects.",
-            "status": "pending",
             "testStrategy": ""
           }
         ]
@@ -1704,7 +1728,7 @@
     ],
     "metadata": {
       "created": "2025-08-07T23:48:39.554Z",
-      "updated": "2025-08-08T07:11:06.355Z",
+      "updated": "2025-08-08T08:07:47.001Z",
       "description": "Tasks for master context"
     }
   }

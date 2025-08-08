@@ -12,3 +12,4 @@
 2025-08-08T07:43:10.0388924Z [master] (task 2.8) done; balanced RR tests added; next: 2.9 bounds tests
 2025-08-08T07:47:11.3942616Z [master] (task 2.9) done; bounds/rotation tests added; next: 2.10 rotation handling tests
 2025-08-08T08:05:09.1943206Z [master] (task 2) done; all subtasks complete; next: 5 policy steps
+2025-08-08T08:07:40.1560489Z [master] (task 5) start: policy steps injection plan (RTL/Loiter after RTL via toggles)
