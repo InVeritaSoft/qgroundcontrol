@@ -181,6 +181,15 @@ public:
     Q_PROPERTY(qreal formationSpacing READ formationSpacing WRITE setFormationSpacing NOTIFY formationSpacingChanged)
     Q_PROPERTY(bool isFormationTransitioning READ isFormationTransitioning NOTIFY formationTransitioningChanged)
     
+    // Swarm status getters
+    bool isSwarmReady() const;
+    QString swarmStatus() const;
+    bool isCoordinatedMissionActive() const;
+    FormationType currentFormation() const;
+    qreal formationSpacing() const { return _formationSpacing; }
+    void setFormationSpacing(qreal spacing);
+    bool isFormationTransitioning() const;
+    
 private:
     // Swarm coordination helpers
     bool checkSwarmReadiness() const;
@@ -279,10 +288,12 @@ signals:
     void formationTransitioningChanged();
     void formationRolesChanged();
     void leaderVehicleChanged();
+    void formationPositionsChanged();
     
     // Swarm configuration signals
     void isValidChanged();
     void droneCountChanged();
+    void altitudeBandStartChanged();
     void altitudeBandStepChanged();
     void timeOffsetPerDroneChanged();
     // Multi-drone signals
@@ -311,12 +322,6 @@ private:
     QGeoCoordinate _areaCenter = QGeoCoordinate(49.82824897481479, 24.033390804256005);
     QGeoCoordinate _homeLocation = QGeoCoordinate();
 
-    // Swarm configuration
-    int _droneCount = _defaultDroneCount;
-    qreal _altitudeBandStep = _defaultAltitudeBandStep;
-    qreal _timeOffsetPerDrone = _defaultTimeOffsetPerDrone;
-    QString _validationError;
-    
     // Cached allocation statistics
     struct DroneStats {
         int waypointCount = 0;
@@ -330,10 +335,9 @@ private:
         QList<QGeoCoordinate> waypoints;
         QList<int> lineIndices;
     };
-    QMap<int, DroneStats> _droneStats;(49.82824897481479, 24.033390804256005);
+    QMap<int, DroneStats> _droneStats;
     qreal _areaRotation = 0.0;  // Rotation in degrees, 0 = North
     qreal _loiterTime = 10.0;   // Loiter time in seconds at each waypoint
-    QString _validationError;
     bool _isProcessing = false;
     int _progressValue = 0;
     QString _progressMessage;
@@ -345,10 +349,11 @@ private:
     // Multi-drone fields
     int   _droneCount = _defaultDroneCount;
     qreal _altitudeBandStart = _defaultAltitudeBandStart;
-    qreal _altitudeBandStep  = _defaultAltitudeBandStep;
+    qreal _altitudeBandStep = _defaultAltitudeBandStep;
     qreal _timeOffsetPerDrone = _defaultTimeOffsetPerDrone;
     bool  _rtlAfterEveryWaypoint = false;
     bool  _loiterAfterRtl = false;
+    QString _validationError;
     
     // Performance optimization members
     QHash<QString, QVariantList> _waypointCache;

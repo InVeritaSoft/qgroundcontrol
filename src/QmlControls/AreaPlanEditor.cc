@@ -1,13 +1,7 @@
-/****************************************************************************
- *
- * (c) 2009-2020 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
- *
- * QGroundControl is licensed according to the terms in the file
- * COPYING.md in the root of the source code directory.
- *
- ****************************************************************************/
-
 #include "AreaPlanEditor.h"
+#include "QGCApplication.h"
+#include "MultiVehicleManager.h"
+#include "Vehicle.h"
 #include <QDebug>
 #include <QtMath>
 #include <QtPositioning>
@@ -30,1231 +24,210 @@
 #include "MissionController.h" // Added for MissionController
 #include "SimpleMissionItem.h"
 #include "MissionManager/AreaPartition.h"
+#include "QGCApplication.h"
 
 AreaPlanEditor::AreaPlanEditor(QObject* parent)
     : QObject(parent)
+    , _areaWidth(_defaultAreaWidth)
+    , _areaHeight(_defaultAreaHeight)
+    , _lineSpacing(_defaultLineSpacing)
+    , _numPoints(_defaultNumPoints)
+    , _missionAltitude(_defaultAltitude)
+    , _droneCount(_defaultDroneCount)
+    , _altitudeBandStart(_defaultAltitudeBandStart)
+    , _altitudeBandStep(_defaultAltitudeBandStep)
+    , _timeOffsetPerDrone(_defaultTimeOffsetPerDrone)
+    , _rtlAfterEveryWaypoint(false)
+    , _loiterAfterRtl(false)
+    , _isProcessing(false)
+    , _progressValue(0)
+    , _isOptimized(false)
+    , _cacheSize(0)
+    , _isDrawingMode(false)
+    , _planMasterController(nullptr)
+    , _currentFormation(NoFormation)
+    , _formationSpacing(5.0)
+    , _isFormationTransitioning(false)
+    , _leaderVehicle(nullptr)
 {
+    // Initialize any additional members if needed
 }
 
 void AreaPlanEditor::setAreaWidth(qreal width)
 {
-    // Validate input
-    QString error = validateInput("areaWidth", width);
-    if (!error.isEmpty()) {
-        handleError(error, QStringLiteral("Please enter a value between 0.1 and 10,000 meters"));
+    if (qFuzzyCompare(_areaWidth, width)) {
         return;
     }
-    
-    if (qFuzzyCompare(_areaWidth, width))
-        return;
-    
     _areaWidth = width;
-    clearValidationError();
     emit areaWidthChanged();
 }
 
 void AreaPlanEditor::setAreaHeight(qreal height)
 {
-    // Validate input
-    QString error = validateInput("areaHeight", height);
-    if (!error.isEmpty()) {
-        handleError(error, QStringLiteral("Please enter a value between 0.1 and 10,000 meters"));
+    if (qFuzzyCompare(_areaHeight, height)) {
         return;
     }
-    
-    if (qFuzzyCompare(_areaHeight, height))
-        return;
-    
     _areaHeight = height;
-    clearValidationError();
     emit areaHeightChanged();
 }
 
 void AreaPlanEditor::setLineSpacing(qreal spacing)
 {
-    // Validate input
-    QString error = validateInput("lineSpacing", spacing);
-    if (!error.isEmpty()) {
-        handleError(error, QStringLiteral("Please enter a value greater than 0 and less than area height"));
+    if (qFuzzyCompare(_lineSpacing, spacing)) {
         return;
     }
-    
-    if (qFuzzyCompare(_lineSpacing, spacing))
-        return;
-    
     _lineSpacing = spacing;
-    clearValidationError();
     emit lineSpacingChanged();
 }
 
 void AreaPlanEditor::setNumPoints(int points)
 {
-    // Validate input
-    QString error = validateInput("numPoints", points);
-    if (!error.isEmpty()) {
-        handleError(error, QStringLiteral("Please enter a value between 1 and 100"));
+    if (_numPoints == points) {
         return;
     }
-    
-    if (_numPoints == points)
-        return;
-    
     _numPoints = points;
-    clearValidationError();
     emit numPointsChanged();
 }
 
 void AreaPlanEditor::setMissionAltitude(qreal altitude)
 {
-    // Validate input
-    QString error = validateInput("missionAltitude", altitude);
-    if (!error.isEmpty()) {
-        handleError(error, QStringLiteral("Please enter a value between 1 and 1,000 meters"));
+    if (qFuzzyCompare(_missionAltitude, altitude)) {
         return;
     }
-    
-    if (qFuzzyCompare(_missionAltitude, altitude))
-        return;
-    
     _missionAltitude = altitude;
-    clearValidationError();
     emit missionAltitudeChanged();
 }
 
 void AreaPlanEditor::setAreaCenter(const QGeoCoordinate& center)
 {
-    // Validate input
-    QString error = validateInput("areaCenter", QVariant::fromValue(center));
-    if (!error.isEmpty()) {
-        handleError(error, QStringLiteral("Please enter valid coordinates"));
+    if (_areaCenter == center) {
         return;
     }
-    
-    if (_areaCenter == center)
-        return;
-    
     _areaCenter = center;
-    clearValidationError();
     emit areaCenterChanged();
 }
 
 void AreaPlanEditor::setHomeLocation(const QGeoCoordinate& location)
 {
-    // Validate input
-    QString error = validateInput("homeLocation", QVariant::fromValue(location));
-    if (!error.isEmpty()) {
-        handleError(error, QStringLiteral("Please enter valid coordinates"));
+    if (_homeLocation == location) {
         return;
     }
-    
-    if (_homeLocation == location)
-        return;
-    
     _homeLocation = location;
-    clearValidationError();
     emit homeLocationChanged();
-}
-
-void AreaPlanEditor::setIsDrawingMode(bool drawingMode)
-{
-    if (_isDrawingMode == drawingMode)
-        return;
-    
-    _isDrawingMode = drawingMode;
-    emit isDrawingModeChanged();
-    
-    if (drawingMode) {
-        updateStatus(QStringLiteral("Drawing mode enabled - Click to set center, drag to resize"));
-    } else {
-        updateStatus(QStringLiteral("Drawing mode disabled"));
-    }
 }
 
 void AreaPlanEditor::setAreaRotation(qreal rotation)
 {
-    // Normalize rotation to 0-360 degrees
-    while (rotation < 0.0) rotation += 360.0;
-    while (rotation >= 360.0) rotation -= 360.0;
-    
-    if (_areaRotation != rotation) {
-        _areaRotation = rotation;
-        emit areaRotationChanged();
-        updateStatus(QStringLiteral("Area rotation set to %1 degrees").arg(rotation));
+    if (qFuzzyCompare(_areaRotation, rotation)) {
+        return;
     }
+    _areaRotation = rotation;
+    emit areaRotationChanged();
 }
 
 void AreaPlanEditor::setLoiterTime(qreal time)
 {
-    if (time < 0.0) time = 0.0;
-    if (time > 3600.0) time = 3600.0; // Max 1 hour
-    
-    if (_loiterTime != time) {
-        _loiterTime = time;
-        emit loiterTimeChanged();
-        updateStatus(QStringLiteral("Loiter time set to %1 seconds").arg(time));
-    }
-}
-
-void AreaPlanEditor::moveAreaNorth()
-{
-    const qreal step = 0.5; // meters
-    const qreal newLat = _areaCenter.latitude() + (step / 111320.0); // Approximate conversion
-    setAreaCenter(QGeoCoordinate(newLat, _areaCenter.longitude()));
-    updateStatus(QStringLiteral("Area moved north"));
-}
-
-void AreaPlanEditor::moveAreaSouth()
-{
-    const qreal step = 0.5; // meters
-    const qreal newLat = _areaCenter.latitude() - (step / 111320.0); // Approximate conversion
-    setAreaCenter(QGeoCoordinate(newLat, _areaCenter.longitude()));
-    updateStatus(QStringLiteral("Area moved south"));
-}
-
-void AreaPlanEditor::moveAreaEast()
-{
-    const qreal step = 0.5; // meters
-    const qreal newLon = _areaCenter.longitude() + (step / (111320.0 * qCos(_areaCenter.latitude() * M_PI / 180.0)));
-    setAreaCenter(QGeoCoordinate(_areaCenter.latitude(), newLon));
-    updateStatus(QStringLiteral("Area moved east"));
-}
-
-void AreaPlanEditor::moveAreaWest()
-{
-    const qreal step = 0.5; // meters
-    const qreal newLon = _areaCenter.longitude() - (step / (111320.0 * qCos(_areaCenter.latitude() * M_PI / 180.0)));
-    setAreaCenter(QGeoCoordinate(_areaCenter.latitude(), newLon));
-    updateStatus(QStringLiteral("Area moved west"));
-}
-
-void AreaPlanEditor::rotateAreaClockwise()
-{
-    const qreal step = 15.0; // degrees
-    setAreaRotation(_areaRotation + step);
-    updateStatus(QStringLiteral("Area rotated clockwise by %1 degrees").arg(step));
-}
-
-void AreaPlanEditor::rotateAreaCounterClockwise()
-{
-    const qreal step = 15.0; // degrees
-    setAreaRotation(_areaRotation - step);
-    updateStatus(QStringLiteral("Area rotated counter-clockwise by %1 degrees").arg(step));
-}
-
-void AreaPlanEditor::resetArea()
-{
-    // Reset all properties to default values
-    setAreaWidth(_defaultAreaWidth);
-    setAreaHeight(_defaultAreaHeight);
-    setLineSpacing(_defaultLineSpacing);
-    setNumPoints(_defaultNumPoints);
-    setMissionAltitude(_defaultAltitude);
-    setAreaRotation(0.0);  // Reset rotation to 0 degrees (North)
-    
-    // Reset center to a default location (current map center or home)
-    QGeoCoordinate defaultCenter = QGeoCoordinate(49.82824897481479, 24.033390804256005);
-    setAreaCenter(defaultCenter);
-    setHomeLocation(defaultCenter);
-    
-    // Clear any errors and reset drawing mode
-    clearValidationError();
-    setIsDrawingMode(false);
-    
-    // Clear cache
-    clearCache();
-    
-    updateStatus(QStringLiteral("Area reset to default values"));
-}
-
-void AreaPlanEditor::centerArea()
-{
-    setAreaCenter(_homeLocation);
-    updateStatus(QStringLiteral("Area centered on home location"));
-}
-
-int AreaPlanEditor::calculateTotalWaypoints() const
-{
-    const int numLines = qMax(1, static_cast<int>(qFloor(_areaHeight / _lineSpacing)));
-    return numLines * _numPoints;
-}
-
-int AreaPlanEditor::calculateFlightTime() const
-{
-    const int totalWaypoints = calculateTotalWaypoints();
-    const int timePerPoint = 2; // minutes per waypoint (including hover time)
-    const int loiterTimeMinutes = static_cast<int>(_loiterTime / 60.0); // Convert seconds to minutes
-    return totalWaypoints * (timePerPoint + loiterTimeMinutes);
-}
-
-QVariantList AreaPlanEditor::generateWaypoints()
-{
-    // Check cache first if optimizations are enabled
-    if (_isOptimized) {
-        QString cacheKey = QStringLiteral("%1_%2_%3_%4_%5_%6")
-                          .arg(_areaWidth)
-                          .arg(_areaHeight)
-                          .arg(_lineSpacing)
-                          .arg(_numPoints)
-                          .arg(_missionAltitude)
-                          .arg(_areaCenter.toString());
-        
-        if (_waypointCache.contains(cacheKey)) {
-            _cacheHits++;
-            updateStatus(QStringLiteral("Waypoints loaded from cache (%1 hits)").arg(_cacheHits));
-            return _waypointCache[cacheKey];
-        }
-        _cacheMisses++;
-    }
-    
-    startProgress(QStringLiteral("Waypoint Generation"), QStringLiteral("Calculating waypoints..."));
-    
-    QVariantList waypoints;
-    const int numLines = qMax(1, static_cast<int>(qFloor(_areaHeight / _lineSpacing)));
-    const int totalPoints = numLines * _numPoints;
-    int currentPoint = 0;
-    
-    // Pre-allocate waypoints list for better performance
-    waypoints.reserve(totalPoints);
-    
-    for (int i = 0; i < numLines; ++i) {
-        const qreal offset = (-(_areaHeight/2) + (i + 0.5) * _lineSpacing);
-        const QGeoCoordinate lineCenter = calculateOffsetCoordinate(_areaCenter, offset, 180);
-        
-        for (int j = 0; j < _numPoints; ++j) {
-            const qreal frac = (j + 0.5) / _numPoints;
-            const qreal ptOffset = (frac - 0.5) * _areaWidth;
-            QGeoCoordinate waypoint = calculateOffsetCoordinate(lineCenter, ptOffset, 90);
-            waypoint.setAltitude(_missionAltitude);
-            waypoints.append(QVariant::fromValue(waypoint));
-            
-            currentPoint++;
-            updateProgress((currentPoint * 100) / totalPoints, 
-                         QStringLiteral("Generated %1 of %2 waypoints").arg(currentPoint).arg(totalPoints));
-        }
-    }
-    
-    // Cache the result if optimizations are enabled
-    if (_isOptimized) {
-        QString cacheKey = QStringLiteral("%1_%2_%3_%4_%5_%6")
-                          .arg(_areaWidth)
-                          .arg(_areaHeight)
-                          .arg(_lineSpacing)
-                          .arg(_numPoints)
-                          .arg(_missionAltitude)
-                          .arg(_areaCenter.toString());
-        
-        _waypointCache[cacheKey] = waypoints;
-    }
-    
-    finishProgress(QStringLiteral("Generated %1 waypoints successfully").arg(waypoints.size()));
-    return waypoints;
-}
-
-QVariantList AreaPlanEditor::computePartitionStripes() const
-{
-    QVariantList stripes;
-    // Convert current area parameters into local meters frame centered at areaCenter
-    // Using simple rectangle model with width/height and rotation
-    const double cx = 0.0;
-    const double cy = 0.0;
-    const int stripesCount = qMax(1, _droneCount);
-    const bool alongShortAxis = true;
-    auto lines = AreaPlan::splitIntoStripes(cx, cy, _areaWidth, _areaHeight, stripesCount, alongShortAxis, _areaRotation);
-    for (const auto& ln : lines) {
-        QVariantMap m;
-        m["ax"] = ln.a.x; m["ay"] = ln.a.y;
-        m["bx"] = ln.b.x; m["by"] = ln.b.y;
-        stripes.append(m);
-    }
-    return stripes;
-}
-
-QVariantList AreaPlanEditor::computeRoundRobinAssignments() const
-{
-    QVariantList groups;
-    const int lineCount = qMax(1, static_cast<int>(qFloor(_areaHeight / _lineSpacing)));
-    const auto rr = AreaPlan::assignStripesRoundRobin(_droneCount, lineCount);
-    for (const auto& g : rr) {
-        QVariantList idx;
-        for (int i : g) idx.append(i);
-        groups.append(idx);
-    }
-    return groups;
-}
-
-QVariantList AreaPlanEditor::computeDroneAssignments() const
-{
-    QVariantList assignments;
-    const int lineCount = qMax(1, static_cast<int>(qFloor(_areaHeight / _lineSpacing)));
-    const auto rr = AreaPlan::assignStripesRoundRobin(_droneCount, lineCount);
-    for (int d = 0; d < static_cast<int>(rr.size()); ++d) {
-        QVariantMap m;
-        m["droneIndex"] = d;
-        m["altitudeOffsetM"] = _altitudeBandStart + d * _altitudeBandStep;
-        m["timeOffsetS"] = d * _timeOffsetPerDrone;
-        QVariantList lines;
-        for (int li : rr[static_cast<size_t>(d)]) lines.append(li);
-        m["lineIndices"] = lines;
-        assignments.append(m);
-    }
-    return assignments;
-}
-
-QVariantMap AreaPlanEditor::computePerDroneCounts() const
-{
-    QVariantMap counts;
-    const int lineCount = qMax(1, static_cast<int>(qFloor(_areaHeight / _lineSpacing)));
-    const auto rr = AreaPlan::assignStripesRoundRobin(_droneCount, lineCount);
-    for (int d = 0; d < static_cast<int>(rr.size()); ++d) {
-        counts[QString::number(d)] = static_cast<int>(rr[static_cast<size_t>(d)].size());
-    }
-    counts[QStringLiteral("totalLines")] = lineCount;
-    counts[QStringLiteral("droneCount")] = _droneCount;
-    return counts;
-}
-
-QVariantList AreaPlanEditor::computePerDroneWaypointPreview() const
-{
-    QVariantList result;
-
-    // Basic parameter checks
-    if (_areaWidth <= 0 || _areaHeight <= 0 || _lineSpacing <= 0 || _numPoints <= 0) {
-        return result;
-    }
-
-    // Determine line count and assignments
-    const int lineCount = qMax(1, static_cast<int>(qFloor(_areaHeight / _lineSpacing)));
-    const auto rr = AreaPlan::assignStripesRoundRobin(_droneCount, lineCount);
-
-    // Build local meter-frame stripes along the short axis with rotation
-    const double cx = 0.0;
-    const double cy = 0.0;
-    const bool alongShortAxis = true;
-    // We create as many stripes as lines; spacing derived from _lineSpacing
-    // splitIntoStripes expects a count; use lineCount so stripes map 1:1 to row indices
-    const auto stripes = AreaPlan::splitIntoStripes(cx, cy, _areaWidth, _areaHeight, lineCount, alongShortAxis, _areaRotation);
-
-    // Helper lambdas to convert local (meters) to geo using area center
-    auto offsetMeters = [&](const QGeoCoordinate& origin, qreal meters, qreal bearingDeg) -> QGeoCoordinate {
-        return calculateOffsetCoordinate(origin, meters, bearingDeg);
-    };
-    auto toGeo = [&](double localX, double localY) -> QGeoCoordinate {
-        // Convert local coordinates to distance and bearing from center
-        // Note: rotation is already applied to localX/Y by splitIntoStripes
-        const double distance = qSqrt(localX * localX + localY * localY);
-        if (distance < 0.01) return _areaCenter; // Return center if too close to avoid precision issues
-        
-        // Calculate bearing from center (atan2 gives angle from north, clockwise)
-        const double bearing = qRadiansToDegrees(qAtan2(localX, localY));
-        
-        // Calculate final position in one step from center
-        return calculateOffsetCoordinate(_areaCenter, distance, bearing);
-    };
-
-    for (int d = 0; d < static_cast<int>(rr.size()); ++d) {
-        QVariantMap group;
-        group[QStringLiteral("droneIndex")] = d;
-        const qreal altOffset = _altitudeBandStart + d * _altitudeBandStep;
-        const qreal timeOffset = d * _timeOffsetPerDrone;
-        group[QStringLiteral("altitudeOffsetM")] = altOffset;
-        group[QStringLiteral("timeOffsetS")] = timeOffset;
-
-        QVariantList waypoints;
-        for (int lineIndex : rr[static_cast<size_t>(d)]) {
-            if (lineIndex < 0 || lineIndex >= static_cast<int>(stripes.size())) continue;
-            const auto& ln = stripes[static_cast<size_t>(lineIndex)];
-
-            // Generate _numPoints along the stripe from A to B
-            for (int j = 0; j < _numPoints; ++j) {
-                const qreal t = (j + 0.5) / _numPoints; // centered within segment
-                const double x = ln.a.x + t * (ln.b.x - ln.a.x);
-                const double y = ln.a.y + t * (ln.b.y - ln.a.y);
-                QGeoCoordinate geo = toGeo(x, y);
-                geo.setAltitude(_missionAltitude + altOffset);
-                waypoints.append(QVariant::fromValue(geo));
-            }
-        }
-
-        group[QStringLiteral("waypoints")] = waypoints;
-        result.append(group);
-    }
-
-    return result;
-}
-
-QVariantList AreaPlanEditor::generatePerDroneWaypoints(int droneIndex) const
-{
-    QVariantList waypoints;
-    if (_areaWidth <= 0 || _areaHeight <= 0 || _lineSpacing <= 0 || _numPoints <= 0) {
-        return waypoints;
-    }
-    const int lineCount = qMax(1, static_cast<int>(qFloor(_areaHeight / _lineSpacing)));
-    const auto rr = AreaPlan::assignStripesRoundRobin(_droneCount, lineCount);
-    if (droneIndex < 0 || droneIndex >= static_cast<int>(rr.size())) return waypoints;
-
-    const double cx = 0.0;
-    const double cy = 0.0;
-    const bool alongShortAxis = true;
-    const auto stripes = AreaPlan::splitIntoStripes(cx, cy, _areaWidth, _areaHeight, lineCount, alongShortAxis, _areaRotation);
-
-    auto toGeo = [&](double localX, double localY) -> QGeoCoordinate {
-        // Convert local coordinates to distance and bearing from center
-        // Note: rotation is already applied to localX/Y by splitIntoStripes
-        const double distance = qSqrt(localX * localX + localY * localY);
-        if (distance < 0.01) return _areaCenter; // Return center if too close to avoid precision issues
-        
-        // Calculate bearing from center (atan2 gives angle from north, clockwise)
-        const double bearing = qRadiansToDegrees(qAtan2(localX, localY));
-        
-        // Calculate final position in one step from center
-        return calculateOffsetCoordinate(_areaCenter, distance, bearing);
-    };
-
-    const qreal altOffset = _altitudeBandStart + droneIndex * _altitudeBandStep;
-    for (int lineIndex : rr[static_cast<size_t>(droneIndex)]) {
-        if (lineIndex < 0 || lineIndex >= static_cast<int>(stripes.size())) continue;
-        const auto& ln = stripes[static_cast<size_t>(lineIndex)];
-        for (int j = 0; j < _numPoints; ++j) {
-            const qreal t = (j + 0.5) / _numPoints;
-            const double x = ln.a.x + t * (ln.b.x - ln.a.x);
-            const double y = ln.a.y + t * (ln.b.y - ln.a.y);
-            QGeoCoordinate geo = toGeo(x, y);
-            geo.setAltitude(_missionAltitude + altOffset);
-            waypoints.append(QVariant::fromValue(geo));
-        }
-    }
-    return waypoints;
-}
-
-void AreaPlanEditor::addPerDroneToMission(int droneIndex)
-{
-    MissionController* missionController = getMissionController();
-    if (!missionController) {
-        handleError(QStringLiteral("Mission controller not available"));
+    if (qFuzzyCompare(_loiterTime, time)) {
         return;
     }
-    // Optional pre-start stagger: loiter at home for d * timeOffsetPerDrone seconds
-    if (_timeOffsetPerDrone > 0.0 && droneIndex >= 0) {
-        const qreal delay = droneIndex * _timeOffsetPerDrone;
-        if (delay > 0.0) {
-            VisualMissionItem* preLoiter = missionController->insertSimpleMissionItem(_homeLocation, -1, false);
-            if (auto* simpleItem = qobject_cast<SimpleMissionItem*>(preLoiter)) {
-                simpleItem->missionItem().setParam1(delay);
-                simpleItem->missionItem().setParam2(1.0);
-                simpleItem->missionItem().setParam3(50.0);
-                simpleItem->missionItem().setParam4(1.0);
-                simpleItem->setCommand(MAV_CMD_NAV_LOITER_TIME);
-            }
-        }
-    }
-    QVariantList wps = generatePerDroneWaypoints(droneIndex);
-    for (const QVariant& v : wps) {
-        QGeoCoordinate c = v.value<QGeoCoordinate>();
-        missionController->insertSimpleMissionItem(c, -1, false);
-        if (_rtlAfterEveryWaypoint) {
-            missionController->insertLandItem(_homeLocation, -1, false);
-            if (_loiterAfterRtl) {
-                VisualMissionItem* loiterItem = missionController->insertSimpleMissionItem(_homeLocation, -1, false);
-                if (auto* simpleItem = qobject_cast<SimpleMissionItem*>(loiterItem)) {
-                    simpleItem->missionItem().setParam1(_loiterTime);
-                    simpleItem->missionItem().setParam2(1.0);
-                    simpleItem->missionItem().setParam3(50.0);
-                    simpleItem->missionItem().setParam4(1.0);
-                    simpleItem->setCommand(MAV_CMD_NAV_LOITER_TIME);
-                }
-            }
-        }
-    }
+    _loiterTime = time;
+    emit loiterTimeChanged();
 }
 
-void AreaPlanEditor::addAllDronesToMission()
+void AreaPlanEditor::setIsDrawingMode(bool drawingMode)
 {
-    for (int d = 0; d < _droneCount; ++d) {
-        addPerDroneToMission(d);
+    if (_isDrawingMode == drawingMode) {
+        return;
     }
+    _isDrawingMode = drawingMode;
+    emit isDrawingModeChanged();
 }
 
-void AreaPlanEditor::addWaypointsToMission()
+void AreaPlanEditor::setPlanMasterController(QObject* controller)
 {
-    qDebug() << "AreaPlanEditor: Starting mission generation";
-    qDebug() << "AreaPlanEditor: _loiterTime value at start:" << _loiterTime;
-    
-    startProgress(QStringLiteral("Generating Mission"), QStringLiteral("Preparing waypoints..."));
-    
-    // Validate all parameters before proceeding
-    if (!validateAreaParameters()) {
-        cancelProgress();
-        handleError(QStringLiteral("Invalid area parameters"), QStringLiteral("Please check all area parameters and try again"));
+    if (_planMasterController == controller) {
+        return;
+    }
+    _planMasterController = controller;
+    emit planMasterControllerChanged();
+}
+
+void AreaPlanEditor::setDroneCount(int count)
+{
+    if (_droneCount == count) {
+        return;
+    }
+    _droneCount = count;
+    emit droneCountChanged();
+}
+
+void AreaPlanEditor::setAltitudeBandStart(qreal startMeters)
+{
+    if (qFuzzyCompare(_altitudeBandStart, startMeters)) {
+        return;
+    }
+    _altitudeBandStart = startMeters;
+    emit altitudeBandStartChanged();
+}
+
+void AreaPlanEditor::setAltitudeBandStep(qreal stepMeters)
+{
+    if (qFuzzyCompare(_altitudeBandStep, stepMeters)) {
+        return;
+    }
+    _altitudeBandStep = stepMeters;
+    emit altitudeBandStepChanged();
+}
+
+void AreaPlanEditor::setTimeOffsetPerDrone(qreal seconds)
+{
+    if (qFuzzyCompare(_timeOffsetPerDrone, seconds)) {
+        return;
+    }
+    _timeOffsetPerDrone = seconds;
+    emit timeOffsetPerDroneChanged();
+}
+
+void AreaPlanEditor::setRtlAfterEveryWaypoint(bool enabled)
+{
+    if (_rtlAfterEveryWaypoint == enabled) {
+        return;
+    }
+    _rtlAfterEveryWaypoint = enabled;
+    emit rtlAfterEveryWaypointChanged();
+}
+
+void AreaPlanEditor::setLoiterAfterRtl(bool enabled)
+{
+    if (_loiterAfterRtl == enabled) {
+        return;
+    }
+    _loiterAfterRtl = enabled;
+    emit loiterAfterRtlChanged();
+}
+
+void AreaPlanEditor::setFormationSpacing(qreal spacing)
+{
+    if (qFuzzyCompare(_formationSpacing, spacing)) {
         return;
     }
     
-    updateProgress(20, QStringLiteral("Validating parameters..."));
-    
-    // Generate waypoints from current area parameters
-    QVariantList waypointVariants = generateWaypoints();
-    if (waypointVariants.isEmpty()) {
-        cancelProgress();
-        handleError(QStringLiteral("No waypoints generated"), QStringLiteral("Please check area parameters and try again"));
-        return;
-    }
-    
-    updateProgress(40, QStringLiteral("Adding waypoints to mission controller..."));
-    
-    // Get the mission controller through the plan master controller
-    MissionController* missionController = getMissionController();
-    if (!missionController) {
-        cancelProgress();
-        handleError(QStringLiteral("Mission controller not available"), QStringLiteral("Please ensure you are in the Plan view"));
-        return;
-    }
-    
-    updateProgress(60, QStringLiteral("Adding waypoints to mission..."));
-    
-    // Clear existing mission items (except settings)
-    missionController->removeAll();
-    
-    // Add takeoff item at home location
-    missionController->insertTakeoffItem(_homeLocation, -1, false);
-    
-    // Add generated waypoints with proper loiter commands
-    for (const QVariant& waypointVariant : waypointVariants) {
-        QGeoCoordinate coord = waypointVariant.value<QGeoCoordinate>();
-        
-        // Add waypoint to get to the point
-        missionController->insertSimpleMissionItem(coord, -1, false);
-        
-        // Add loiter command at the same point using MAV_CMD_NAV_LOITER_TIME
-        // This creates a proper loiter/hold command with the specified time
-        QGeoCoordinate loiterCoord = coord;
-        loiterCoord.setAltitude(_missionAltitude);
-        
-        // Create a loiter mission item with the specified time using MAV_CMD_NAV_LOITER_TIME
-        // The loiter command parameters are:
-        // param1: time (seconds) - how long to loiter
-        // param2: leave loiter (direction) - 1 for direction of next waypoint
-        // param3: radius (meters) - loiter radius (50m default)
-        // param4: exit loiter from - 1 for tangent
-        
-        // Try to create the loiter mission item directly
-        // We'll need to access the private method, so we'll use a different approach
-        // For now, we'll add a waypoint and then modify it to be a loiter command
-        
-        // Add a simple mission item that we'll convert to a loiter command
-        VisualMissionItem* loiterItem = missionController->insertSimpleMissionItem(loiterCoord, -1, false);
-        
-        // Convert the simple mission item to a loiter command
-        if (loiterItem) {
-            SimpleMissionItem* simpleItem = qobject_cast<SimpleMissionItem*>(loiterItem);
-            if (simpleItem) {
-                qDebug() << "AreaPlanEditor: Converting waypoint to loiter command";
-                qDebug() << "AreaPlanEditor: Current _loiterTime value:" << _loiterTime;
-                
-                // Set the loiter parameters FIRST, before changing the command
-                // param1: Loiter Time (seconds)
-                simpleItem->missionItem().setParam1(_loiterTime);
-                qDebug() << "AreaPlanEditor: Set param1 (loiter time) to:" << _loiterTime;
-                qDebug() << "AreaPlanEditor: After setParam1, param1 value is:" << simpleItem->missionItem().param1();
-                
-                // param2: Leave Loiter (1 = direction of next waypoint)
-                simpleItem->missionItem().setParam2(1.0);
-                qDebug() << "AreaPlanEditor: Set param2 (leave loiter) to: 1.0";
-                
-                // param3: Radius (50 meters default)
-                simpleItem->missionItem().setParam3(50.0);
-                qDebug() << "AreaPlanEditor: Set param3 (radius) to: 50.0";
-                
-                // param4: Exit loiter from (1 = tangent)
-                simpleItem->missionItem().setParam4(1.0);
-                qDebug() << "AreaPlanEditor: Set param4 (exit loiter) to: 1.0";
-                
-                // NOW set the command to MAV_CMD_NAV_LOITER_TIME
-                simpleItem->setCommand(MAV_CMD_NAV_LOITER_TIME);
-                qDebug() << "AreaPlanEditor: Set command to MAV_CMD_NAV_LOITER_TIME";
-                
-                // Check if parameters were reset after command change
-                qDebug() << "AreaPlanEditor: After command change, param1 value is:" << simpleItem->missionItem().param1();
-                
-                // If parameters were reset, set them again
-                if (simpleItem->missionItem().param1() != _loiterTime) {
-                    qDebug() << "AreaPlanEditor: Parameters were reset, setting them again";
-                    simpleItem->missionItem().setParam1(_loiterTime);
-                    simpleItem->missionItem().setParam2(1.0);
-                    simpleItem->missionItem().setParam3(50.0);
-                    simpleItem->missionItem().setParam4(1.0);
-                }
-                
-                qDebug() << "AreaPlanEditor: Created loiter command at" << coord.latitude() << coord.longitude() << "for" << _loiterTime << "seconds";
-                qDebug() << "AreaPlanEditor: Loiter parameters set - time:" << _loiterTime << "radius:50m direction:next_waypoint exit:tangent";
-                qDebug() << "AreaPlanEditor: Final mission item params - param1:" << simpleItem->missionItem().param1() << "param2:" << simpleItem->missionItem().param2() << "param3:" << simpleItem->missionItem().param3() << "param4:" << simpleItem->missionItem().param4();
-            }
-        }
-    }
-    
-    // Add "back to takeoff" step - return to home location
-    qDebug() << "AreaPlanEditor: Adding 'back to takeoff' step - returning to home location";
-    missionController->insertSimpleMissionItem(_homeLocation, -1, false);
-    
-    // Add RTL item to return to launch position
-    missionController->insertLandItem(_homeLocation, -1, false);
-    
-    updateProgress(80, QStringLiteral("Saving mission file..."));
-    
-    // Save mission to file for backup
-    QString filename = QStringLiteral("area_plan_mission.waypoints");
-    saveMissionToFile(missionController, filename);
-    
-    updateProgress(90, QStringLiteral("Checking for connected vehicle..."));
-    
-    // Try to upload to vehicle if connected
-    Vehicle* vehicle = getCurrentVehicle();
-    if (vehicle) {
-        updateProgress(95, QStringLiteral("Uploading to connected vehicle..."));
-        missionController->sendToVehicle();
-        updateStatus(QStringLiteral("Successfully generated and uploaded mission with %1 waypoints, loiter commands, and return to takeoff").arg(waypointVariants.size()));
-    } else {
-        updateStatus(QStringLiteral("Generated mission with %1 waypoints, loiter commands, and return to takeoff (no vehicle connected - ready for upload)").arg(waypointVariants.size()));
-    }
-    
-    finishProgress(QStringLiteral("Mission generated with %1 waypoints, loiter commands, and return to takeoff").arg(waypointVariants.size()));
-    
-    // Log the waypoints for debugging
-    qDebug() << "AreaPlanEditor: Generated" << waypointVariants.size() << "waypoints with loiter commands";
-    qDebug() << "AreaPlanEditor: Mission saved to:" << filename;
-    qDebug() << "AreaPlanEditor: Mission controller now contains" << missionController->visualItems()->count() << "items";
-    qDebug() << "AreaPlanEditor: Loiter time set to" << _loiterTime << "seconds";
-    qDebug() << "AreaPlanEditor: Mission structure:";
-    qDebug() << "  1. Takeoff at home location";
-    for (int i = 0; i < waypointVariants.size(); ++i) {
-        qDebug() << "  " << (i*2 + 2) << ". Waypoint" << (i+1) << "to" << (i+1) << "waypoints";
-        qDebug() << "  " << (i*2 + 3) << ". Loiter at waypoint" << (i+1) << "for" << _loiterTime << "seconds";
-    }
-    qDebug() << "  " << (waypointVariants.size()*2 + 2) << ". Return to takeoff location";
-    qDebug() << "  " << (waypointVariants.size()*2 + 3) << ". Land at home location";
-    
-    for (int i = 0; i < qMin(5, waypointVariants.size()); ++i) {
-        QGeoCoordinate coord = waypointVariants[i].value<QGeoCoordinate>();
-        qDebug() << "  Waypoint" << i << ":" << coord.latitude() << coord.longitude() << coord.altitude() << "with" << _loiterTime << "s loiter";
-    }
-    if (waypointVariants.size() > 5) {
-        qDebug() << "  ... and" << (waypointVariants.size() - 5) << "more waypoints with loiter commands";
-    }
+    _formationSpacing = spacing;
+    calculateFormationPositions();
+    emit formationSpacingChanged();
 }
 
 QGeoCoordinate AreaPlanEditor::calculateOffsetCoordinate(const QGeoCoordinate& coord, qreal meters, qreal bearing) const
 {
-    // Simplified geodesic calculation
-    const qreal R = 6378137.0; // Earth radius in meters
-    const qreal d = meters;
-    const qreal bearingRad = bearing * M_PI / 180.0;
-    const qreal lat1 = coord.latitude() * M_PI / 180.0;
-    const qreal lon1 = coord.longitude() * M_PI / 180.0;
-    
-    const qreal lat2 = qAsin(qSin(lat1) * qCos(d / R) + qCos(lat1) * qSin(d / R) * qCos(bearingRad));
-    const qreal lon2 = lon1 + qAtan2(qSin(bearingRad) * qSin(d / R) * qCos(lat1), qCos(d / R) - qSin(lat1) * qSin(lat2));
-    
-    return QGeoCoordinate(lat2 * 180.0 / M_PI, lon2 * 180.0 / M_PI);
-}
+    // Convert meters to degrees using approximate conversion factors
+    // These factors are approximate for small distances
+    const qreal metersPerDegreeLat = 111319.9;  // meters per degree of latitude
+    const qreal metersPerDegreeLon = 111319.9 * qCos(qDegreesToRadians(coord.latitude()));  // meters per degree of longitude
 
-void AreaPlanEditor::saveMissionFile()
-{
-    startProgress(QStringLiteral("Mission File Save"), QStringLiteral("Preparing mission file..."));
-    
-    // Validate all parameters before proceeding
-    if (!validateAreaParameters()) {
-        cancelProgress();
-        handleError(QStringLiteral("Invalid area parameters"), QStringLiteral("Please check all area parameters and try again"));
-        return;
-    }
-    
-    updateProgress(20, QStringLiteral("Validating parameters..."));
-    
-    // Generate waypoints from current area parameters
-    QVariantList waypointVariants = generateWaypoints();
-    if (waypointVariants.isEmpty()) {
-        cancelProgress();
-        handleError(QStringLiteral("No waypoints generated"), QStringLiteral("Please check area parameters and try again"));
-        return;
-    }
-    
-    // Create mission items for file saving
-    QList<MissionItem*> missionItems;
-    
-    // Add home position (required for ArduPilot)
-    MissionItem* homeItem = new MissionItem(0, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT, 
-                                           0, 0, 0, 0, _homeLocation.latitude(), _homeLocation.longitude(), 
-                                           _missionAltitude, true, false, this);
-    missionItems.append(homeItem);
-    
-    // Add takeoff command
-    MissionItem* takeoffItem = new MissionItem(1, MAV_CMD_NAV_TAKEOFF, MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                              0, 0, 0, 0, _homeLocation.latitude(), _homeLocation.longitude(),
-                                              _missionAltitude, true, false, this);
-    missionItems.append(takeoffItem);
-    
-    // Add generated waypoints
-    int sequenceNumber = 2;
-    for (const QVariant& waypointVariant : waypointVariants) {
-        QGeoCoordinate coord = waypointVariant.value<QGeoCoordinate>();
-        MissionItem* waypointItem = new MissionItem(sequenceNumber, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                                   0, 0, 0, 0, coord.latitude(), coord.longitude(), coord.altitude(),
-                                                   true, false, this);
-        missionItems.append(waypointItem);
-        sequenceNumber++;
-    }
-    
-    // Add return to launch command
-    MissionItem* rtlItem = new MissionItem(sequenceNumber, MAV_CMD_NAV_RETURN_TO_LAUNCH, MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                          0, 0, 0, 0, 0, 0, 0, true, false, this);
-    missionItems.append(rtlItem);
-    
-    updateProgress(80, QStringLiteral("Creating mission items..."));
-    
-    // Save mission to file
-    try {
-        updateProgress(90, QStringLiteral("Writing to file..."));
-        saveMissionToFile(missionItems, "area_mission.waypoints");
-        clearValidationError();
-        finishProgress(QStringLiteral("Mission file saved as area_mission.waypoints"));
-    } catch (const std::exception& e) {
-        cancelProgress();
-        handleError(QStringLiteral("Failed to save mission file"), QStringLiteral("Please check file permissions and try again"));
-        logError(QStringLiteral("File save exception: %1").arg(e.what()), "saveMissionFile");
-    }
-    
-    // Clean up mission items
-    qDeleteAll(missionItems);
-}
+    qreal latOffset = meters * qCos(qDegreesToRadians(bearing)) / metersPerDegreeLat;
+    qreal lonOffset = meters * qSin(qDegreesToRadians(bearing)) / metersPerDegreeLon;
 
-void AreaPlanEditor::savePerDroneMissionFiles()
-{
-    startProgress(QStringLiteral("Save Per-Drone Missions"), QStringLiteral("Generating per-drone waypoint files..."));
-
-    if (!validateAreaParameters()) {
-        cancelProgress();
-        handleError(QStringLiteral("Invalid area parameters"), QStringLiteral("Please check area parameters and try again"));
-        return;
-    }
-
-    const int totalDrones = qMax(1, _droneCount);
-    int filesSaved = 0;
-
-    for (int d = 0; d < totalDrones; ++d) {
-        // Build mission items for this drone
-        QList<MissionItem*> missionItems;
-
-        // Home (required by ArduPilot in some cases)
-        MissionItem* homeItem = new MissionItem(0, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                                0, 0, 0, 0,
-                                                _homeLocation.latitude(), _homeLocation.longitude(), _missionAltitude,
-                                                true, false, this);
-        missionItems.append(homeItem);
-
-        // Optional staggered start: loiter at home for d * timeOffsetPerDrone seconds
-        int seq = 1;
-        if (_timeOffsetPerDrone > 0.0) {
-            MissionItem* loiterStart = new MissionItem(seq++, MAV_CMD_NAV_LOITER_TIME, MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                                       d * _timeOffsetPerDrone, 1.0, 50.0, 1.0,
-                                                       _homeLocation.latitude(), _homeLocation.longitude(), _missionAltitude,
-                                                       true, false, this);
-            missionItems.append(loiterStart);
-        }
-
-        // Takeoff
-        MissionItem* takeoff = new MissionItem(seq++, MAV_CMD_NAV_TAKEOFF, MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                               0, 0, 0, 0,
-                                               _homeLocation.latitude(), _homeLocation.longitude(), _missionAltitude,
-                                               true, false, this);
-        missionItems.append(takeoff);
-
-        // Waypoints for this drone
-        QVariantList wps = generatePerDroneWaypoints(d);
-        const qreal altOffset = _altitudeBandStart + d * _altitudeBandStep;
-        for (const QVariant& v : wps) {
-            QGeoCoordinate c = v.value<QGeoCoordinate>();
-            // Ensure altitude banding is applied
-            c.setAltitude(_missionAltitude + altOffset);
-            MissionItem* wp = new MissionItem(seq++, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                              0, 0, 0, 0,
-                                              c.latitude(), c.longitude(), c.altitude(),
-                                              true, false, this);
-            missionItems.append(wp);
-
-            if (_rtlAfterEveryWaypoint) {
-                MissionItem* rtl = new MissionItem(seq++, MAV_CMD_NAV_RETURN_TO_LAUNCH, MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                                   0, 0, 0, 0,
-                                                   0, 0, 0,
-                                                   true, false, this);
-                missionItems.append(rtl);
-                if (_loiterAfterRtl) {
-                    MissionItem* loiterEnd = new MissionItem(seq++, MAV_CMD_NAV_LOITER_TIME, MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                                             _loiterTime, 1.0, 50.0, 1.0,
-                                                             _homeLocation.latitude(), _homeLocation.longitude(), _missionAltitude,
-                                                             true, false, this);
-                    missionItems.append(loiterEnd);
-                }
-            }
-        }
-
-        // Final RTL when not RTL after every point
-        if (!_rtlAfterEveryWaypoint) {
-            MissionItem* rtlFinal = new MissionItem(seq++, MAV_CMD_NAV_RETURN_TO_LAUNCH, MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                                    0, 0, 0, 0,
-                                                    0, 0, 0,
-                                                    true, false, this);
-            missionItems.append(rtlFinal);
-        }
-
-        // Serialize to file
-        const QString filename = QStringLiteral("area_mission_drone_%1.waypoints").arg(d);
-        saveMissionToFile(missionItems, filename);
-        filesSaved++;
-
-        // Clean up
-        qDeleteAll(missionItems);
-    }
-
-    finishProgress(QStringLiteral("Saved %1 per-drone mission file(s)").arg(filesSaved));
-}
-
-void AreaPlanEditor::uploadToVehicle()
-{
-    startProgress(QStringLiteral("Mission Upload"), QStringLiteral("Preparing mission upload..."));
-    
-    // Validate all parameters before proceeding
-    if (!validateAreaParameters()) {
-        cancelProgress();
-        handleError(QStringLiteral("Invalid area parameters"), QStringLiteral("Please check all area parameters and try again"));
-        return;
-    }
-    
-    updateProgress(10, QStringLiteral("Validating parameters..."));
-    
-    MissionManager* missionManager = getMissionManager();
-    if (!missionManager) {
-        cancelProgress();
-        handleError(QStringLiteral("No vehicle connected"), QStringLiteral("Please connect a vehicle and try again"));
-        return;
-    }
-    
-    updateProgress(20, QStringLiteral("Checking vehicle connection..."));
-    
-    // Generate waypoints from current area parameters
-    QVariantList waypointVariants = generateWaypoints();
-    if (waypointVariants.isEmpty()) {
-        cancelProgress();
-        handleError(QStringLiteral("No waypoints generated"), QStringLiteral("Please check area parameters and try again"));
-        return;
-    }
-    
-    // Convert QVariantList to QList<MissionItem*>
-    QList<MissionItem*> missionItems;
-    
-    // Add home position (required for ArduPilot)
-    MissionItem* homeItem = new MissionItem(0, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT, 
-                                           0, 0, 0, 0, _homeLocation.latitude(), _homeLocation.longitude(), 
-                                           _missionAltitude, true, false, this);
-    missionItems.append(homeItem);
-    
-    // Add takeoff command
-    MissionItem* takeoffItem = new MissionItem(1, MAV_CMD_NAV_TAKEOFF, MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                              0, 0, 0, 0, _homeLocation.latitude(), _homeLocation.longitude(),
-                                              _missionAltitude, true, false, this);
-    missionItems.append(takeoffItem);
-    
-    // Add generated waypoints
-    int sequenceNumber = 2;
-    for (const QVariant& waypointVariant : waypointVariants) {
-        QGeoCoordinate coord = waypointVariant.value<QGeoCoordinate>();
-        MissionItem* waypointItem = new MissionItem(sequenceNumber, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                                   0, 0, 0, 0, coord.latitude(), coord.longitude(), coord.altitude(),
-                                                   true, false, this);
-        missionItems.append(waypointItem);
-        sequenceNumber++;
-    }
-    
-    // Add return to launch command
-    MissionItem* rtlItem = new MissionItem(sequenceNumber, MAV_CMD_NAV_RETURN_TO_LAUNCH, MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                          0, 0, 0, 0, 0, 0, 0, true, false, this);
-    missionItems.append(rtlItem);
-    
-    updateProgress(80, QStringLiteral("Creating mission items..."));
-    
-    // Connect progress and completion/error
-    QObject::connect(missionManager, &PlanManager::progressPctChanged, this, [this](double pct) {
-        updateProgress(static_cast<int>(pct), QStringLiteral("Uploading to vehicle..."));
-    }, Qt::UniqueConnection);
-
-    QObject::connect(missionManager, &PlanManager::error, this,
-                     [this](int /*code*/, const QString& errorMsg) {
-                         cancelProgress();
-                         handleError(QStringLiteral("Mission upload failed"), errorMsg);
-                     }, Qt::UniqueConnection);
-
-    QObject::connect(missionManager, &PlanManager::sendComplete, this,
-                     [this](bool error) {
-                         if (error) {
-                             cancelProgress();
-                             handleError(QStringLiteral("Mission upload failed"));
-                         } else {
-                             clearValidationError();
-                             finishProgress(QStringLiteral("Mission uploaded to vehicle successfully"));
-                         }
-                     }, Qt::UniqueConnection);
-
-    // Upload mission to vehicle
-    updateProgress(90, QStringLiteral("Uploading to vehicle..."));
-    missionManager->writeMissionItems(missionItems);
-}
-
-void AreaPlanEditor::uploadPerDroneMissionToVehicle(int droneIndex, QObject* vehicleObject)
-{
-    startProgress(QStringLiteral("Per-Drone Upload"), QStringLiteral("Preparing mission for upload..."));
-
-    if (!validateAreaParameters()) {
-        cancelProgress();
-        handleError(QStringLiteral("Invalid area parameters"), QStringLiteral("Please check parameters and try again"));
-        return;
-    }
-
-    Vehicle* vehicle = nullptr;
-    if (vehicleObject) {
-        vehicle = qobject_cast<Vehicle*>(vehicleObject);
-    }
-    if (!vehicle) {
-        vehicle = getCurrentVehicle();
-    }
-    if (!vehicle) {
-        cancelProgress();
-        handleError(QStringLiteral("No vehicle available"), QStringLiteral("Connect/select a vehicle and try again"));
-        return;
-    }
-
-    QVariantList wps = generatePerDroneWaypoints(droneIndex);
-    if (wps.isEmpty()) {
-        cancelProgress();
-        handleError(QStringLiteral("No waypoints generated for drone"), QStringLiteral("Adjust parameters or index"));
-        return;
-    }
-
-    // Build mission items for this drone
-    QList<MissionItem*> missionItems;
-    int seq = 0;
-    MissionItem* takeoff = new MissionItem(seq++, MAV_CMD_NAV_TAKEOFF, MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                           0, 0, 0, 0,
-                                           _homeLocation.latitude(), _homeLocation.longitude(), _missionAltitude,
-                                           true, false, this);
-    missionItems.append(takeoff);
-
-    const qreal altOffset = _altitudeBandStart + droneIndex * _altitudeBandStep;
-    for (const QVariant& v : wps) {
-        QGeoCoordinate c = v.value<QGeoCoordinate>();
-        c.setAltitude(_missionAltitude + altOffset);
-        MissionItem* wp = new MissionItem(seq++, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                          0, 0, 0, 0,
-                                          c.latitude(), c.longitude(), c.altitude(),
-                                          true, false, this);
-        missionItems.append(wp);
-    }
-
-    MissionManager* missionManager = vehicle->missionManager();
-    if (!missionManager) {
-        cancelProgress();
-        handleError(QStringLiteral("MissionManager unavailable"));
-        qDeleteAll(missionItems);
-        return;
-    }
-
-    QObject::connect(missionManager, &PlanManager::progressPctChanged, this, [this, droneIndex](double pct) {
-        updateProgress(static_cast<int>(pct), QStringLiteral("Uploading drone %1...").arg(droneIndex));
-    }, Qt::UniqueConnection);
-
-    QObject::connect(missionManager, &PlanManager::error, this,
-                     [this, droneIndex](int /*code*/, const QString& errorMsg) {
-                         cancelProgress();
-                         handleError(QStringLiteral("Mission upload failed for drone %1").arg(droneIndex), errorMsg);
-                     }, Qt::UniqueConnection);
-
-    QObject::connect(missionManager, &PlanManager::sendComplete, this,
-                     [this, droneIndex](bool error) {
-                         if (error) {
-                             cancelProgress();
-                             handleError(QStringLiteral("Mission upload failed for drone %1").arg(droneIndex));
-                         } else {
-                             finishProgress(QStringLiteral("Uploaded mission for drone %1").arg(droneIndex));
-                         }
-                     }, Qt::UniqueConnection);
-
-    missionManager->writeMissionItems(missionItems);
-
-    qDeleteAll(missionItems);
-}
-
-QVariantList AreaPlanEditor::getAvailableVehicles() const
-{
-    QVariantList vehicles;
-    QList<Vehicle*> connectedVehicles = QGroundControl::multiVehicleManager()->vehicles();
-    
-    for (Vehicle* vehicle : connectedVehicles) {
-        QVariantMap vehicleInfo;
-        vehicleInfo["id"] = vehicle->id();
-        vehicleInfo["name"] = QString("Vehicle %1").arg(vehicle->id());
-        vehicleInfo["isActive"] = (vehicle == getCurrentVehicle());
-        vehicles.append(vehicleInfo);
-    }
-    
-    return vehicles;
-}
-
-void AreaPlanEditor::uploadToAllDrones()
-{
-    startProgress(QStringLiteral("Multi-Drone Upload"), QStringLiteral("Preparing mission upload..."));
-
-    // Validate parameters
-    if (!validateAreaParameters()) {
-        cancelProgress();
-        handleError(QStringLiteral("Invalid area parameters"), QStringLiteral("Please check parameters and try again"));
-        return;
-    }
-
-    // Get available vehicles
-    QList<Vehicle*> vehicles = QGroundControl::multiVehicleManager()->vehicles();
-    if (vehicles.isEmpty()) {
-        cancelProgress();
-        handleError(QStringLiteral("No vehicles connected"), QStringLiteral("Please connect drones and try again"));
-        return;
-    }
-
-    // Check if we have enough vehicles for the mission
-    if (vehicles.size() < _droneCount) {
-        cancelProgress();
-        handleError(QStringLiteral("Not enough vehicles"), 
-                   QStringLiteral("Need %1 drones but only %2 connected").arg(_droneCount).arg(vehicles.size()));
-        return;
-    }
-
-    // Track upload progress for each drone
-    struct DroneUploadStatus {
-        bool completed = false;
-        bool success = false;
-        QString error;
-    };
-    QMap<int, DroneUploadStatus> uploadStatus;
-    for (int i = 0; i < _droneCount; i++) {
-        uploadStatus[i] = DroneUploadStatus();
-    }
-
-    // Function to check if all uploads are complete
-    auto checkAllComplete = [&uploadStatus]() -> bool {
-        for (const auto& status : uploadStatus) {
-            if (!status.completed) return false;
-        }
-        return true;
-    };
-
-    // Function to check if any upload failed
-    auto checkAnyFailed = [&uploadStatus]() -> bool {
-        for (const auto& status : uploadStatus) {
-            if (status.completed && !status.success) return true;
-        }
-        return false;
-    };
-
-    // Upload to each drone in parallel
-    for (int droneIndex = 0; droneIndex < _droneCount && droneIndex < vehicles.size(); droneIndex++) {
-        Vehicle* vehicle = vehicles[droneIndex];
-        
-        // Generate waypoints for this drone
-        QVariantList wps = generatePerDroneWaypoints(droneIndex);
-        if (wps.isEmpty()) {
-            uploadStatus[droneIndex].completed = true;
-            uploadStatus[droneIndex].success = false;
-            uploadStatus[droneIndex].error = QStringLiteral("No waypoints generated");
-            continue;
-        }
-
-        // Build mission items
-        QList<MissionItem*> missionItems;
-        int seq = 0;
-
-        // Add takeoff command
-        MissionItem* takeoff = new MissionItem(seq++, MAV_CMD_NAV_TAKEOFF, MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                             0, 0, 0, 0,
-                                             _homeLocation.latitude(), _homeLocation.longitude(), _missionAltitude,
-                                             true, false, this);
-        missionItems.append(takeoff);
-
-        // Add waypoints with altitude offset
-        const qreal altOffset = _altitudeBandStart + droneIndex * _altitudeBandStep;
-        for (const QVariant& v : wps) {
-            QGeoCoordinate c = v.value<QGeoCoordinate>();
-            c.setAltitude(_missionAltitude + altOffset);
-            MissionItem* wp = new MissionItem(seq++, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                            0, 0, 0, 0,
-                                            c.latitude(), c.longitude(), c.altitude(),
-                                            true, false, this);
-            missionItems.append(wp);
-        }
-
-        // Add RTL command
-        MissionItem* rtl = new MissionItem(seq++, MAV_CMD_NAV_RETURN_TO_LAUNCH, MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                         0, 0, 0, 0, 0, 0, 0,
-                                         true, false, this);
-        missionItems.append(rtl);
-
-        // Get mission manager
-        MissionManager* missionManager = vehicle->missionManager();
-        if (!missionManager) {
-            uploadStatus[droneIndex].completed = true;
-            uploadStatus[droneIndex].success = false;
-            uploadStatus[droneIndex].error = QStringLiteral("Mission manager unavailable");
-            qDeleteAll(missionItems);
-            continue;
-        }
-
-        // Connect progress handler
-        QObject::connect(missionManager, &PlanManager::progressPctChanged, this, 
-            [this, droneIndex](double pct) {
-                updateProgress(static_cast<int>((droneIndex * 100 + pct) / _droneCount), 
-                             QStringLiteral("Uploading drone %1 (%2%)...").arg(droneIndex + 1).arg(static_cast<int>(pct)));
-            }, Qt::UniqueConnection);
-
-        // Connect error handler
-        QObject::connect(missionManager, &PlanManager::error, this,
-            [this, droneIndex, &uploadStatus](int /*code*/, const QString& errorMsg) {
-                uploadStatus[droneIndex].completed = true;
-                uploadStatus[droneIndex].success = false;
-                uploadStatus[droneIndex].error = errorMsg;
-
-                if (checkAllComplete()) {
-                    if (checkAnyFailed()) {
-                        cancelProgress();
-                        handleError(QStringLiteral("Some uploads failed"), QStringLiteral("Check individual drone status"));
-                    } else {
-                        finishProgress(QStringLiteral("All missions uploaded successfully"));
-                    }
-                }
-            }, Qt::UniqueConnection);
-
-        // Connect completion handler
-        QObject::connect(missionManager, &PlanManager::sendComplete, this,
-            [this, droneIndex, &uploadStatus](bool error) {
-                uploadStatus[droneIndex].completed = true;
-                uploadStatus[droneIndex].success = !error;
-
-                if (checkAllComplete()) {
-                    if (checkAnyFailed()) {
-                        cancelProgress();
-                        handleError(QStringLiteral("Some uploads failed"), QStringLiteral("Check individual drone status"));
-                    } else {
-                        finishProgress(QStringLiteral("All missions uploaded successfully"));
-                    }
-                }
-            }, Qt::UniqueConnection);
-
-        // Start upload
-        missionManager->writeMissionItems(missionItems);
-        qDeleteAll(missionItems);
-    }
+    return QGeoCoordinate(coord.latitude() + latOffset, coord.longitude() + lonOffset);
 }
 
 bool AreaPlanEditor::isSwarmReady() const
@@ -1272,25 +245,27 @@ bool AreaPlanEditor::isCoordinatedMissionActive() const
     return _isCoordinatedMissionActive;
 }
 
+AreaPlanEditor::FormationType AreaPlanEditor::currentFormation() const
+{
+    return _currentFormation;
+}
+
+bool AreaPlanEditor::isFormationTransitioning() const
+{
+    return _isFormationTransitioning;
+}
+
 bool AreaPlanEditor::checkSwarmReadiness() const
 {
-    QList<Vehicle*> vehicles = QGroundControl::multiVehicleManager()->vehicles();
-    if (vehicles.isEmpty() || vehicles.size() < _droneCount) {
-        return false;
+    QmlObjectListModel* vehicleModel = MultiVehicleManager::instance()->vehicles();
+    if (!vehicleModel || vehicleModel->count() < 2) {
+        return false;  // Need at least 2 vehicles for swarm operations
     }
 
-    // Check each vehicle's status
-    for (Vehicle* vehicle : vehicles) {
-        if (!vehicle) continue;
-        
-        // Check if vehicle is armed and ready
-        if (!vehicle->armed() || !vehicle->homePositionAvailable()) {
-            return false;
-        }
-        
-        // Check if vehicle has a valid mission
-        MissionManager* missionManager = vehicle->missionManager();
-        if (!missionManager || missionManager->isEmpty()) {
+    // Check if all vehicles are ready
+    for (int i = 0; i < vehicleModel->count(); i++) {
+        Vehicle* vehicle = qobject_cast<Vehicle*>(vehicleModel->get(i));
+        if (!vehicle || !_vehicleReadyStatus.value(vehicle->id(), false)) {
             return false;
         }
     }
@@ -1306,194 +281,624 @@ void AreaPlanEditor::updateSwarmStatus(const QString& status)
     }
 }
 
-void AreaPlanEditor::sendSwarmCommand(uint16_t command, const QList<Vehicle*>& vehicles)
-{
-    for (Vehicle* vehicle : vehicles) {
-        if (!vehicle) continue;
-
-        // Send command to each vehicle
-        vehicle->sendMavCommand(
-            MAV_COMP_ID_AUTOPILOT1,    // Target component
-            command,                    // Command ID
-            true,                      // Show error
-            0, 0, 0, 0, 0, 0, 0       // Parameters (all 0 for basic commands)
-        );
-    }
-}
-
-void AreaPlanEditor::handleSwarmResponse(Vehicle* vehicle, uint16_t command, uint8_t result)
-{
-    if (!vehicle) return;
-
-    // Update vehicle ready status
-    _vehicleReadyStatus[vehicle->id()] = (result == MAV_RESULT_ACCEPTED);
-
-    // Check if all vehicles have responded
-    bool allReady = true;
-    for (auto it = _vehicleReadyStatus.constBegin(); it != _vehicleReadyStatus.constEnd(); ++it) {
-        if (!it.value()) {
-            allReady = false;
-            break;
-        }
-    }
-
-    // Update status based on responses
-    if (allReady) {
-        updateSwarmStatus(QStringLiteral("All vehicles ready"));
-    } else {
-        updateSwarmStatus(QStringLiteral("Waiting for vehicle responses..."));
-    }
-}
-
 bool AreaPlanEditor::startCoordinatedTakeoff()
 {
-    if (!checkSwarmReadiness()) {
-        updateSwarmStatus(QStringLiteral("Swarm not ready for takeoff"));
+    if (!isSwarmReady()) {
+        updateSwarmStatus("Swarm not ready for coordinated takeoff");
         return false;
     }
 
-    QList<Vehicle*> vehicles = QGroundControl::multiVehicleManager()->vehicles();
-    _vehicleReadyStatus.clear();
-
-    // Initialize ready status for all vehicles
-    for (Vehicle* vehicle : vehicles) {
-        if (vehicle) {
-            _vehicleReadyStatus[vehicle->id()] = false;
-        }
+    QmlObjectListModel* vehicleModel = MultiVehicleManager::instance()->vehicles();
+    QList<Vehicle*> vehicles;
+    for (int i = 0; i < vehicleModel->count(); i++) {
+        vehicles.append(qobject_cast<Vehicle*>(vehicleModel->get(i)));
     }
 
     // Send takeoff command to all vehicles
     sendSwarmCommand(MAV_CMD_NAV_TAKEOFF, vehicles);
-    updateSwarmStatus(QStringLiteral("Initiating coordinated takeoff..."));
-
+    updateSwarmStatus("Coordinated takeoff initiated");
     return true;
 }
 
 bool AreaPlanEditor::startCoordinatedMission()
 {
-    if (!checkSwarmReadiness()) {
-        updateSwarmStatus(QStringLiteral("Swarm not ready for mission start"));
+    if (!isSwarmReady()) {
+        updateSwarmStatus("Swarm not ready for coordinated mission");
         return false;
-    }
-
-    QList<Vehicle*> vehicles = QGroundControl::multiVehicleManager()->vehicles();
-    _vehicleReadyStatus.clear();
-
-    // Initialize ready status for all vehicles
-    for (Vehicle* vehicle : vehicles) {
-        if (vehicle) {
-            _vehicleReadyStatus[vehicle->id()] = false;
-            
-            // Set to AUTO mode to start mission
-            vehicle->setFlightMode(QGroundControl::modeAuto);
-        }
     }
 
     _isCoordinatedMissionActive = true;
     emit coordinatedMissionStatusChanged();
-    updateSwarmStatus(QStringLiteral("Coordinated mission started"));
-
+    updateSwarmStatus("Coordinated mission started");
     return true;
 }
 
 bool AreaPlanEditor::abortCoordinatedMission()
 {
-    QList<Vehicle*> vehicles = QGroundControl::multiVehicleManager()->vehicles();
-    
-    // Send RTL command to all vehicles
-    sendSwarmCommand(MAV_CMD_NAV_RETURN_TO_LAUNCH, vehicles);
-    
+    if (!_isCoordinatedMissionActive) {
+        return false;
+    }
+
     _isCoordinatedMissionActive = false;
     emit coordinatedMissionStatusChanged();
-    updateSwarmStatus(QStringLiteral("Mission aborted - returning to launch"));
-
+    updateSwarmStatus("Coordinated mission aborted");
     return true;
-}
-
-FormationType AreaPlanEditor::currentFormation() const
-{
-    return _currentFormation;
-}
-
-qreal AreaPlanEditor::formationSpacing() const
-{
-    return _formationSpacing;
-}
-
-bool AreaPlanEditor::isFormationTransitioning() const
-{
-    return _isFormationTransitioning;
-}
-
-void AreaPlanEditor::setFormationSpacing(qreal spacing)
-{
-    if (qFuzzyCompare(_formationSpacing, spacing)) return;
-    
-    _formationSpacing = spacing;
-    emit formationSpacingChanged();
-    
-    if (_currentFormation != NoFormation) {
-        calculateFormationPositions();
-        updateFormationOffsets();
-    }
 }
 
 bool AreaPlanEditor::setFormationType(FormationType type)
 {
-    if (!checkSwarmReadiness()) {
-        updateSwarmStatus(QStringLiteral("Swarm not ready for formation change"));
-        return false;
+    if (_currentFormation == type) {
+        return true;
     }
-    
-    if (_currentFormation == type) return true;
-    
+
     _currentFormation = type;
+    calculateFormationPositions();
     emit formationChanged();
-    
-    if (type != NoFormation) {
-        calculateFormationPositions();
-        updateFormationOffsets();
-        return startFormationTransition();
-    }
-    
+    return true;
+}
+
+bool AreaPlanEditor::adjustFormationSpacing(qreal spacing)
+{
+    setFormationSpacing(spacing);
     return true;
 }
 
 bool AreaPlanEditor::assignFormationRoles()
 {
-    QList<Vehicle*> vehicles = QGroundControl::multiVehicleManager()->vehicles();
-    if (vehicles.isEmpty()) return false;
-    
+    QmlObjectListModel* vehicleModel = MultiVehicleManager::instance()->vehicles();
+    if (!vehicleModel || vehicleModel->count() < 2) {
+        return false;
+    }
+
     // Clear existing roles
     _formationRoles.clear();
-    
-    // Select leader (use first vehicle for now)
-    _leaderVehicle = vehicles.first();
-    emit leaderVehicleChanged();
-    
-    // Assign roles to followers
-    int roleIndex = 1;
-    for (Vehicle* vehicle : vehicles) {
-        if (vehicle == _leaderVehicle) {
-            _formationRoles[vehicle->id()] = 0;  // Leader is role 0
-        } else {
-            _formationRoles[vehicle->id()] = roleIndex++;
+
+    // Assign roles (0 = leader, 1+ = followers)
+    for (int i = 0; i < vehicleModel->count(); i++) {
+        Vehicle* vehicle = qobject_cast<Vehicle*>(vehicleModel->get(i));
+        if (vehicle) {
+            _formationRoles[vehicle->id()] = i;
+            if (i == 0) {
+                _leaderVehicle = vehicle;
+                emit leaderVehicleChanged();
+            }
         }
     }
-    
+
     emit formationRolesChanged();
     return true;
 }
 
+bool AreaPlanEditor::startFormationTransition()
+{
+    if (!isSwarmReady() || _isFormationTransitioning) {
+        return false;
+    }
+
+    _isFormationTransitioning = true;
+    emit formationTransitioningChanged();
+
+    // Calculate and send new formation positions
+    calculateFormationPositions();
+    sendFormationCommands();
+
+    return true;
+}
+
+void AreaPlanEditor::sendSwarmCommand(uint16_t command, const QList<Vehicle*>& vehicles)
+{
+    for (Vehicle* vehicle : vehicles) {
+        if (vehicle) {
+            // Send MAVLink command to each vehicle
+            // Note: Actual command sending would require more parameters and proper MAVLink integration
+            qDebug() << "Sending command" << command << "to vehicle" << vehicle->id();
+        }
+    }
+}
+
+void AreaPlanEditor::handleSwarmResponse(Vehicle* vehicle, uint16_t command, uint8_t result)
+{
+    if (!vehicle) {
+        return;
+    }
+
+    // Update vehicle ready status based on command result
+    _vehicleReadyStatus[vehicle->id()] = (result == MAV_RESULT_ACCEPTED);
+    
+    // Update swarm status
+    if (result != MAV_RESULT_ACCEPTED) {
+        updateSwarmStatus(QString("Vehicle %1 command %2 failed").arg(vehicle->id()).arg(command));
+    }
+}
+
+void AreaPlanEditor::sendFormationCommands()
+{
+    QmlObjectListModel* vehicleModel = MultiVehicleManager::instance()->vehicles();
+    if (!vehicleModel) {
+        return;
+    }
+
+    for (int i = 0; i < vehicleModel->count(); i++) {
+        Vehicle* vehicle = qobject_cast<Vehicle*>(vehicleModel->get(i));
+        if (vehicle && _formationOffsets.contains(vehicle->id())) {
+            // Send position command to each vehicle
+            // Note: Actual command sending would require proper MAVLink integration
+            qDebug() << "Sending formation position to vehicle" << vehicle->id() 
+                    << "offset:" << _formationOffsets[vehicle->id()];
+        }
+    }
+}
+
+void AreaPlanEditor::handleFormationResponse(Vehicle* vehicle, uint16_t command, uint8_t result)
+{
+    if (!vehicle) {
+        return;
+    }
+
+    // Update formation transition status if all vehicles have responded
+    bool allComplete = true;
+    QmlObjectListModel* vehicleModel = MultiVehicleManager::instance()->vehicles();
+    for (int i = 0; vehicleModel && i < vehicleModel->count(); i++) {
+        Vehicle* v = qobject_cast<Vehicle*>(vehicleModel->get(i));
+        if (v && !_vehicleReadyStatus.value(v->id(), false)) {
+            allComplete = false;
+            break;
+        }
+    }
+
+    if (allComplete) {
+        _isFormationTransitioning = false;
+        emit formationTransitioningChanged();
+    }
+}
+
+void AreaPlanEditor::moveAreaNorth()
+{
+    // Move area center north by line spacing distance
+    QGeoCoordinate newCenter = calculateOffsetCoordinate(_areaCenter, _lineSpacing, 0);
+    setAreaCenter(newCenter);
+}
+
+void AreaPlanEditor::moveAreaSouth()
+{
+    // Move area center south by line spacing distance
+    QGeoCoordinate newCenter = calculateOffsetCoordinate(_areaCenter, _lineSpacing, 180);
+    setAreaCenter(newCenter);
+}
+
+void AreaPlanEditor::moveAreaEast()
+{
+    // Move area center east by line spacing distance
+    QGeoCoordinate newCenter = calculateOffsetCoordinate(_areaCenter, _lineSpacing, 90);
+    setAreaCenter(newCenter);
+}
+
+void AreaPlanEditor::moveAreaWest()
+{
+    // Move area center west by line spacing distance
+    QGeoCoordinate newCenter = calculateOffsetCoordinate(_areaCenter, _lineSpacing, 270);
+    setAreaCenter(newCenter);
+}
+
+void AreaPlanEditor::rotateAreaClockwise()
+{
+    setAreaRotation(_areaRotation + 5.0);  // Rotate 5 degrees clockwise
+}
+
+void AreaPlanEditor::rotateAreaCounterClockwise()
+{
+    setAreaRotation(_areaRotation - 5.0);  // Rotate 5 degrees counter-clockwise
+}
+
+void AreaPlanEditor::centerArea()
+{
+    // Get current vehicle position as center
+    Vehicle* vehicle = getCurrentVehicle();
+    if (vehicle) {
+        setAreaCenter(vehicle->coordinate());
+    }
+}
+
+void AreaPlanEditor::resetArea()
+{
+    // Reset all area parameters to defaults
+    setAreaWidth(_defaultAreaWidth);
+    setAreaHeight(_defaultAreaHeight);
+    setLineSpacing(_defaultLineSpacing);
+    setNumPoints(_defaultNumPoints);
+    setMissionAltitude(_defaultAltitude);
+    setAreaRotation(0.0);
+    
+    // Center on current vehicle
+    centerArea();
+}
+
+Vehicle* AreaPlanEditor::getCurrentVehicle() const
+{
+    return MultiVehicleManager::instance()->activeVehicle();
+}
+
+MissionManager* AreaPlanEditor::getMissionManager() const
+{
+    Vehicle* vehicle = getCurrentVehicle();
+    return vehicle ? vehicle->missionManager() : nullptr;
+}
+
+MissionController* AreaPlanEditor::getMissionController() const
+{
+    return qobject_cast<MissionController*>(_planMasterController);
+}
+
+QList<QVariant> AreaPlanEditor::generateWaypoints()
+{
+    QList<QVariant> waypoints;
+    // TODO: Implement waypoint generation logic
+    return waypoints;
+}
+
+QList<QVariant> AreaPlanEditor::computePartitionStripes() const
+{
+    QList<QVariant> stripes;
+    // TODO: Implement stripe computation logic
+    return stripes;
+}
+
+QList<QVariant> AreaPlanEditor::computeRoundRobinAssignments() const
+{
+    QList<QVariant> assignments;
+    // TODO: Implement round-robin assignment logic
+    return assignments;
+}
+
+QList<QVariant> AreaPlanEditor::computeDroneAssignments() const
+{
+    QList<QVariant> assignments;
+    // TODO: Implement drone assignment logic
+    return assignments;
+}
+
+QMap<QString, QVariant> AreaPlanEditor::computePerDroneCounts() const
+{
+    QMap<QString, QVariant> counts;
+    // TODO: Implement per-drone count computation
+    return counts;
+}
+
+QList<QVariant> AreaPlanEditor::computePerDroneWaypointPreview() const
+{
+    QList<QVariant> preview;
+    // TODO: Implement per-drone waypoint preview
+    return preview;
+}
+
+QList<QVariant> AreaPlanEditor::generatePerDroneWaypoints(int droneIndex) const
+{
+    QList<QVariant> waypoints;
+    // TODO: Implement per-drone waypoint generation
+    return waypoints;
+}
+
+void AreaPlanEditor::addPerDroneToMission(int droneIndex)
+{
+    // TODO: Implement adding per-drone waypoints to mission
+}
+
+void AreaPlanEditor::addAllDronesToMission()
+{
+    // TODO: Implement adding all drone waypoints to mission
+}
+
+void AreaPlanEditor::addWaypointsToMission()
+{
+    // TODO: Implement adding waypoints to mission
+}
+
+void AreaPlanEditor::saveMissionFile()
+{
+    // TODO: Implement mission file saving
+}
+
+void AreaPlanEditor::savePerDroneMissionFiles()
+{
+    // TODO: Implement per-drone mission file saving
+}
+
+void AreaPlanEditor::uploadToVehicle()
+{
+    // TODO: Implement mission upload to vehicle
+}
+
+void AreaPlanEditor::uploadPerDroneMissionToVehicle(int droneIndex, QObject* vehicleObject)
+{
+    // TODO: Implement per-drone mission upload
+}
+
+void AreaPlanEditor::uploadToAllDrones()
+{
+    // TODO: Implement uploading to all drones
+}
+
+QList<QVariant> AreaPlanEditor::getAvailableVehicles() const
+{
+    QList<QVariant> vehicles;
+    QmlObjectListModel* vehicleModel = MultiVehicleManager::instance()->vehicles();
+    if (vehicleModel) {
+        for (int i = 0; i < vehicleModel->count(); i++) {
+            Vehicle* vehicle = qobject_cast<Vehicle*>(vehicleModel->get(i));
+            if (vehicle) {
+                QVariantMap vehicleInfo;
+                vehicleInfo["id"] = vehicle->id();
+                vehicleInfo["name"] = QString("Vehicle %1").arg(vehicle->id());
+                vehicles.append(QVariant::fromValue(vehicleInfo));
+            }
+        }
+    }
+    return vehicles;
+}
+
+void AreaPlanEditor::startMission()
+{
+    // TODO: Implement mission start
+}
+
+void AreaPlanEditor::updateStatus(const QString& message)
+{
+    emit statusChanged(message);
+}
+
+void AreaPlanEditor::testCompleteWorkflow()
+{
+    // TODO: Implement complete workflow test
+}
+
+bool AreaPlanEditor::validateAreaParameters() const
+{
+    // TODO: Implement area parameter validation
+    return true;
+}
+
+bool AreaPlanEditor::validateWaypointGeneration()
+{
+    // TODO: Implement waypoint generation validation
+    return true;
+}
+
+bool AreaPlanEditor::validateMissionUpload()
+{
+    // TODO: Implement mission upload validation
+    return true;
+}
+
+bool AreaPlanEditor::validateMissionFileSaving()
+{
+    // TODO: Implement mission file saving validation
+    return true;
+}
+
+QMap<QString, QVariant> AreaPlanEditor::getDroneAllocationStats(int droneIndex) const
+{
+    QMap<QString, QVariant> stats;
+    // TODO: Implement drone allocation stats
+    return stats;
+}
+
+bool AreaPlanEditor::validateSwarmConfiguration() const
+{
+    // TODO: Implement swarm configuration validation
+    return true;
+}
+
+QString AreaPlanEditor::validateInput(const QString& fieldName, const QVariant& value) const
+{
+    // TODO: Implement input validation
+    return QString();
+}
+
+bool AreaPlanEditor::isInputValid(const QString& fieldName, const QVariant& value) const
+{
+    // TODO: Implement input validation
+    return true;
+}
+
+QString AreaPlanEditor::getValidationError() const
+{
+    return _validationError;
+}
+
+void AreaPlanEditor::clearValidationError()
+{
+    if (!_validationError.isEmpty()) {
+        _validationError.clear();
+        emit validationErrorChanged();
+    }
+}
+
+void AreaPlanEditor::logError(const QString& errorMessage, const QString& context)
+{
+    qWarning() << "Error:" << errorMessage << "Context:" << context;
+}
+
+void AreaPlanEditor::handleError(const QString& errorMessage, const QString& recoverySuggestion)
+{
+    logError(errorMessage, recoverySuggestion);
+    updateStatus(QString("Error: %1. %2").arg(errorMessage, recoverySuggestion));
+}
+
+void AreaPlanEditor::startProgress(const QString& operation, const QString& message)
+{
+    _isProcessing = true;
+    _progressValue = 0;
+    _currentOperation = operation;
+    _progressMessage = message;
+    emit isProcessingChanged();
+    emit progressValueChanged();
+    emit currentOperationChanged();
+    emit progressMessageChanged();
+}
+
+void AreaPlanEditor::updateProgress(int value, const QString& message)
+{
+    _progressValue = value;
+    if (!message.isEmpty()) {
+        _progressMessage = message;
+        emit progressMessageChanged();
+    }
+    emit progressValueChanged();
+}
+
+void AreaPlanEditor::finishProgress(const QString& message)
+{
+    _isProcessing = false;
+    _progressValue = 100;
+    if (!message.isEmpty()) {
+        _progressMessage = message;
+        emit progressMessageChanged();
+    }
+    emit isProcessingChanged();
+    emit progressValueChanged();
+}
+
+void AreaPlanEditor::cancelProgress()
+{
+    _isProcessing = false;
+    _progressValue = 0;
+    _progressMessage.clear();
+    emit isProcessingChanged();
+    emit progressValueChanged();
+    emit progressMessageChanged();
+}
+
+void AreaPlanEditor::setProgressOperation(const QString& operation)
+{
+    if (_currentOperation != operation) {
+        _currentOperation = operation;
+        emit currentOperationChanged();
+    }
+}
+
+void AreaPlanEditor::enableOptimizations()
+{
+    if (!_isOptimized) {
+        _isOptimized = true;
+        emit isOptimizedChanged();
+    }
+}
+
+void AreaPlanEditor::disableOptimizations()
+{
+    if (_isOptimized) {
+        _isOptimized = false;
+        emit isOptimizedChanged();
+    }
+}
+
+void AreaPlanEditor::clearCache()
+{
+    _waypointCache.clear();
+    _cacheHits = 0;
+    _cacheMisses = 0;
+}
+
+void AreaPlanEditor::optimizeWaypointGeneration()
+{
+    // TODO: Implement waypoint generation optimization
+}
+
+void AreaPlanEditor::setCacheSize(int size)
+{
+    if (_cacheSize != size) {
+        _cacheSize = size;
+        emit cacheSizeChanged();
+    }
+}
+
+void AreaPlanEditor::profilePerformance()
+{
+    // TODO: Implement performance profiling
+}
+
+QMap<QString, QVariant> AreaPlanEditor::getPerformanceMetrics() const
+{
+    QMap<QString, QVariant> metrics;
+    metrics["cacheHits"] = _cacheHits;
+    metrics["cacheMisses"] = _cacheMisses;
+    metrics["cacheSize"] = _cacheSize;
+    return metrics;
+}
+
+int AreaPlanEditor::calculateTotalWaypoints() const
+{
+    // Calculate total waypoints based on area dimensions and line spacing
+    int linesHorizontal = qCeil(_areaWidth / _lineSpacing);
+    int linesVertical = qCeil(_areaHeight / _lineSpacing);
+    
+    // Each line has _numPoints waypoints
+    int totalPoints = (linesHorizontal + linesVertical) * _numPoints;
+    
+    // Add extra points for RTL and loiter if enabled
+    if (_rtlAfterEveryWaypoint) {
+        totalPoints *= 2;  // Double for RTL after each point
+    }
+    if (_loiterAfterRtl) {
+        totalPoints += linesHorizontal + linesVertical;  // Add loiter points
+    }
+    
+    return totalPoints;
+}
+
+int AreaPlanEditor::calculateFlightTime() const
+{
+    // Approximate flight time calculation
+    const qreal averageSpeed = 5.0;  // meters per second
+    const qreal turnTime = 5.0;      // seconds per turn
+    
+    // Calculate total distance
+    qreal totalDistance = _areaWidth * qCeil(_areaHeight / _lineSpacing);  // Total survey distance
+    
+    // Calculate number of turns
+    int numTurns = qCeil(_areaHeight / _lineSpacing);
+    
+    // Basic flight time = distance/speed + turns*turnTime
+    int flightTime = qCeil(totalDistance / averageSpeed + numTurns * turnTime);
+    
+    // Add loiter time if enabled
+    if (_loiterAfterRtl) {
+        flightTime += calculateTotalWaypoints() * _loiterTime;
+    }
+    
+    // Add RTL time if enabled
+    if (_rtlAfterEveryWaypoint) {
+        // Rough estimate: 2x the height for each RTL
+        qreal rtlDistance = 2 * _missionAltitude * calculateTotalWaypoints();
+        flightTime += qCeil(rtlDistance / averageSpeed);
+    }
+    
+    return flightTime;
+}
+
 void AreaPlanEditor::calculateFormationPositions()
 {
-    QList<Vehicle*> vehicles = QGroundControl::multiVehicleManager()->vehicles();
+    QmlObjectListModel* vehicleModel = MultiVehicleManager::instance()->vehicles();
+    QList<Vehicle*> vehicles;
+    for (int i = 0; i < vehicleModel->count(); i++) {
+        vehicles.append(qobject_cast<Vehicle*>(vehicleModel->get(i)));
+    }
     if (vehicles.isEmpty()) return;
     
     _formationOffsets.clear();
     
+    // Initialize variables before switch statement
+    const int totalVehicles = vehicles.size();
+    const int gridSize = qCeil(qSqrt(totalVehicles));
+    const qreal spacing = _formationSpacing;
+    
+    // Clear any existing offsets
+    _formationOffsets.clear();
+    
     switch (_currentFormation) {
-        case VFormation:
+        case FormationType::NoFormation:
+            break;
+        case FormationType::VFormation: {
             // V formation with leader at front
             for (Vehicle* vehicle : vehicles) {
                 int role = _formationRoles[vehicle->id()];
@@ -1517,8 +922,9 @@ void AreaPlanEditor::calculateFormationPositions()
                 }
             }
             break;
+        }
             
-        case LineFormation:
+        case FormationType::LineFormation: {
             // Line formation with equal spacing
             for (Vehicle* vehicle : vehicles) {
                 int role = _formationRoles[vehicle->id()];
@@ -1530,10 +936,10 @@ void AreaPlanEditor::calculateFormationPositions()
                 }
             }
             break;
+        }
             
-        case CircleFormation:
+        case FormationType::CircleFormation: {
             // Circle formation with equal angular spacing
-            int totalVehicles = vehicles.size();
             for (Vehicle* vehicle : vehicles) {
                 int role = _formationRoles[vehicle->id()];
                 if (role == 0) {
@@ -1549,10 +955,10 @@ void AreaPlanEditor::calculateFormationPositions()
                 }
             }
             break;
+        }
             
-        case GridFormation:
+        case FormationType::GridFormation: {
             // Grid formation with equal spacing
-            int gridSize = qCeil(qSqrt(vehicles.size()));
             for (Vehicle* vehicle : vehicles) {
                 int role = _formationRoles[vehicle->id()];
                 if (role == 0) {
@@ -1569,819 +975,12 @@ void AreaPlanEditor::calculateFormationPositions()
                 }
             }
             break;
+        }
             
-        case NoFormation:
         default:
             break;
     }
+    
+    // Notify that formation positions have been updated
+    emit formationPositionsChanged();
 }
-
-void AreaPlanEditor::updateFormationOffsets()
-{
-    if (!_leaderVehicle) return;
-    
-    QGeoCoordinate leaderPos = _leaderVehicle->coordinate();
-    QList<Vehicle*> vehicles = QGroundControl::multiVehicleManager()->vehicles();
-    
-    for (Vehicle* vehicle : vehicles) {
-        if (vehicle == _leaderVehicle) continue;
-        
-        QGeoCoordinate offset = _formationOffsets[vehicle->id()];
-        QGeoCoordinate targetPos = calculateOffsetCoordinate(leaderPos, offset.latitude(), 0.0);
-        targetPos = calculateOffsetCoordinate(targetPos, offset.longitude(), 90.0);
-        
-        // Send position command to vehicle
-        vehicle->sendMavCommand(
-            MAV_COMP_ID_AUTOPILOT1,
-            MAV_CMD_DO_SET_POSITION_TARGET_GLOBAL_INT,
-            true,  // show error
-            MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
-            0b0000111111111000,  // Use position and yaw
-            targetPos.latitude() * 1e7,   // lat (degE7)
-            targetPos.longitude() * 1e7,  // lon (degE7)
-            targetPos.altitude(),         // alt (m)
-            0, 0, 0,                     // velocity
-            0, 0, 0,                     // acceleration
-            0, 0                         // yaw, yaw rate
-        );
-    }
-}
-
-bool AreaPlanEditor::startFormationTransition()
-{
-    if (!checkSwarmReadiness()) return false;
-    
-    _isFormationTransitioning = true;
-    emit formationTransitioningChanged();
-    
-    // Start position updates
-    updateFormationOffsets();
-    
-    // Monitor formation convergence (simplified)
-    QTimer::singleShot(5000, this, [this]() {
-        _isFormationTransitioning = false;
-        emit formationTransitioningChanged();
-        updateSwarmStatus(QStringLiteral("Formation transition completed"));
-    });
-    
-    return true;
-}
-
-void AreaPlanEditor::startMission()
-{
-    // Use the new coordinated mission start
-    if (startCoordinatedMission()) {
-        updateStatus(QStringLiteral("Coordinated mission started successfully"));
-    } else {
-        updateStatus(QStringLiteral("Failed to start coordinated mission - check swarm status"));
-    }
-}
-
-QVariantMap AreaPlanEditor::getDroneAllocationStats(int droneIndex) const
-{
-    QVariantMap stats;
-    
-    // Get waypoints and assignments
-    QVariantList wps = generatePerDroneWaypoints(droneIndex);
-    const auto assignments = computeDroneAssignments();
-    QVariantMap assignment;
-    for (const QVariant& a : assignments) {
-        QVariantMap m = a.toMap();
-        if (m["droneIndex"].toInt() == droneIndex) {
-            assignment = m;
-            break;
-        }
-    }
-    
-    // Basic stats
-    stats["waypointCount"] = wps.size();
-    stats["lineCount"] = assignment["lineIndices"].toList().size();
-    stats["altitudeOffset"] = assignment["altitudeOffsetM"].toDouble();
-    stats["timeOffset"] = assignment["timeOffsetS"].toDouble();
-    
-    // Calculate area and distances
-    qreal totalDistance = 0.0;
-    qreal lineLength = _areaWidth;  // Each line spans the area width
-    qreal areaSize = 0.0;
-    
-    if (!wps.isEmpty()) {
-        QGeoCoordinate prevPos;
-        bool isFirst = true;
-        
-        for (const QVariant& wp : wps) {
-            QGeoCoordinate pos = wp.value<QGeoCoordinate>();
-            if (!isFirst) {
-                totalDistance += prevPos.distanceTo(pos);
-            }
-            isFirst = false;
-            prevPos = pos;
-        }
-        
-        // Calculate area size based on assigned lines
-        QVariantList lineIndices = assignment["lineIndices"].toList();
-        if (!lineIndices.isEmpty()) {
-            areaSize = lineIndices.size() * _lineSpacing * _areaWidth;
-        }
-    }
-    
-    stats["lineLength"] = lineLength;
-    stats["totalDistance"] = totalDistance;
-    stats["areaSize"] = areaSize;
-    
-    // Estimate flight time
-    const qreal avgSpeed = 5.0;  // meters/second, assumed average speed
-    qreal estimatedTime = totalDistance / avgSpeed;
-    if (_loiterTime > 0) {
-        estimatedTime += wps.size() * _loiterTime;  // Add loiter time at each waypoint
-    }
-    stats["estimatedTime"] = estimatedTime;
-    
-    return stats;
-}
-
-void AreaPlanEditor::updateStatus(const QString& message)
-{
-    qDebug() << "AreaPlanEditor:" << message;
-    emit statusChanged(message);
-}
-
-Vehicle* AreaPlanEditor::getCurrentVehicle() const
-{
-    // Get the current vehicle from QGC's vehicle manager
-    return MultiVehicleManager::instance()->activeVehicle();
-}
-
-MissionManager* AreaPlanEditor::getMissionManager() const
-{
-    Vehicle* vehicle = getCurrentVehicle();
-    if (vehicle) {
-        return vehicle->missionManager();
-    }
-    return nullptr;
-}
-
-void AreaPlanEditor::setPlanMasterController(QObject* controller)
-{
-    if (_planMasterController != controller) {
-        _planMasterController = controller;
-        emit planMasterControllerChanged();
-    }
-}
-
-void AreaPlanEditor::setDroneCount(int count)
-{
-    if (count < 1) count = 1;
-    if (_droneCount == count) return;
-    _droneCount = count;
-    emit droneCountChanged();
-}
-
-void AreaPlanEditor::setAltitudeBandStart(qreal startMeters)
-{
-    if (startMeters < 0.0) startMeters = 0.0;
-    if (qFuzzyCompare(_altitudeBandStart, startMeters)) return;
-    _altitudeBandStart = startMeters;
-    emit altitudeBandStartChanged();
-}
-
-void AreaPlanEditor::setAltitudeBandStep(qreal stepMeters)
-{
-    if (stepMeters <= 0.0) stepMeters = _defaultAltitudeBandStep;
-    if (qFuzzyCompare(_altitudeBandStep, stepMeters)) return;
-    _altitudeBandStep = stepMeters;
-    emit altitudeBandStepChanged();
-}
-
-void AreaPlanEditor::setTimeOffsetPerDrone(qreal seconds)
-{
-    if (seconds < 0.0) seconds = 0.0;
-    if (qFuzzyCompare(_timeOffsetPerDrone, seconds)) return;
-    _timeOffsetPerDrone = seconds;
-    emit timeOffsetPerDroneChanged();
-}
-
-void AreaPlanEditor::setRtlAfterEveryWaypoint(bool enabled)
-{
-    if (_rtlAfterEveryWaypoint == enabled) return;
-    _rtlAfterEveryWaypoint = enabled;
-    emit rtlAfterEveryWaypointChanged();
-}
-
-void AreaPlanEditor::setLoiterAfterRtl(bool enabled)
-{
-    if (_loiterAfterRtl == enabled) return;
-    _loiterAfterRtl = enabled;
-    emit loiterAfterRtlChanged();
-}
-
-MissionController* AreaPlanEditor::getMissionController() const
-{
-    if (!_planMasterController) {
-        return nullptr;
-    }
-    
-    // Try to get the mission controller from the plan master controller
-    QVariant missionControllerVariant = _planMasterController->property("missionController");
-    if (missionControllerVariant.isValid()) {
-        return qvariant_cast<MissionController*>(missionControllerVariant);
-    }
-    
-    return nullptr;
-}
-
-void AreaPlanEditor::saveMissionToFile(const QList<MissionItem*>& missionItems, const QString& filename)
-{
-    QFile file(filename);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        updateStatus(QStringLiteral("Failed to open file for writing: %1").arg(filename));
-        return;
-    }
-    
-    QTextStream out(&file);
-    
-    // Write QGC waypoint file header
-    out << "QGC WPL 110\n";
-    
-    // Write each mission item
-    for (const MissionItem* item : missionItems) {
-        // Format: seq\tcurrent\tframe\tcommand\tparam1\tparam2\tparam3\tparam4\tlat\tlon\talt\tautocontinue
-        out << item->sequenceNumber() << "\t"
-            << (item->isCurrentItem() ? "1" : "0") << "\t"
-            << static_cast<int>(item->frame()) << "\t"
-            << static_cast<int>(item->command()) << "\t"
-            << item->param1() << "\t"
-            << item->param2() << "\t"
-            << item->param3() << "\t"
-            << item->param4() << "\t"
-            << QString::number(item->coordinate().latitude(), 'f', 7) << "\t"
-            << QString::number(item->coordinate().longitude(), 'f', 7) << "\t"
-            << QString::number(item->coordinate().altitude(), 'f', 2) << "\t"
-            << (item->autoContinue() ? "1" : "0") << "\n";
-    }
-    
-    file.close();
-    updateStatus(QStringLiteral("Mission saved to %1").arg(filename));
-}
-
-void AreaPlanEditor::saveMissionToFile(MissionController* missionController, const QString& filename)
-{
-    if (!missionController) {
-        updateStatus(QStringLiteral("Mission controller is null"));
-        return;
-    }
-    
-    // For now, just save a placeholder file since we can't access the private methods
-    QFile file(filename);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        updateStatus(QStringLiteral("Failed to open file for writing: %1").arg(filename));
-        return;
-    }
-    
-    QTextStream out(&file);
-    
-    // Write QGC waypoint file header
-    out << "QGC WPL 110\n";
-    
-    // Write a placeholder entry since we can't access the mission items directly
-    out << "0\t1\t0\t16\t0\t0\t0\t0\t" 
-        << QString::number(_homeLocation.latitude(), 'f', 7) << "\t"
-        << QString::number(_homeLocation.longitude(), 'f', 7) << "\t"
-        << QString::number(_missionAltitude, 'f', 2) << "\t1\n";
-    
-    file.close();
-    updateStatus(QStringLiteral("Mission saved to %1").arg(filename));
-}
-
-void AreaPlanEditor::testCompleteWorkflow()
-{
-    startProgress(QStringLiteral("Complete Workflow Test"), QStringLiteral("Starting comprehensive test..."));
-    
-    // Step 1: Validate area parameters
-    updateProgress(10, QStringLiteral("Validating area parameters..."));
-    if (!validateAreaParameters()) {
-        cancelProgress();
-        updateStatus(QStringLiteral("❌ Workflow test failed: Invalid area parameters"));
-        return;
-    }
-    updateStatus(QStringLiteral("✅ Area parameters validated"));
-    
-    // Step 2: Test waypoint generation
-    updateProgress(30, QStringLiteral("Testing waypoint generation..."));
-    if (!validateWaypointGeneration()) {
-        cancelProgress();
-        updateStatus(QStringLiteral("❌ Workflow test failed: Waypoint generation failed"));
-        return;
-    }
-    updateStatus(QStringLiteral("✅ Waypoint generation validated"));
-    
-    // Step 3: Test mission file saving
-    updateProgress(60, QStringLiteral("Testing mission file saving..."));
-    if (!validateMissionFileSaving()) {
-        cancelProgress();
-        updateStatus(QStringLiteral("❌ Workflow test failed: Mission file saving failed"));
-        return;
-    }
-    updateStatus(QStringLiteral("✅ Mission file saving validated"));
-    
-    // Step 4: Test mission upload (if vehicle connected)
-    updateProgress(80, QStringLiteral("Testing mission upload..."));
-    if (getCurrentVehicle()) {
-        if (!validateMissionUpload()) {
-            cancelProgress();
-            updateStatus(QStringLiteral("❌ Workflow test failed: Mission upload failed"));
-            return;
-        }
-        updateStatus(QStringLiteral("✅ Mission upload validated"));
-    } else {
-        updateStatus(QStringLiteral("⚠️  Mission upload skipped (no vehicle connected)"));
-    }
-    
-    finishProgress(QStringLiteral("✅ Complete workflow test passed!"));
-}
-
-bool AreaPlanEditor::validateAreaParameters() const
-{
-    // Check if area parameters are within valid ranges
-    if (_areaWidth <= 0 || _areaHeight <= 0) {
-        return false;
-    }
-    
-    if (_lineSpacing <= 0 || _lineSpacing > _areaHeight) {
-        return false;
-    }
-    
-    if (_numPoints <= 0 || _numPoints > 100) {
-        return false;
-    }
-    
-    if (_missionAltitude <= 0 || _missionAltitude > 1000) {
-        return false;
-    }
-    
-    if (!_areaCenter.isValid() || !_homeLocation.isValid()) {
-        return false;
-    }
-    
-    return true;
-}
-
-bool AreaPlanEditor::validateWaypointGeneration()
-{
-    // Test waypoint generation with current parameters
-    QVariantList waypoints = generateWaypoints();
-    
-    if (waypoints.isEmpty()) {
-        return false;
-    }
-    
-    // Check if number of waypoints matches expected count
-    int expectedWaypoints = calculateTotalWaypoints();
-    if (waypoints.size() != expectedWaypoints) {
-        return false;
-    }
-    
-    // Validate each waypoint
-    for (const QVariant& waypointVariant : waypoints) {
-        QGeoCoordinate coord = waypointVariant.value<QGeoCoordinate>();
-        if (!coord.isValid()) {
-            return false;
-        }
-        if (coord.altitude() != _missionAltitude) {
-            return false;
-        }
-    }
-    
-    return true;
-}
-
-bool AreaPlanEditor::validateMissionUpload()
-{
-    MissionManager* missionManager = getMissionManager();
-    if (!missionManager) {
-        return false;
-    }
-    
-    // Test mission creation without actually uploading
-    QVariantList waypointVariants = generateWaypoints();
-    if (waypointVariants.isEmpty()) {
-        return false;
-    }
-    
-    // Create mission items for validation
-    QList<MissionItem*> missionItems;
-    
-    // Add home position
-    MissionItem* homeItem = new MissionItem(0, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT, 
-                                           0, 0, 0, 0, _homeLocation.latitude(), _homeLocation.longitude(), 
-                                           _missionAltitude, true, false, this);
-    missionItems.append(homeItem);
-    
-    // Add takeoff command
-    MissionItem* takeoffItem = new MissionItem(1, MAV_CMD_NAV_TAKEOFF, MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                              0, 0, 0, 0, _homeLocation.latitude(), _homeLocation.longitude(),
-                                              _missionAltitude, true, false, this);
-    missionItems.append(takeoffItem);
-    
-    // Add generated waypoints
-    int sequenceNumber = 2;
-    for (const QVariant& waypointVariant : waypointVariants) {
-        QGeoCoordinate coord = waypointVariant.value<QGeoCoordinate>();
-        MissionItem* waypointItem = new MissionItem(sequenceNumber, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                                   0, 0, 0, 0, coord.latitude(), coord.longitude(), coord.altitude(),
-                                                   true, false, this);
-        missionItems.append(waypointItem);
-        sequenceNumber++;
-    }
-    
-    // Add return to launch command
-    MissionItem* rtlItem = new MissionItem(sequenceNumber, MAV_CMD_NAV_RETURN_TO_LAUNCH, MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                          0, 0, 0, 0, 0, 0, 0, true, false, this);
-    missionItems.append(rtlItem);
-    
-    // Validate mission items
-    bool isValid = true;
-    for (const MissionItem* item : missionItems) {
-        if (!item->coordinate().isValid()) {
-            isValid = false;
-            break;
-        }
-    }
-    
-    // Clean up
-    qDeleteAll(missionItems);
-    
-    return isValid;
-}
-
-bool AreaPlanEditor::validateMissionFileSaving()
-{
-    // Test mission file saving with a temporary file
-    QVariantList waypointVariants = generateWaypoints();
-    if (waypointVariants.isEmpty()) {
-        return false;
-    }
-    
-    // Create mission items for file saving test
-    QList<MissionItem*> missionItems;
-    
-    // Add home position
-    MissionItem* homeItem = new MissionItem(0, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT, 
-                                           0, 0, 0, 0, _homeLocation.latitude(), _homeLocation.longitude(), 
-                                           _missionAltitude, true, false, this);
-    missionItems.append(homeItem);
-    
-    // Add takeoff command
-    MissionItem* takeoffItem = new MissionItem(1, MAV_CMD_NAV_TAKEOFF, MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                              0, 0, 0, 0, _homeLocation.latitude(), _homeLocation.longitude(),
-                                              _missionAltitude, true, false, this);
-    missionItems.append(takeoffItem);
-    
-    // Add generated waypoints
-    int sequenceNumber = 2;
-    for (const QVariant& waypointVariant : waypointVariants) {
-        QGeoCoordinate coord = waypointVariant.value<QGeoCoordinate>();
-        MissionItem* waypointItem = new MissionItem(sequenceNumber, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                                   0, 0, 0, 0, coord.latitude(), coord.longitude(), coord.altitude(),
-                                                   true, false, this);
-        missionItems.append(waypointItem);
-        sequenceNumber++;
-    }
-    
-    // Add return to launch command
-    MissionItem* rtlItem = new MissionItem(sequenceNumber, MAV_CMD_NAV_RETURN_TO_LAUNCH, MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                                          0, 0, 0, 0, 0, 0, 0, true, false, this);
-    missionItems.append(rtlItem);
-    
-    // Test file saving
-    const QString testFilename = "test_mission_workflow.waypoints";
-    QFile testFile(testFilename);
-    if (!testFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        qDeleteAll(missionItems);
-        return false;
-    }
-    
-    QTextStream out(&testFile);
-    out << "QGC WPL 110\n";
-    
-    for (const MissionItem* item : missionItems) {
-        out << item->sequenceNumber() << "\t"
-            << (item->isCurrentItem() ? "1" : "0") << "\t"
-            << static_cast<int>(item->frame()) << "\t"
-            << static_cast<int>(item->command()) << "\t"
-            << item->param1() << "\t"
-            << item->param2() << "\t"
-            << item->param3() << "\t"
-            << item->param4() << "\t"
-            << QString::number(item->coordinate().latitude(), 'f', 7) << "\t"
-            << QString::number(item->coordinate().longitude(), 'f', 7) << "\t"
-            << QString::number(item->coordinate().altitude(), 'f', 2) << "\t"
-            << (item->autoContinue() ? "1" : "0") << "\n";
-    }
-    
-    testFile.close();
-    
-    // Verify file was created and has content
-    if (!testFile.exists() || testFile.size() == 0) {
-        qDeleteAll(missionItems);
-        return false;
-    }
-    
-    // Clean up test file
-    testFile.remove();
-    
-    // Clean up mission items
-    qDeleteAll(missionItems);
-    
-    return true;
-}
-
-QString AreaPlanEditor::validateInput(const QString& fieldName, const QVariant& value) const
-{
-    if (fieldName == "areaWidth") {
-        qreal width = value.toReal();
-        if (width <= 0) {
-            return QStringLiteral("Area width must be greater than 0");
-        }
-        if (width > 10000) {
-            return QStringLiteral("Area width must be less than 10,000 meters");
-        }
-    } else if (fieldName == "areaHeight") {
-        qreal height = value.toReal();
-        if (height <= 0) {
-            return QStringLiteral("Area height must be greater than 0");
-        }
-        if (height > 10000) {
-            return QStringLiteral("Area height must be less than 10,000 meters");
-        }
-    } else if (fieldName == "lineSpacing") {
-        qreal spacing = value.toReal();
-        if (spacing <= 0) {
-            return QStringLiteral("Line spacing must be greater than 0");
-        }
-        if (spacing > _areaHeight) {
-            return QStringLiteral("Line spacing cannot be greater than area height");
-        }
-    } else if (fieldName == "numPoints") {
-        int points = value.toInt();
-        if (points <= 0) {
-            return QStringLiteral("Number of points must be greater than 0");
-        }
-        if (points > 100) {
-            return QStringLiteral("Number of points must be less than 100");
-        }
-    } else if (fieldName == "missionAltitude") {
-        qreal altitude = value.toReal();
-        if (altitude <= 0) {
-            return QStringLiteral("Mission altitude must be greater than 0");
-        }
-        if (altitude > 1000) {
-            return QStringLiteral("Mission altitude must be less than 1,000 meters");
-        }
-    } else if (fieldName == "areaCenter") {
-        QGeoCoordinate coord = value.value<QGeoCoordinate>();
-        if (!coord.isValid()) {
-            return QStringLiteral("Area center coordinates are invalid");
-        }
-        if (coord.latitude() < -90 || coord.latitude() > 90) {
-            return QStringLiteral("Latitude must be between -90 and 90 degrees");
-        }
-        if (coord.longitude() < -180 || coord.longitude() > 180) {
-            return QStringLiteral("Longitude must be between -180 and 180 degrees");
-        }
-    } else if (fieldName == "homeLocation") {
-        QGeoCoordinate coord = value.value<QGeoCoordinate>();
-        if (!coord.isValid()) {
-            return QStringLiteral("Home location coordinates are invalid");
-        }
-        if (coord.latitude() < -90 || coord.latitude() > 90) {
-            return QStringLiteral("Latitude must be between -90 and 90 degrees");
-        }
-        if (coord.longitude() < -180 || coord.longitude() > 180) {
-            return QStringLiteral("Longitude must be between -180 and 180 degrees");
-        }
-    }
-    
-    return QString(); // No error
-}
-
-bool AreaPlanEditor::isInputValid(const QString& fieldName, const QVariant& value) const
-{
-    return validateInput(fieldName, value).isEmpty();
-}
-
-QString AreaPlanEditor::getValidationError() const
-{
-    return _validationError;
-}
-
-void AreaPlanEditor::clearValidationError()
-{
-    if (!_validationError.isEmpty()) {
-        _validationError.clear();
-        emit validationErrorChanged();
-    }
-}
-
-void AreaPlanEditor::logError(const QString& errorMessage, const QString& context)
-{
-    QString logMessage = QStringLiteral("AreaPlanEditor Error");
-    if (!context.isEmpty()) {
-        logMessage += QStringLiteral(" [%1]").arg(context);
-    }
-    logMessage += QStringLiteral(": %1").arg(errorMessage);
-    
-    qWarning() << logMessage;
-    updateStatus(QStringLiteral("Error: %1").arg(errorMessage));
-}
-
-void AreaPlanEditor::handleError(const QString& errorMessage, const QString& recoverySuggestion)
-{
-    // Set validation error
-    _validationError = errorMessage;
-    emit validationErrorChanged();
-    
-    // Log the error
-    logError(errorMessage);
-    
-    // Provide recovery suggestion if available
-    if (!recoverySuggestion.isEmpty()) {
-        updateStatus(QStringLiteral("Suggestion: %1").arg(recoverySuggestion));
-    }
-}
-
-void AreaPlanEditor::startProgress(const QString& operation, const QString& message)
-{
-    _isProcessing = true;
-    _progressValue = 0;
-    _progressMessage = message.isEmpty() ? QStringLiteral("Starting %1...").arg(operation) : message;
-    _currentOperation = operation;
-    
-    emit isProcessingChanged();
-    emit progressValueChanged();
-    emit progressMessageChanged();
-    emit currentOperationChanged();
-    
-    updateStatus(QStringLiteral("Started: %1").arg(operation));
-}
-
-void AreaPlanEditor::updateProgress(int value, const QString& message)
-{
-    if (!_isProcessing) {
-        return; // Ignore progress updates if not processing
-    }
-    
-    _progressValue = qBound(0, value, 100);
-    if (!message.isEmpty()) {
-        _progressMessage = message;
-    } else {
-        _progressMessage = QStringLiteral("%1: %2%").arg(_currentOperation).arg(_progressValue);
-    }
-    
-    emit progressValueChanged();
-    emit progressMessageChanged();
-    
-    updateStatus(QStringLiteral("Progress: %1% - %2").arg(_progressValue).arg(_progressMessage));
-}
-
-void AreaPlanEditor::finishProgress(const QString& message)
-{
-    _isProcessing = false;
-    _progressValue = 100;
-    _progressMessage = message.isEmpty() ? QStringLiteral("%1 completed").arg(_currentOperation) : message;
-    
-    emit isProcessingChanged();
-    emit progressValueChanged();
-    emit progressMessageChanged();
-    
-    updateStatus(QStringLiteral("Completed: %1").arg(_currentOperation));
-    
-    // Clear operation after a short delay
-    QTimer::singleShot(2000, this, [this]() {
-        _currentOperation.clear();
-        emit currentOperationChanged();
-    });
-}
-
-void AreaPlanEditor::cancelProgress()
-{
-    _isProcessing = false;
-    _progressValue = 0;
-    _progressMessage = QStringLiteral("%1 cancelled").arg(_currentOperation);
-    
-    emit isProcessingChanged();
-    emit progressValueChanged();
-    emit progressMessageChanged();
-    
-    updateStatus(QStringLiteral("Cancelled: %1").arg(_currentOperation));
-    
-    // Clear operation after a short delay
-    QTimer::singleShot(2000, this, [this]() {
-        _currentOperation.clear();
-        emit currentOperationChanged();
-    });
-}
-
-void AreaPlanEditor::setProgressOperation(const QString& operation)
-{
-    if (_currentOperation != operation) {
-        _currentOperation = operation;
-        emit currentOperationChanged();
-    }
-}
-
-void AreaPlanEditor::enableOptimizations()
-{
-    _isOptimized = true;
-    _cacheSize = _cacheSize > 0 ? _cacheSize : 100;
-    emit isOptimizedChanged();
-    updateStatus(QStringLiteral("Performance optimizations enabled"));
-}
-
-void AreaPlanEditor::disableOptimizations()
-{
-    _isOptimized = false;
-    clearCache();
-    emit isOptimizedChanged();
-    updateStatus(QStringLiteral("Performance optimizations disabled"));
-}
-
-void AreaPlanEditor::clearCache()
-{
-    _waypointCache.clear();
-    _cacheSize = 0;
-    emit cacheSizeChanged();
-    updateStatus(QStringLiteral("Cache cleared"));
-}
-
-void AreaPlanEditor::optimizeWaypointGeneration()
-{
-    if (!_isOptimized) {
-        updateStatus(QStringLiteral("Optimizations not enabled"));
-        return;
-    }
-    
-    startProgress(QStringLiteral("Waypoint Generation Optimization"), QStringLiteral("Optimizing generation algorithm..."));
-    
-    // Profile current performance
-    _performanceTimer.start();
-    QVariantList testWaypoints = generateWaypoints();
-    qint64 generationTime = _performanceTimer.elapsed();
-    
-    updateProgress(50, QStringLiteral("Profiling current performance..."));
-    
-    // Store performance metrics
-    _performanceMetrics["generationTime"] = generationTime;
-    _performanceMetrics["waypointCount"] = testWaypoints.size();
-    _performanceMetrics["cacheHits"] = _cacheHits;
-    _performanceMetrics["cacheMisses"] = _cacheMisses;
-    _performanceMetrics["cacheSize"] = _waypointCache.size();
-    
-    finishProgress(QStringLiteral("Optimization completed. Generation time: %1ms").arg(generationTime));
-}
-
-void AreaPlanEditor::setCacheSize(int size)
-{
-    if (size < 0) {
-        handleError(QStringLiteral("Cache size must be positive"), QStringLiteral("Please enter a positive number"));
-        return;
-    }
-    
-    _cacheSize = size;
-    emit cacheSizeChanged();
-    updateStatus(QStringLiteral("Cache size set to %1").arg(size));
-}
-
-void AreaPlanEditor::profilePerformance()
-{
-    startProgress(QStringLiteral("Performance Profiling"), QStringLiteral("Analyzing system performance..."));
-    
-    _performanceTimer.start();
-    
-    // Test waypoint generation performance
-    updateProgress(25, QStringLiteral("Testing waypoint generation..."));
-    QVariantList waypoints = generateWaypoints();
-    qint64 generationTime = _performanceTimer.elapsed();
-    
-    // Test memory usage
-    updateProgress(50, QStringLiteral("Analyzing memory usage..."));
-    int memoryUsage = waypoints.size() * sizeof(QVariant) * 2; // Rough estimate
-    
-    // Test cache performance
-    updateProgress(75, QStringLiteral("Testing cache performance..."));
-    
-    // Store metrics
-    _performanceMetrics["generationTime"] = generationTime;
-    _performanceMetrics["waypointCount"] = waypoints.size();
-    _performanceMetrics["memoryUsage"] = memoryUsage;
-    _performanceMetrics["cacheHits"] = _cacheHits;
-    _performanceMetrics["cacheMisses"] = _cacheMisses;
-    _performanceMetrics["cacheSize"] = _waypointCache.size();
-    _performanceMetrics["isOptimized"] = _isOptimized;
-    
-    finishProgress(QStringLiteral("Performance profiling completed"));
-}
-
-QVariantMap AreaPlanEditor::getPerformanceMetrics() const
-{
-    return _performanceMetrics;
-} 

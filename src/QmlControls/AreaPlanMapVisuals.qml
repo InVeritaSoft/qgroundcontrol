@@ -31,8 +31,9 @@ Item {
 
 	// Z-order management following QGC patterns
 	property real _zorderRectangle:     QGroundControl.zOrderMapItems
-	property real _zorderCenterMarker:  QGroundControl.zOrderMapItems + 1
-	property real _zorderWaypoints:     QGroundControl.zOrderMapItems + 3
+	property real _zorderLines:         QGroundControl.zOrderMapItems + 1
+	property real _zorderPoints:        QGroundControl.zOrderMapItems + 2
+	property real _zorderCenterMarker:  QGroundControl.zOrderMapItems + 3
 
 	// Interactive drawing properties
 	property bool isDrawingMode: areaPlanEditor ? areaPlanEditor.isDrawingMode : false
@@ -93,6 +94,9 @@ Item {
 		console.log("AreaPlanMapVisuals: isDrawingMode:", isDrawingMode)
 		console.log("AreaPlanMapVisuals: areaPlanEditor:", areaPlanEditor)
 		console.log("AreaPlanMapVisuals: mapControl:", mapControl)
+		
+		// Initial creation of map items
+		addMapItems()
 	}
 
     // Object managers following QGC patterns
@@ -119,7 +123,6 @@ Item {
 	// Calculate rectangle corners based on area parameters
 	property var rectangleCorners: {
 		if (!areaPlanEditor || !areaPlanEditor.areaCenter || !areaPlanEditor.areaWidth || !areaPlanEditor.areaHeight) {
-			console.log("AreaPlanMapVisuals: No areaPlanEditor or areaCenter")
 			return []
 		}
 
@@ -127,10 +130,6 @@ Item {
 		var width = areaPlanEditor.areaWidth
 		var height = areaPlanEditor.areaHeight
 		var rotation = areaPlanEditor.areaRotation || 0.0
-
-		console.log("AreaPlanMapVisuals: Calculating corners - center:", center.latitude, center.longitude, "width:", width, "height:", height, "rotation:", rotation)
-		console.log("AreaPlanMapVisuals: Center valid:", center.isValid)
-		console.log("AreaPlanMapVisuals: Width > 0:", width > 0, "Height > 0:", height > 0)
 
 		var corners = []
 
@@ -200,13 +199,13 @@ Item {
 		id: areaRectangleComponent
 
 		MapPolygon {
-			id: areaRectangle
+			id: missionShape
 			path: rectangleCorners
 			color: interiorColor
 			border.color: borderColor
 			border.width: borderWidth
-			opacity: areaPlanEditor && areaPlanEditor.areaCenter.isValid && areaPlanEditor.areaWidth > 0 && areaPlanEditor.areaHeight > 0 ? interiorOpacity : 0
-			visible: areaPlanEditor && areaPlanEditor.areaCenter.isValid && areaPlanEditor.areaWidth > 0 && areaPlanEditor.areaHeight > 0
+			opacity: interiorOpacity
+			visible: areaPlanEditor && areaPlanEditor.areaCenter && areaPlanEditor.areaCenter.isValid
 			z: _zorderRectangle
 
 			// Debug: Add console logging to track polygon updates
@@ -435,10 +434,10 @@ Item {
 		id: gridLineComponent
 
         MapPolyline {
-			id: gridLine
+			id: missionLines
             line.color: (qgcPal && qgcPal.colorGreen) ? qgcPal.colorGreen : "#43A047"
 			line.width: Math.max(1, Math.round(ScreenTools.defaultFontPixelWidth * 0.5))
-			z: QGroundControl.zOrderMapItems - 1
+			z: _zorderLines
 		}
 	}
 
@@ -447,8 +446,8 @@ Item {
 		id: waypointMarkerComponent
 
 		MapQuickItem {
-			id: waypointMarker
-			z: _zorderWaypoints
+			id: missionPoints
+			z: _zorderPoints
 			anchorPoint.x: sourceItem.width / 2
 			anchorPoint.y: sourceItem.height / 2
 
@@ -627,51 +626,42 @@ Item {
 		console.log("Component opacity:", opacity)
 		console.log("Component interactive:", interactive)
 
-		// Don't add map items if component is not visible
-		if (!visible || opacity === 0) {
-			console.log("AreaPlanMapVisuals: Skipping map item creation - component not visible")
-			return
-		}
+		// Always try to add map items
+		console.log("AreaPlanMapVisuals: Adding map items, visible:", visible, "opacity:", opacity)
 
 		console.log("Rectangle corners count:", rectangleCorners.length)
 		console.log("Area center valid:", areaPlanEditor ? areaPlanEditor.areaCenter.isValid : false)
 		console.log("Area dimensions:", areaPlanEditor ? areaPlanEditor.areaWidth + "x" + areaPlanEditor.areaHeight : "null")
 
-		// Clear existing items first to prevent duplication
-		removeMapItems()
+			// Create all map items
+	if (!areaPlanEditor || !mapControl) {
+		console.log("AreaPlanMapVisuals: Skipping map item creation - missing editor or map")
+		return
+	}
 
-		// Create items even with minimal valid data to ensure immediate visibility
-		if (!areaPlanEditor) {
-			console.log("AreaPlanMapVisuals: Skipping map item creation - no editor")
-			return
-		}
-		
-		// Always create the area rectangle - it will auto-hide when invalid
-		var areaRect = _objMgrRectangle.createObject(areaRectangleComponent, mapControl, true)
-		console.log("Area rectangle created:", !!areaRect)
-		
-		// Create center marker if we have a valid center
-		if (areaPlanEditor.areaCenter.isValid) {
-			var centerMarker = _objMgrCenterMarker.createObject(centerMarkerComponent, mapControl, true)
-			console.log("Center marker created:", !!centerMarker)
-		}
+	// Remove existing items to prevent duplicates
+	removeMapItems()
+	
+	console.log("AreaPlanMapVisuals: Creating map items with mapControl:", mapControl)
+	console.log("AreaPlanMapVisuals: Map control parent:", mapControl.parent)
+	
+	// Create the area rectangle
+	var areaRect = _objMgrRectangle.createObject(areaRectangleComponent, mapControl, false)
+	if (areaRect) {
+		areaRect.parent = mapControl
+		console.log("Area rectangle created and parented to map")
+	} else {
+		console.log("Failed to create area rectangle")
+	}
 
-		// Create area rectangle
-		var areaRect = _objMgrRectangle.createObject(areaRectangleComponent, mapControl, true)
-		console.log("Area rectangle created:", !!areaRect)
-		if (areaRect) {
-			console.log("Area rectangle path length:", areaRect.path.length)
-			console.log("Area rectangle visible:", areaRect.visible)
-			console.log("Area rectangle opacity:", areaRect.opacity)
-		}
-
-		// Create center marker
-		var centerMarker = _objMgrCenterMarker.createObject(centerMarkerComponent, mapControl, true)
-		console.log("Center marker created:", !!centerMarker)
-		if (centerMarker) {
-			console.log("Center marker coordinate:", centerMarker.coordinate.latitude, centerMarker.coordinate.longitude)
-			console.log("Center marker visible:", centerMarker.visible)
-		}
+	// Create center marker
+	var centerMarker = _objMgrCenterMarker.createObject(centerMarkerComponent, mapControl, false)
+	if (centerMarker) {
+		centerMarker.parent = mapControl
+		console.log("Center marker created and parented to map")
+	} else {
+		console.log("Failed to create center marker")
+	}
 
 		// Add grid lines
 		addGridLines()
@@ -764,39 +754,26 @@ Item {
 		removeWaypointMarkers()
 	}
 
-	// Monitor visibility changes
+	// Monitor visibility and property changes
 	onVisibleChanged: {
 		console.log("AreaPlanMapVisuals: Visibility changed to:", visible)
-		if (!visible) {
-			console.log("AreaPlanMapVisuals: Component not visible - removing all map items")
-			removeMapItems()
-		} else {
+		if (visible) {
 			console.log("AreaPlanMapVisuals: Component visible - adding map items")
 			// Add items when becoming visible
 			addMapItems()
 		}
 	}
 
-	onOpacityChanged: {
-		console.log("AreaPlanMapVisuals: Opacity changed to:", opacity)
-		if (opacity === 0) {
-			console.log("AreaPlanMapVisuals: Opacity is 0 - removing all map items")
-			removeMapItems()
-		} else if (visible) {
-			console.log("AreaPlanMapVisuals: Opacity is non-zero and visible - adding map items")
-			// Add items when opacity becomes non-zero and visible
+	onMapControlChanged: {
+		console.log("AreaPlanMapVisuals: Map control changed")
+		if (mapControl) {
 			addMapItems()
 		}
 	}
 
-	// Also monitor the interactive property changes
-	onInteractiveChanged: {
-		console.log("AreaPlanMapVisuals: Interactive changed to:", interactive)
-		if (!interactive) {
-			console.log("AreaPlanMapVisuals: Not interactive - removing map items")
-			removeMapItems()
-		} else if (visible && opacity > 0) {
-			console.log("AreaPlanMapVisuals: Interactive and visible - adding map items")
+	onAreaPlanEditorChanged: {
+		console.log("AreaPlanMapVisuals: Area plan editor changed")
+		if (areaPlanEditor) {
 			addMapItems()
 		}
 	}
@@ -806,8 +783,7 @@ Item {
 		target: areaPlanEditor
 
 		function onAreaWidthChanged() {
-			console.log("AreaPlanMapVisuals: Area width changed, updating map items")
-			addMapItems()
+			console.log("AreaPlanMapVisuals: Area width changed")
             if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) {
                 _updatePreviewIfChanged()
                 _overlayDebounce.restart()
@@ -815,8 +791,7 @@ Item {
 		}
 
 		function onAreaHeightChanged() {
-			console.log("AreaPlanMapVisuals: Area height changed, updating map items")
-			addMapItems()
+			console.log("AreaPlanMapVisuals: Area height changed")
             if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) {
                 _updatePreviewIfChanged()
                 _overlayDebounce.restart()
@@ -824,8 +799,7 @@ Item {
 		}
 
 		function onAreaCenterChanged() {
-			console.log("AreaPlanMapVisuals: Area center changed, updating map items")
-			addMapItems()
+			console.log("AreaPlanMapVisuals: Area center changed")
             if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) {
                 _updatePreviewIfChanged()
                 _overlayDebounce.restart()
@@ -833,8 +807,7 @@ Item {
 		}
 
 		function onAreaRotationChanged() {
-			console.log("AreaPlanMapVisuals: Area rotation changed, updating map items")
-			addMapItems()
+			console.log("AreaPlanMapVisuals: Area rotation changed")
             if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) {
                 _updatePreviewIfChanged()
                 _overlayDebounce.restart()
@@ -842,9 +815,7 @@ Item {
 		}
 
 		function onLineSpacingChanged() {
-			console.log("AreaPlanMapVisuals: Line spacing changed, updating map items")
-			addGridLines()
-			addWaypointMarkers()
+			console.log("AreaPlanMapVisuals: Line spacing changed")
             if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) {
                 perDronePreview = areaPlanEditor.computePerDroneWaypointPreview()
                 addPerDroneOverlays()
@@ -852,8 +823,7 @@ Item {
 		}
 
 		function onNumPointsChanged() {
-			console.log("AreaPlanMapVisuals: Number of points changed, updating map items")
-			addWaypointMarkers()
+			console.log("AreaPlanMapVisuals: Number of points changed")
             if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) {
                 perDronePreview = areaPlanEditor.computePerDroneWaypointPreview()
                 addPerDroneOverlays()
@@ -919,7 +889,7 @@ Item {
     MouseArea {
 		id: mapAreaMouseArea
 		anchors.fill: parent
-        enabled: interactive
+        enabled: interactive && isDrawingMode  // Only enable shape manipulation in drawing mode
 		hoverEnabled: true
 		preventStealing: true
 		z: 999  // High z-order but below the rectangle MouseArea
@@ -1033,19 +1003,9 @@ Item {
 							console.log("Set default area size: 10x10 meters")
         }
 					} else {
-						// Calculate new area size based on distance from center
-						var center = areaPlanEditor.areaCenter
-						var distance = center.distanceTo(clickCoordinate)
-						var newWidth = Math.max(distance * 2, 10)
-						var newHeight = Math.max(distance * 2, 10)
-
-						// Limit maximum size
-						newWidth = Math.min(newWidth, 1000)
-						newHeight = Math.min(newHeight, 1000)
-
-						areaPlanEditor.setAreaWidth(newWidth)
-						areaPlanEditor.setAreaHeight(newHeight)
-						console.log("Updated area size:", newWidth, "x", newHeight, "meters")
+						// Move center to clicked point
+						areaPlanEditor.setAreaCenter(clickCoordinate)
+						console.log("Moved area center to:", clickCoordinate.latitude, clickCoordinate.longitude)
 					}
 				}
 			}

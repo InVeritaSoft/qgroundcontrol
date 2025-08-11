@@ -36,7 +36,7 @@ Item {
     readonly property real  _margin:                    ScreenTools.defaultFontPixelHeight * 0.5
     readonly property real  _toolsMargin:               ScreenTools.defaultFontPixelWidth * 0.75
     readonly property real  _radius:                    ScreenTools.defaultFontPixelWidth  * 0.5
-    readonly property real  _rightPanelWidth:           Math.min(width / 3, ScreenTools.defaultFontPixelWidth * 50)
+    readonly property real  _rightPanelWidth:           Math.min(width / 2.5, ScreenTools.defaultFontPixelWidth * 60)  // Increased width for better content visibility
     readonly property var   _defaultVehicleCoordinate:  QtPositioning.coordinate(37.803784, -122.462276)
     readonly property bool  _waypointsOnlyMode:         QGroundControl.corePlugin.options.missionWaypointsOnly
 
@@ -422,20 +422,15 @@ Item {
                     if (QGroundControl.areaPlanEditor) {
                         console.log("Area Plan: Map clicked at", coordinate.latitude, coordinate.longitude)
                         
-                        if (QGroundControl.areaPlanEditor.isDrawingMode) {
-                            // In drawing mode, just set the center point
-                            console.log("Area Plan: Drawing mode active - setting center point")
-                            QGroundControl.areaPlanEditor.setAreaCenter(coordinate)
-                            
-                            // Set default area size if not already set
-                            if (QGroundControl.areaPlanEditor.areaWidth <= 0 || QGroundControl.areaPlanEditor.areaHeight <= 0) {
-                                QGroundControl.areaPlanEditor.setAreaWidth(10.0)
-                                QGroundControl.areaPlanEditor.setAreaHeight(10.0)
-                                console.log("Set default area size: 10x10 meters")
-                            }
-                        } else {
-                            // Not in drawing mode, ignore clicks
-                            console.log("Area Plan: Drawing mode not active, ignoring click")
+                        // Allow shape manipulation in any state
+                        console.log("Area Plan: Map clicked at", coordinate.latitude, coordinate.longitude)
+                        QGroundControl.areaPlanEditor.setAreaCenter(coordinate)
+                        
+                        // Set default area size if not already set
+                        if (QGroundControl.areaPlanEditor.areaWidth <= 0 || QGroundControl.areaPlanEditor.areaHeight <= 0) {
+                            QGroundControl.areaPlanEditor.setAreaWidth(10.0)
+                            QGroundControl.areaPlanEditor.setAreaHeight(10.0)
+                            console.log("Set default area size: 10x10 meters")
                         }
                     }
                     break
@@ -478,9 +473,9 @@ Item {
                 id: areaPlanVisuals
                 mapControl: editorMap
                 areaPlanEditor: QGroundControl.areaPlanEditor
-                visible: _editingLayer == _layerAreaPlan
-                opacity: _editingLayer == _layerAreaPlan ? 1 : editorMap._nonInteractiveOpacity
-                z: QGroundControl.zOrderMapItems + 5
+                visible: true  // Always keep visible, use opacity for showing/hiding
+                opacity: _editingLayer == _layerAreaPlan ? 1 : 0  // Fully hide when not on area layer
+                z: QGroundControl.zOrderMapItems + 0.5  // Place shapes just above base map items but below mission elements
                 anchors.fill: parent
             }
 
