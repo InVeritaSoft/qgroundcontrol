@@ -399,6 +399,21 @@ void AreaPlanEditorTest::_waypointGenerationCountsAndPositions()
     editor->setAreaWidth(20.0);
     editor->setAreaHeight(20.0);
     editor->setLineSpacing(10.0); // 2 lines
+    editor->setNumPoints(3);
+    editor->setAreaRotation(0.0);
+
+    const QList<QVariant> wps0 = editor->generateWaypoints();
+    QCOMPARE(wps0.size(), 2 * 3);
+
+    // Validate bounds via editor's validator
+    QVERIFY(editor->validateWaypointGeneration());
+
+    // Rotate and ensure still valid and count preserved
+    editor->setAreaRotation(45.0);
+    const QList<QVariant> wpsR = editor->generateWaypoints();
+    QCOMPARE(wpsR.size(), 2 * 3);
+    QVERIFY(editor->validateWaypointGeneration());
+    editor->setLineSpacing(10.0); // 2 lines
     editor->setNumPoints(4);      // 4 points per line
     editor->setMissionAltitude(30.0);
     editor->setAreaRotation(0.0);
