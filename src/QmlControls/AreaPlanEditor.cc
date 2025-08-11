@@ -532,7 +532,61 @@ MissionController* AreaPlanEditor::getMissionController() const
 QList<QVariant> AreaPlanEditor::generateWaypoints()
 {
     QList<QVariant> waypoints;
-    // TODO: Implement waypoint generation logic
+
+    // Basic validation
+    if (_areaCenter.isValid() == false || _areaWidth <= 0 || _areaHeight <= 0 || _numPoints <= 0 || _lineSpacing <= 0) {
+        return waypoints;
+    }
+
+    // Compute number of grid lines along height (north-south axis before rotation)
+    const int lineCount = qMax(1, static_cast<int>(qFloor(_areaHeight / _lineSpacing)));
+
+    // Local helpers for geometry
+    const qreal halfW = _areaWidth * 0.5;
+    const qreal halfH = _areaHeight * 0.5;
+    const qreal theta = qDegreesToRadians(_areaRotation); // rotation: 0 = North
+    const qreal cosT = qCos(theta);
+    const qreal sinT = qSin(theta);
+
+    auto rotateXY = [&](qreal x, qreal y) {
+        // Rotate local (x,y) around origin by theta
+        return QPointF(x * cosT - y * sinT, x * sinT + y * cosT);
+    };
+
+    auto offsetByXY = [&](const QGeoCoordinate& c, qreal dx_m, qreal dy_m) {
+        // Approximate translation by dy north, then dx east
+        QGeoCoordinate tmp = calculateOffsetCoordinate(c, qAbs(dy_m), dy_m >= 0 ? 0.0 : 180.0);
+        QGeoCoordinate res = calculateOffsetCoordinate(tmp, qAbs(dx_m), dx_m >= 0 ? 90.0 : 270.0);
+        return res;
+    };
+
+    // Y coordinates for each line (evenly distributed from -halfH to +halfH)
+    for (int li = 0; li < lineCount; ++li) {
+        qreal y;
+        if (lineCount == 1) {
+            y = 0.0;
+        } else {
+            y = -halfH + (static_cast<qreal>(li) * (_areaHeight / (lineCount - 1)));
+        }
+
+        // X coordinates along width
+        for (int pi = 0; pi < _numPoints; ++pi) {
+            qreal x;
+            if (_numPoints == 1) {
+                x = 0.0;
+            } else {
+                x = -halfW + (static_cast<qreal>(pi) * (_areaWidth / (_numPoints - 1)));
+            }
+
+            // Apply rotation around center
+            const QPointF r = rotateXY(x, y);
+
+            // Convert to geo coordinate
+            const QGeoCoordinate wp = offsetByXY(_areaCenter, r.x(), r.y());
+            waypoints.append(QVariant::fromValue(wp));
+        }
+    }
+
     return waypoints;
 }
 
