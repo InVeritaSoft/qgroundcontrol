@@ -713,7 +713,55 @@ bool AreaPlanEditor::validateAreaParameters() const
 
 bool AreaPlanEditor::validateWaypointGeneration()
 {
-    // TODO: Implement waypoint generation validation
+    // Validate that generated waypoints match expected counts and lie within the rotated rectangle bounds.
+    if (_areaCenter.isValid() == false || _areaWidth <= 0 || _areaHeight <= 0 || _numPoints <= 0 || _lineSpacing <= 0) {
+        return false;
+    }
+
+    const QList<QVariant> wps = generateWaypoints();
+    const int lineCount = qMax(1, static_cast<int>(qFloor(_areaHeight / _lineSpacing)));
+    const int expectedCount = lineCount * _numPoints;
+    if (wps.size() != expectedCount) {
+        qWarning() << "Waypoint count mismatch" << wps.size() << "!=" << expectedCount;
+        return false;
+    }
+
+    // Geometry check: approximate dx,dy in meters from center, unrotate, and assert within half width/height
+    const qreal halfW = _areaWidth * 0.5;
+    const qreal halfH = _areaHeight * 0.5;
+    const qreal theta = qDegreesToRadians(_areaRotation);
+    const qreal cosT = qCos(theta);
+    const qreal sinT = qSin(theta);
+
+    auto toMeters = [&](const QGeoCoordinate& c0, const QGeoCoordinate& c1) {
+        const qreal metersPerDegreeLat = 111319.9;
+        const qreal metersPerDegreeLon = 111319.9 * qCos(qDegreesToRadians(c0.latitude()));
+        const qreal dy = (c1.latitude() - c0.latitude()) * metersPerDegreeLat; // north positive
+        const qreal dx = (c1.longitude() - c0.longitude()) * metersPerDegreeLon; // east positive
+        return QPointF(dx, dy);
+    };
+
+    auto unrotate = [&](const QPointF& p) {
+        // Apply inverse rotation by -theta to map back to local rectangle axes
+        return QPointF(p.x() *  cosT + p.y() * sinT,
+                       -p.x() * sinT + p.y() * cosT);
+    };
+
+    const qreal eps = 0.25; // meters tolerance
+    for (const QVariant& v : wps) {
+        const QGeoCoordinate wp = v.value<QGeoCoordinate>();
+        if (!wp.isValid()) {
+            qWarning() << "Invalid waypoint coordinate";
+            return false;
+        }
+        const QPointF dxy = toMeters(_areaCenter, wp);
+        const QPointF local = unrotate(dxy);
+        if (qAbs(local.x()) > halfW + eps || qAbs(local.y()) > halfH + eps) {
+            qWarning() << "Waypoint out of bounds" << local << "halfW/H" << halfW << halfH;
+            return false;
+        }
+    }
+
     return true;
 }
 

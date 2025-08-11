@@ -1997,7 +1997,7 @@
             "id": 3,
             "title": "Validate Waypoint Positioning",
             "description": "Check that generated waypoints are accurately positioned within the defined area.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [
               2
             ],
@@ -2507,7 +2507,7 @@
     ],
     "metadata": {
       "created": "2025-08-07T23:48:39.554Z",
-      "updated": "2025-08-11T23:41:59.448Z",
+      "updated": "2025-08-11T23:47:30.884Z",
       "description": "Tasks for master context"
     }
   }
