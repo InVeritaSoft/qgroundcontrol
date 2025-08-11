@@ -39,12 +39,9 @@ Item {
 	property bool showGridLines: true
 	property bool showWaypoints: true
     property bool isDragging: false
-    // Per-drone overlays
-    property var perDronePreview: (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) ? areaPlanEditor.computePerDroneWaypointPreview() : []
-    property var droneVisibility: new Array(perDronePreview ? perDronePreview.length : 0).fill(true)
-    // Robust color palette (fallback to hex constants to avoid undefined warnings)
-    readonly property var _seriesColors: [
-        (qgcPal && qgcPal.buttonHighlight) || "#FF9800",  // orange
+    // Waypoint visualization colors
+    readonly property var droneColors: [
+        "#FF9800",  // orange
         "#1E88E5",  // blue
         "#8E24AA",  // purple
         "#43A047",  // green
@@ -53,9 +50,9 @@ Item {
         "#FDD835",  // yellow
         "#EC407A"   // pink
     ]
-    // Cache to avoid unnecessary preview recompute
-    property string _lastPreviewKey: ""
-    property var _lastPreviewData: []
+    readonly property color waypointBorderColor: "#FFFFFF"  // white
+    readonly property real waypointBaseSize: ScreenTools.defaultFontPixelHeight * 1.5
+    readonly property real waypointLabelSize: ScreenTools.defaultFontPixelHeight * 0.8
 
     function _makePreviewKey() {
         if (!areaPlanEditor) return "";
@@ -208,7 +205,8 @@ Item {
 			color: interiorColor
 			border.color: borderColor
 			border.width: borderWidth
-			opacity: interiorOpacity
+			opacity: areaPlanEditor && areaPlanEditor.areaCenter.isValid && areaPlanEditor.areaWidth > 0 && areaPlanEditor.areaHeight > 0 ? interiorOpacity : 0
+			visible: areaPlanEditor && areaPlanEditor.areaCenter.isValid && areaPlanEditor.areaWidth > 0 && areaPlanEditor.areaHeight > 0
 			z: _zorderRectangle
 
 			// Debug: Add console logging to track polygon updates
@@ -454,28 +452,69 @@ Item {
 			anchorPoint.x: sourceItem.width / 2
 			anchorPoint.y: sourceItem.height / 2
 
-            sourceItem: Rectangle {
-				width: ScreenTools.defaultFontPixelHeight * 1.5
-				height: width
-				radius: width / 2
-                color: (qgcPal && qgcPal.colorGreen) ? qgcPal.colorGreen : "#43A047"
-                border.color: (qgcPal && qgcPal.text) ? qgcPal.text : "#FFFFFF"
-				border.width: Math.max(1, Math.round(ScreenTools.defaultFontPixelWidth * 0.5))
+            sourceItem: Item {
+                width: waypointBaseSize
+                height: width
 
-				// Add a small dot in the center
-				Rectangle {
-					anchors.centerIn: parent
-					width: parent.width * 0.4
-					height: width
-					radius: width / 2
-					color: qgcPal.text
-				}
+                // Main waypoint circle
+                Rectangle {
+                    id: waypointCircle
+                    anchors.fill: parent
+                    radius: width / 2
+                    color: droneColors[Math.min(droneIndex, droneColors.length - 1)]
+                    border.color: waypointBorderColor
+                    border.width: Math.max(2, Math.round(ScreenTools.defaultFontPixelWidth * 0.5))
+                    opacity: 0.8
 
-				// Smooth scale animation
-				Behavior on scale {
-					NumberAnimation { duration: 150 }
-				}
-			}
+                    // Inner ring showing altitude band
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: parent.width * 0.6
+                        height: width
+                        radius: width / 2
+                        color: "transparent"
+                        border.color: waypointBorderColor
+                        border.width: 1
+                        opacity: 0.6
+
+                        // Altitude indicator
+                        Rectangle {
+                            anchors.centerIn: parent
+                            width: parent.width * 0.8
+                            height: width
+                            radius: width / 2
+                            color: Qt.darker(droneColors[Math.min(droneIndex, droneColors.length - 1)], 1.3)
+                            opacity: 0.4
+                        }
+                    }
+
+                    // Drone index label
+                    Text {
+                        anchors.centerIn: parent
+                        text: (droneIndex + 1).toString()
+                        color: waypointBorderColor
+                        font.pixelSize: waypointLabelSize
+                        font.bold: true
+                        style: Text.Outline
+                        styleColor: "black"
+                    }
+
+                    // Smooth scale animation
+                    Behavior on scale {
+                        NumberAnimation { duration: 150 }
+                    }
+
+                    // Hover effect
+                    states: State {
+                        name: "hover"
+                        PropertyChanges {
+                            target: waypointCircle
+                            scale: 1.2
+                            opacity: 1.0
+                        }
+                    }
+                }
+            }
 		}
 	}
 
@@ -601,13 +640,20 @@ Item {
 		// Clear existing items first to prevent duplication
 		removeMapItems()
 
-		// Only add items if we have valid data
-		if (!areaPlanEditor || !areaPlanEditor.areaCenter.isValid || rectangleCorners.length < 3) {
-			console.log("AreaPlanMapVisuals: Skipping map item creation - invalid data")
-			console.log("  areaPlanEditor:", !!areaPlanEditor)
-			console.log("  areaCenter valid:", areaPlanEditor ? areaPlanEditor.areaCenter.isValid : false)
-			console.log("  rectangleCorners length:", rectangleCorners.length)
+		// Create items even with minimal valid data to ensure immediate visibility
+		if (!areaPlanEditor) {
+			console.log("AreaPlanMapVisuals: Skipping map item creation - no editor")
 			return
+		}
+		
+		// Always create the area rectangle - it will auto-hide when invalid
+		var areaRect = _objMgrRectangle.createObject(areaRectangleComponent, mapControl, true)
+		console.log("Area rectangle created:", !!areaRect)
+		
+		// Create center marker if we have a valid center
+		if (areaPlanEditor.areaCenter.isValid) {
+			var centerMarker = _objMgrCenterMarker.createObject(centerMarkerComponent, mapControl, true)
+			console.log("Center marker created:", !!centerMarker)
 		}
 
 		// Create area rectangle
@@ -668,19 +714,35 @@ Item {
 		// Remove existing waypoint markers first
 		removeWaypointMarkers()
 
-		console.log("AreaPlanMapVisuals: Creating", waypointPositions.length, "waypoint markers")
+		if (!areaPlanEditor || !areaPlanEditor.computePerDroneWaypointPreview) {
+			console.log("AreaPlanMapVisuals: No editor or preview function available")
+			return
+		}
 
-		// Create new waypoint markers based on current parameters
-		for (var i = 0; i < waypointPositions.length; i++) {
-			var waypointData = waypointPositions[i]
-			var waypointMarker = _objMgrWaypointMarkers.createObject(waypointMarkerComponent, mapControl, true)
-			if (waypointMarker) {
-				waypointMarker.coordinate = waypointData.coordinate
-				console.log("AreaPlanMapVisuals: Created waypoint marker", i, "at:", waypointData.coordinate.latitude, waypointData.coordinate.longitude)
-				console.log("AreaPlanMapVisuals: Marker coordinate valid:", waypointData.coordinate.isValid)
-				console.log("AreaPlanMapVisuals: Marker visible:", waypointMarker.visible)
-			} else {
-				console.log("AreaPlanMapVisuals: Failed to create waypoint marker", i)
+		// Get per-drone waypoint data
+		var perDroneData = areaPlanEditor.computePerDroneWaypointPreview()
+		console.log("AreaPlanMapVisuals: Creating waypoints for", perDroneData.length, "drones")
+
+		// Create waypoint markers for each drone
+		for (var droneIndex = 0; droneIndex < perDroneData.length; droneIndex++) {
+			var droneData = perDroneData[droneIndex]
+			var waypoints = droneData.waypoints || []
+			var altOffset = droneData.altitudeOffsetM || 0
+
+			console.log("AreaPlanMapVisuals: Creating", waypoints.length, "waypoints for drone", droneIndex)
+
+			for (var i = 0; i < waypoints.length; i++) {
+				var waypointMarker = _objMgrWaypointMarkers.createObject(waypointMarkerComponent, mapControl, true)
+				if (waypointMarker) {
+					waypointMarker.coordinate = waypoints[i]
+					waypointMarker.droneIndex = droneIndex
+					waypointMarker.altitudeOffset = altOffset
+					console.log("AreaPlanMapVisuals: Created waypoint", i, "for drone", droneIndex, 
+						"at:", waypoints[i].latitude, waypoints[i].longitude, 
+						"alt:", waypoints[i].altitude)
+				} else {
+					console.log("AreaPlanMapVisuals: Failed to create waypoint marker", i, "for drone", droneIndex)
+				}
 			}
 		}
 
@@ -692,75 +754,7 @@ Item {
 		_objMgrWaypointMarkers.destroyObjects()
 	}
 
-    // Per-drone overlays creation
-    function addPerDroneOverlays() {
-        var t0 = Date.now()
-        // Initialize object arrays to match drone count
-        if (!_perDroneMarkerObjects || _perDroneMarkerObjects.length !== (perDronePreview ? perDronePreview.length : 0)) {
-            // Clean old
-            removePerDroneOverlays()
-            _perDroneMarkerObjects = []
-            for (var k = 0; k < (perDronePreview ? perDronePreview.length : 0); k++) _perDroneMarkerObjects.push([])
-        }
-
-        var totalCreated = 0, totalUpdated = 0, totalDestroyed = 0
-
-        // For each drone group
-        if (!perDronePreview || perDronePreview.length === 0) {
-            console.log("AreaPlanMapVisuals: no per-drone preview; clearing overlays")
-            removePerDroneOverlays()
-            return
-        }
-
-        for (var d = 0; d < perDronePreview.length; d++) {
-            var color = _seriesColors[(d % _seriesColors.length)] || "#00FF00"
-            var wps = droneVisibility[d] ? (perDronePreview[d].waypoints || []) : []
-            var arr = _perDroneMarkerObjects[d]
-            // Ensure enough objects
-            for (var i = 0; i < wps.length; i++) {
-                var obj
-                if (i < arr.length) {
-                    obj = arr[i]
-                    if (obj) {
-                        obj.coordinate = wps[i]
-                        if (obj.sourceItem) obj.sourceItem.color = color
-                        totalUpdated++
-                    }
-                } else {
-                    obj = _objMgrPerDroneMarkers.createObject(waypointMarkerComponent, mapControl, true)
-                    if (obj) {
-                        obj.coordinate = wps[i]
-                        if (obj.sourceItem) obj.sourceItem.color = color
-                        arr.push(obj)
-                        totalCreated++
-                    }
-                }
-            }
-            // Destroy extras
-            for (var j = wps.length; j < arr.length; j++) {
-                if (arr[j] && arr[j].destroy) {
-                    arr[j].destroy()
-                    totalDestroyed++
-                }
-            }
-            if (arr.length > wps.length) arr.length = wps.length
-        }
-        console.log("AreaPlanMapVisuals: overlays updated in", (Date.now()-t0), "ms; created:", totalCreated, "updated:", totalUpdated, "destroyed:", totalDestroyed)
-    }
-
-    function removePerDroneOverlays() {
-        _objMgrPerDroneGrid.destroyObjects()
-        _objMgrPerDroneMarkers.destroyObjects()
-        if (_perDroneMarkerObjects) {
-            for (var d = 0; d < _perDroneMarkerObjects.length; d++) {
-                var arr = _perDroneMarkerObjects[d]
-                for (var i = 0; i < arr.length; i++) {
-                    if (arr[i] && arr[i].destroy) arr[i].destroy()
-                }
-            }
-            _perDroneMarkerObjects = []
-        }
-    }
+    // Placeholder for future swarm-related functions
 
 	function removeMapItems() {
 		console.log("AreaPlanMapVisuals: Removing all map items")
@@ -955,23 +949,45 @@ Item {
 		}
 
         onPressed: function(mouse) {
-			console.log("Map area pressed - setting isDragging to true")
-			console.log("Map area MouseArea - enabled:", enabled, "interactive:", interactive, "isDrawingMode:", isDrawingMode)
-			console.log("Mouse position:", mouse.x, mouse.y)
-			startPos = Qt.point(mouse.x, mouse.y)
-			startCenter = areaPlanEditor ? areaPlanEditor.areaCenter : null
-			isDragging = true
-			hasMoved = false
-			console.log("Map area isDragging set to:", isDragging)
-			// Get the coordinate at the press position
-            if (mapControl) {
+            console.log("Map area pressed")
+            console.log("Map area MouseArea - enabled:", enabled, "interactive:", interactive, "isDrawingMode:", isDrawingMode)
+            console.log("Mouse position:", mouse.x, mouse.y)
+            
+            if (mapControl && areaPlanEditor) {
+                // Get click coordinate
                 var p = mapAreaMouseArea.mapToItem(mapControl, mouse.x, mouse.y)
-                startCoordinate = mapControl.toCoordinate(Qt.point(p.x, p.y), false)
-				console.log("Map area drag started at coordinate:", startCoordinate.latitude, startCoordinate.longitude)
-			} else {
-				console.log("ERROR: mapControl is null!")
+                var clickCoordinate = mapControl.toCoordinate(Qt.point(p.x, p.y), false)
+                
+                if (clickCoordinate.isValid) {
+                    console.log("Map area clicked at coordinate:", clickCoordinate.latitude, clickCoordinate.longitude)
+                    
+                    // Always set the center immediately on first click
+                    if (!areaPlanEditor.areaCenter.isValid ||
+                        (Math.abs(areaPlanEditor.areaCenter.latitude) < 0.001 && Math.abs(areaPlanEditor.areaCenter.longitude) < 0.001) ||
+                        areaPlanEditor.areaWidth <= 0 || areaPlanEditor.areaHeight <= 0) {
+                        
+                        areaPlanEditor.setAreaCenter(clickCoordinate)
+                        console.log("Area center set to:", clickCoordinate.latitude, clickCoordinate.longitude)
+                        
+                        // Set default area size if not already set
+                        if (areaPlanEditor.areaWidth <= 0 || areaPlanEditor.areaHeight <= 0) {
+                            areaPlanEditor.setAreaWidth(10.0)
+                            areaPlanEditor.setAreaHeight(10.0)
+                            console.log("Set default area size: 10x10 meters")
+                        }
+                    }
+                }
+                
+                // Store start position for potential dragging
+                startPos = Qt.point(mouse.x, mouse.y)
+                startCenter = areaPlanEditor.areaCenter
+                startCoordinate = clickCoordinate
+                isDragging = true
+                hasMoved = false
+            } else {
+                console.log("ERROR: mapControl or areaPlanEditor is null!")
+            }
         }
-		}
 
         onPositionChanged: function(mouse) {
 			if (pressed && areaPlanEditor && mapControl) {

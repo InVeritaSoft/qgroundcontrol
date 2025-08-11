@@ -439,10 +439,16 @@ QVariantList AreaPlanEditor::computePerDroneWaypointPreview() const
         return calculateOffsetCoordinate(origin, meters, bearingDeg);
     };
     auto toGeo = [&](double localX, double localY) -> QGeoCoordinate {
-        // localX: + to east, localY: + to north in meters after rotation already applied
-        QGeoCoordinate northShift = offsetMeters(_areaCenter, localY, 0.0);
-        QGeoCoordinate eastShift  = offsetMeters(northShift,   localX, 90.0);
-        return eastShift;
+        // Convert local coordinates to distance and bearing from center
+        // Note: rotation is already applied to localX/Y by splitIntoStripes
+        const double distance = qSqrt(localX * localX + localY * localY);
+        if (distance < 0.01) return _areaCenter; // Return center if too close to avoid precision issues
+        
+        // Calculate bearing from center (atan2 gives angle from north, clockwise)
+        const double bearing = qRadiansToDegrees(qAtan2(localX, localY));
+        
+        // Calculate final position in one step from center
+        return calculateOffsetCoordinate(_areaCenter, distance, bearing);
     };
 
     for (int d = 0; d < static_cast<int>(rr.size()); ++d) {
@@ -492,9 +498,16 @@ QVariantList AreaPlanEditor::generatePerDroneWaypoints(int droneIndex) const
     const auto stripes = AreaPlan::splitIntoStripes(cx, cy, _areaWidth, _areaHeight, lineCount, alongShortAxis, _areaRotation);
 
     auto toGeo = [&](double localX, double localY) -> QGeoCoordinate {
-        QGeoCoordinate northShift = calculateOffsetCoordinate(_areaCenter, localY, 0.0);
-        QGeoCoordinate eastShift  = calculateOffsetCoordinate(northShift,   localX, 90.0);
-        return eastShift;
+        // Convert local coordinates to distance and bearing from center
+        // Note: rotation is already applied to localX/Y by splitIntoStripes
+        const double distance = qSqrt(localX * localX + localY * localY);
+        if (distance < 0.01) return _areaCenter; // Return center if too close to avoid precision issues
+        
+        // Calculate bearing from center (atan2 gives angle from north, clockwise)
+        const double bearing = qRadiansToDegrees(qAtan2(localX, localY));
+        
+        // Calculate final position in one step from center
+        return calculateOffsetCoordinate(_areaCenter, distance, bearing);
     };
 
     const qreal altOffset = _altitudeBandStart + droneIndex * _altitudeBandStep;
@@ -1076,17 +1089,614 @@ void AreaPlanEditor::uploadPerDroneMissionToVehicle(int droneIndex, QObject* veh
     qDeleteAll(missionItems);
 }
 
-void AreaPlanEditor::startMission()
+QVariantList AreaPlanEditor::getAvailableVehicles() const
 {
-    Vehicle* vehicle = getCurrentVehicle();
-    if (!vehicle) {
-        updateStatus(QStringLiteral("No vehicle connected"));
-        return;
+    QVariantList vehicles;
+    QList<Vehicle*> connectedVehicles = QGroundControl::multiVehicleManager()->vehicles();
+    
+    for (Vehicle* vehicle : connectedVehicles) {
+        QVariantMap vehicleInfo;
+        vehicleInfo["id"] = vehicle->id();
+        vehicleInfo["name"] = QString("Vehicle %1").arg(vehicle->id());
+        vehicleInfo["isActive"] = (vehicle == getCurrentVehicle());
+        vehicles.append(vehicleInfo);
     }
     
-    // Set vehicle to AUTO mode to start the mission
-    // This is a simplified implementation - in a real scenario, you'd use proper MAVLink commands
-    updateStatus(QStringLiteral("Mission started (set vehicle to AUTO mode)"));
+    return vehicles;
+}
+
+void AreaPlanEditor::uploadToAllDrones()
+{
+    startProgress(QStringLiteral("Multi-Drone Upload"), QStringLiteral("Preparing mission upload..."));
+
+    // Validate parameters
+    if (!validateAreaParameters()) {
+        cancelProgress();
+        handleError(QStringLiteral("Invalid area parameters"), QStringLiteral("Please check parameters and try again"));
+        return;
+    }
+
+    // Get available vehicles
+    QList<Vehicle*> vehicles = QGroundControl::multiVehicleManager()->vehicles();
+    if (vehicles.isEmpty()) {
+        cancelProgress();
+        handleError(QStringLiteral("No vehicles connected"), QStringLiteral("Please connect drones and try again"));
+        return;
+    }
+
+    // Check if we have enough vehicles for the mission
+    if (vehicles.size() < _droneCount) {
+        cancelProgress();
+        handleError(QStringLiteral("Not enough vehicles"), 
+                   QStringLiteral("Need %1 drones but only %2 connected").arg(_droneCount).arg(vehicles.size()));
+        return;
+    }
+
+    // Track upload progress for each drone
+    struct DroneUploadStatus {
+        bool completed = false;
+        bool success = false;
+        QString error;
+    };
+    QMap<int, DroneUploadStatus> uploadStatus;
+    for (int i = 0; i < _droneCount; i++) {
+        uploadStatus[i] = DroneUploadStatus();
+    }
+
+    // Function to check if all uploads are complete
+    auto checkAllComplete = [&uploadStatus]() -> bool {
+        for (const auto& status : uploadStatus) {
+            if (!status.completed) return false;
+        }
+        return true;
+    };
+
+    // Function to check if any upload failed
+    auto checkAnyFailed = [&uploadStatus]() -> bool {
+        for (const auto& status : uploadStatus) {
+            if (status.completed && !status.success) return true;
+        }
+        return false;
+    };
+
+    // Upload to each drone in parallel
+    for (int droneIndex = 0; droneIndex < _droneCount && droneIndex < vehicles.size(); droneIndex++) {
+        Vehicle* vehicle = vehicles[droneIndex];
+        
+        // Generate waypoints for this drone
+        QVariantList wps = generatePerDroneWaypoints(droneIndex);
+        if (wps.isEmpty()) {
+            uploadStatus[droneIndex].completed = true;
+            uploadStatus[droneIndex].success = false;
+            uploadStatus[droneIndex].error = QStringLiteral("No waypoints generated");
+            continue;
+        }
+
+        // Build mission items
+        QList<MissionItem*> missionItems;
+        int seq = 0;
+
+        // Add takeoff command
+        MissionItem* takeoff = new MissionItem(seq++, MAV_CMD_NAV_TAKEOFF, MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                             0, 0, 0, 0,
+                                             _homeLocation.latitude(), _homeLocation.longitude(), _missionAltitude,
+                                             true, false, this);
+        missionItems.append(takeoff);
+
+        // Add waypoints with altitude offset
+        const qreal altOffset = _altitudeBandStart + droneIndex * _altitudeBandStep;
+        for (const QVariant& v : wps) {
+            QGeoCoordinate c = v.value<QGeoCoordinate>();
+            c.setAltitude(_missionAltitude + altOffset);
+            MissionItem* wp = new MissionItem(seq++, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                            0, 0, 0, 0,
+                                            c.latitude(), c.longitude(), c.altitude(),
+                                            true, false, this);
+            missionItems.append(wp);
+        }
+
+        // Add RTL command
+        MissionItem* rtl = new MissionItem(seq++, MAV_CMD_NAV_RETURN_TO_LAUNCH, MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                         0, 0, 0, 0, 0, 0, 0,
+                                         true, false, this);
+        missionItems.append(rtl);
+
+        // Get mission manager
+        MissionManager* missionManager = vehicle->missionManager();
+        if (!missionManager) {
+            uploadStatus[droneIndex].completed = true;
+            uploadStatus[droneIndex].success = false;
+            uploadStatus[droneIndex].error = QStringLiteral("Mission manager unavailable");
+            qDeleteAll(missionItems);
+            continue;
+        }
+
+        // Connect progress handler
+        QObject::connect(missionManager, &PlanManager::progressPctChanged, this, 
+            [this, droneIndex](double pct) {
+                updateProgress(static_cast<int>((droneIndex * 100 + pct) / _droneCount), 
+                             QStringLiteral("Uploading drone %1 (%2%)...").arg(droneIndex + 1).arg(static_cast<int>(pct)));
+            }, Qt::UniqueConnection);
+
+        // Connect error handler
+        QObject::connect(missionManager, &PlanManager::error, this,
+            [this, droneIndex, &uploadStatus](int /*code*/, const QString& errorMsg) {
+                uploadStatus[droneIndex].completed = true;
+                uploadStatus[droneIndex].success = false;
+                uploadStatus[droneIndex].error = errorMsg;
+
+                if (checkAllComplete()) {
+                    if (checkAnyFailed()) {
+                        cancelProgress();
+                        handleError(QStringLiteral("Some uploads failed"), QStringLiteral("Check individual drone status"));
+                    } else {
+                        finishProgress(QStringLiteral("All missions uploaded successfully"));
+                    }
+                }
+            }, Qt::UniqueConnection);
+
+        // Connect completion handler
+        QObject::connect(missionManager, &PlanManager::sendComplete, this,
+            [this, droneIndex, &uploadStatus](bool error) {
+                uploadStatus[droneIndex].completed = true;
+                uploadStatus[droneIndex].success = !error;
+
+                if (checkAllComplete()) {
+                    if (checkAnyFailed()) {
+                        cancelProgress();
+                        handleError(QStringLiteral("Some uploads failed"), QStringLiteral("Check individual drone status"));
+                    } else {
+                        finishProgress(QStringLiteral("All missions uploaded successfully"));
+                    }
+                }
+            }, Qt::UniqueConnection);
+
+        // Start upload
+        missionManager->writeMissionItems(missionItems);
+        qDeleteAll(missionItems);
+    }
+}
+
+bool AreaPlanEditor::isSwarmReady() const
+{
+    return checkSwarmReadiness();
+}
+
+QString AreaPlanEditor::swarmStatus() const
+{
+    return _swarmStatus;
+}
+
+bool AreaPlanEditor::isCoordinatedMissionActive() const
+{
+    return _isCoordinatedMissionActive;
+}
+
+bool AreaPlanEditor::checkSwarmReadiness() const
+{
+    QList<Vehicle*> vehicles = QGroundControl::multiVehicleManager()->vehicles();
+    if (vehicles.isEmpty() || vehicles.size() < _droneCount) {
+        return false;
+    }
+
+    // Check each vehicle's status
+    for (Vehicle* vehicle : vehicles) {
+        if (!vehicle) continue;
+        
+        // Check if vehicle is armed and ready
+        if (!vehicle->armed() || !vehicle->homePositionAvailable()) {
+            return false;
+        }
+        
+        // Check if vehicle has a valid mission
+        MissionManager* missionManager = vehicle->missionManager();
+        if (!missionManager || missionManager->isEmpty()) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void AreaPlanEditor::updateSwarmStatus(const QString& status)
+{
+    if (_swarmStatus != status) {
+        _swarmStatus = status;
+        emit swarmStatusChanged();
+    }
+}
+
+void AreaPlanEditor::sendSwarmCommand(uint16_t command, const QList<Vehicle*>& vehicles)
+{
+    for (Vehicle* vehicle : vehicles) {
+        if (!vehicle) continue;
+
+        // Send command to each vehicle
+        vehicle->sendMavCommand(
+            MAV_COMP_ID_AUTOPILOT1,    // Target component
+            command,                    // Command ID
+            true,                      // Show error
+            0, 0, 0, 0, 0, 0, 0       // Parameters (all 0 for basic commands)
+        );
+    }
+}
+
+void AreaPlanEditor::handleSwarmResponse(Vehicle* vehicle, uint16_t command, uint8_t result)
+{
+    if (!vehicle) return;
+
+    // Update vehicle ready status
+    _vehicleReadyStatus[vehicle->id()] = (result == MAV_RESULT_ACCEPTED);
+
+    // Check if all vehicles have responded
+    bool allReady = true;
+    for (auto it = _vehicleReadyStatus.constBegin(); it != _vehicleReadyStatus.constEnd(); ++it) {
+        if (!it.value()) {
+            allReady = false;
+            break;
+        }
+    }
+
+    // Update status based on responses
+    if (allReady) {
+        updateSwarmStatus(QStringLiteral("All vehicles ready"));
+    } else {
+        updateSwarmStatus(QStringLiteral("Waiting for vehicle responses..."));
+    }
+}
+
+bool AreaPlanEditor::startCoordinatedTakeoff()
+{
+    if (!checkSwarmReadiness()) {
+        updateSwarmStatus(QStringLiteral("Swarm not ready for takeoff"));
+        return false;
+    }
+
+    QList<Vehicle*> vehicles = QGroundControl::multiVehicleManager()->vehicles();
+    _vehicleReadyStatus.clear();
+
+    // Initialize ready status for all vehicles
+    for (Vehicle* vehicle : vehicles) {
+        if (vehicle) {
+            _vehicleReadyStatus[vehicle->id()] = false;
+        }
+    }
+
+    // Send takeoff command to all vehicles
+    sendSwarmCommand(MAV_CMD_NAV_TAKEOFF, vehicles);
+    updateSwarmStatus(QStringLiteral("Initiating coordinated takeoff..."));
+
+    return true;
+}
+
+bool AreaPlanEditor::startCoordinatedMission()
+{
+    if (!checkSwarmReadiness()) {
+        updateSwarmStatus(QStringLiteral("Swarm not ready for mission start"));
+        return false;
+    }
+
+    QList<Vehicle*> vehicles = QGroundControl::multiVehicleManager()->vehicles();
+    _vehicleReadyStatus.clear();
+
+    // Initialize ready status for all vehicles
+    for (Vehicle* vehicle : vehicles) {
+        if (vehicle) {
+            _vehicleReadyStatus[vehicle->id()] = false;
+            
+            // Set to AUTO mode to start mission
+            vehicle->setFlightMode(QGroundControl::modeAuto);
+        }
+    }
+
+    _isCoordinatedMissionActive = true;
+    emit coordinatedMissionStatusChanged();
+    updateSwarmStatus(QStringLiteral("Coordinated mission started"));
+
+    return true;
+}
+
+bool AreaPlanEditor::abortCoordinatedMission()
+{
+    QList<Vehicle*> vehicles = QGroundControl::multiVehicleManager()->vehicles();
+    
+    // Send RTL command to all vehicles
+    sendSwarmCommand(MAV_CMD_NAV_RETURN_TO_LAUNCH, vehicles);
+    
+    _isCoordinatedMissionActive = false;
+    emit coordinatedMissionStatusChanged();
+    updateSwarmStatus(QStringLiteral("Mission aborted - returning to launch"));
+
+    return true;
+}
+
+FormationType AreaPlanEditor::currentFormation() const
+{
+    return _currentFormation;
+}
+
+qreal AreaPlanEditor::formationSpacing() const
+{
+    return _formationSpacing;
+}
+
+bool AreaPlanEditor::isFormationTransitioning() const
+{
+    return _isFormationTransitioning;
+}
+
+void AreaPlanEditor::setFormationSpacing(qreal spacing)
+{
+    if (qFuzzyCompare(_formationSpacing, spacing)) return;
+    
+    _formationSpacing = spacing;
+    emit formationSpacingChanged();
+    
+    if (_currentFormation != NoFormation) {
+        calculateFormationPositions();
+        updateFormationOffsets();
+    }
+}
+
+bool AreaPlanEditor::setFormationType(FormationType type)
+{
+    if (!checkSwarmReadiness()) {
+        updateSwarmStatus(QStringLiteral("Swarm not ready for formation change"));
+        return false;
+    }
+    
+    if (_currentFormation == type) return true;
+    
+    _currentFormation = type;
+    emit formationChanged();
+    
+    if (type != NoFormation) {
+        calculateFormationPositions();
+        updateFormationOffsets();
+        return startFormationTransition();
+    }
+    
+    return true;
+}
+
+bool AreaPlanEditor::assignFormationRoles()
+{
+    QList<Vehicle*> vehicles = QGroundControl::multiVehicleManager()->vehicles();
+    if (vehicles.isEmpty()) return false;
+    
+    // Clear existing roles
+    _formationRoles.clear();
+    
+    // Select leader (use first vehicle for now)
+    _leaderVehicle = vehicles.first();
+    emit leaderVehicleChanged();
+    
+    // Assign roles to followers
+    int roleIndex = 1;
+    for (Vehicle* vehicle : vehicles) {
+        if (vehicle == _leaderVehicle) {
+            _formationRoles[vehicle->id()] = 0;  // Leader is role 0
+        } else {
+            _formationRoles[vehicle->id()] = roleIndex++;
+        }
+    }
+    
+    emit formationRolesChanged();
+    return true;
+}
+
+void AreaPlanEditor::calculateFormationPositions()
+{
+    QList<Vehicle*> vehicles = QGroundControl::multiVehicleManager()->vehicles();
+    if (vehicles.isEmpty()) return;
+    
+    _formationOffsets.clear();
+    
+    switch (_currentFormation) {
+        case VFormation:
+            // V formation with leader at front
+            for (Vehicle* vehicle : vehicles) {
+                int role = _formationRoles[vehicle->id()];
+                if (role == 0) {
+                    // Leader at front
+                    _formationOffsets[vehicle->id()] = QGeoCoordinate();
+                } else {
+                    // Followers in V shape
+                    bool isLeft = (role % 2 == 1);
+                    int position = (role + 1) / 2;
+                    double angle = isLeft ? 30.0 : -30.0;  // 30-degree V shape
+                    double distance = position * _formationSpacing;
+                    
+                    // Calculate offset using trigonometry
+                    double dx = distance * qSin(qDegreesToRadians(angle));
+                    double dy = -distance * qCos(qDegreesToRadians(angle));
+                    
+                    QGeoCoordinate offset = calculateOffsetCoordinate(QGeoCoordinate(), dy, 0.0);
+                    offset = calculateOffsetCoordinate(offset, dx, 90.0);
+                    _formationOffsets[vehicle->id()] = offset;
+                }
+            }
+            break;
+            
+        case LineFormation:
+            // Line formation with equal spacing
+            for (Vehicle* vehicle : vehicles) {
+                int role = _formationRoles[vehicle->id()];
+                if (role == 0) {
+                    _formationOffsets[vehicle->id()] = QGeoCoordinate();
+                } else {
+                    double offset = role * _formationSpacing;
+                    _formationOffsets[vehicle->id()] = calculateOffsetCoordinate(QGeoCoordinate(), 0.0, offset);
+                }
+            }
+            break;
+            
+        case CircleFormation:
+            // Circle formation with equal angular spacing
+            int totalVehicles = vehicles.size();
+            for (Vehicle* vehicle : vehicles) {
+                int role = _formationRoles[vehicle->id()];
+                if (role == 0) {
+                    _formationOffsets[vehicle->id()] = QGeoCoordinate();
+                } else {
+                    double angle = (360.0 * role) / totalVehicles;
+                    double dx = _formationSpacing * qSin(qDegreesToRadians(angle));
+                    double dy = _formationSpacing * qCos(qDegreesToRadians(angle));
+                    
+                    QGeoCoordinate offset = calculateOffsetCoordinate(QGeoCoordinate(), dy, 0.0);
+                    offset = calculateOffsetCoordinate(offset, dx, 90.0);
+                    _formationOffsets[vehicle->id()] = offset;
+                }
+            }
+            break;
+            
+        case GridFormation:
+            // Grid formation with equal spacing
+            int gridSize = qCeil(qSqrt(vehicles.size()));
+            for (Vehicle* vehicle : vehicles) {
+                int role = _formationRoles[vehicle->id()];
+                if (role == 0) {
+                    _formationOffsets[vehicle->id()] = QGeoCoordinate();
+                } else {
+                    int row = role / gridSize;
+                    int col = role % gridSize;
+                    double dx = col * _formationSpacing;
+                    double dy = row * _formationSpacing;
+                    
+                    QGeoCoordinate offset = calculateOffsetCoordinate(QGeoCoordinate(), dy, 0.0);
+                    offset = calculateOffsetCoordinate(offset, dx, 90.0);
+                    _formationOffsets[vehicle->id()] = offset;
+                }
+            }
+            break;
+            
+        case NoFormation:
+        default:
+            break;
+    }
+}
+
+void AreaPlanEditor::updateFormationOffsets()
+{
+    if (!_leaderVehicle) return;
+    
+    QGeoCoordinate leaderPos = _leaderVehicle->coordinate();
+    QList<Vehicle*> vehicles = QGroundControl::multiVehicleManager()->vehicles();
+    
+    for (Vehicle* vehicle : vehicles) {
+        if (vehicle == _leaderVehicle) continue;
+        
+        QGeoCoordinate offset = _formationOffsets[vehicle->id()];
+        QGeoCoordinate targetPos = calculateOffsetCoordinate(leaderPos, offset.latitude(), 0.0);
+        targetPos = calculateOffsetCoordinate(targetPos, offset.longitude(), 90.0);
+        
+        // Send position command to vehicle
+        vehicle->sendMavCommand(
+            MAV_COMP_ID_AUTOPILOT1,
+            MAV_CMD_DO_SET_POSITION_TARGET_GLOBAL_INT,
+            true,  // show error
+            MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
+            0b0000111111111000,  // Use position and yaw
+            targetPos.latitude() * 1e7,   // lat (degE7)
+            targetPos.longitude() * 1e7,  // lon (degE7)
+            targetPos.altitude(),         // alt (m)
+            0, 0, 0,                     // velocity
+            0, 0, 0,                     // acceleration
+            0, 0                         // yaw, yaw rate
+        );
+    }
+}
+
+bool AreaPlanEditor::startFormationTransition()
+{
+    if (!checkSwarmReadiness()) return false;
+    
+    _isFormationTransitioning = true;
+    emit formationTransitioningChanged();
+    
+    // Start position updates
+    updateFormationOffsets();
+    
+    // Monitor formation convergence (simplified)
+    QTimer::singleShot(5000, this, [this]() {
+        _isFormationTransitioning = false;
+        emit formationTransitioningChanged();
+        updateSwarmStatus(QStringLiteral("Formation transition completed"));
+    });
+    
+    return true;
+}
+
+void AreaPlanEditor::startMission()
+{
+    // Use the new coordinated mission start
+    if (startCoordinatedMission()) {
+        updateStatus(QStringLiteral("Coordinated mission started successfully"));
+    } else {
+        updateStatus(QStringLiteral("Failed to start coordinated mission - check swarm status"));
+    }
+}
+
+QVariantMap AreaPlanEditor::getDroneAllocationStats(int droneIndex) const
+{
+    QVariantMap stats;
+    
+    // Get waypoints and assignments
+    QVariantList wps = generatePerDroneWaypoints(droneIndex);
+    const auto assignments = computeDroneAssignments();
+    QVariantMap assignment;
+    for (const QVariant& a : assignments) {
+        QVariantMap m = a.toMap();
+        if (m["droneIndex"].toInt() == droneIndex) {
+            assignment = m;
+            break;
+        }
+    }
+    
+    // Basic stats
+    stats["waypointCount"] = wps.size();
+    stats["lineCount"] = assignment["lineIndices"].toList().size();
+    stats["altitudeOffset"] = assignment["altitudeOffsetM"].toDouble();
+    stats["timeOffset"] = assignment["timeOffsetS"].toDouble();
+    
+    // Calculate area and distances
+    qreal totalDistance = 0.0;
+    qreal lineLength = _areaWidth;  // Each line spans the area width
+    qreal areaSize = 0.0;
+    
+    if (!wps.isEmpty()) {
+        QGeoCoordinate prevPos;
+        bool isFirst = true;
+        
+        for (const QVariant& wp : wps) {
+            QGeoCoordinate pos = wp.value<QGeoCoordinate>();
+            if (!isFirst) {
+                totalDistance += prevPos.distanceTo(pos);
+            }
+            isFirst = false;
+            prevPos = pos;
+        }
+        
+        // Calculate area size based on assigned lines
+        QVariantList lineIndices = assignment["lineIndices"].toList();
+        if (!lineIndices.isEmpty()) {
+            areaSize = lineIndices.size() * _lineSpacing * _areaWidth;
+        }
+    }
+    
+    stats["lineLength"] = lineLength;
+    stats["totalDistance"] = totalDistance;
+    stats["areaSize"] = areaSize;
+    
+    // Estimate flight time
+    const qreal avgSpeed = 5.0;  // meters/second, assumed average speed
+    qreal estimatedTime = totalDistance / avgSpeed;
+    if (_loiterTime > 0) {
+        estimatedTime += wps.size() * _loiterTime;  // Add loiter time at each waypoint
+    }
+    stats["estimatedTime"] = estimatedTime;
+    
+    return stats;
 }
 
 void AreaPlanEditor::updateStatus(const QString& message)

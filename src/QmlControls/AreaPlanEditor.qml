@@ -897,12 +897,333 @@ Item {
 					}
 				}
 
-				// Mission Controls Section
-				Rectangle {
-					width: parent.width
+				                // Mission Controls Section
+                Rectangle {
+                    width: parent.width
                     height: missionControlsColumn.height + _h * 2
                     color: qgcPal.windowShade
                     radius: _w * 0.5
+
+                    Column {
+                        id: missionControlsColumn
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: _h
+                        spacing: _h
+
+                        // Section header
+                        QGCLabel {
+                            text: qsTr("Mission Controls")
+                            font.pointSize: ScreenTools.mediumFontPointSize
+                        }
+
+                        // Connected vehicles list
+                        Rectangle {
+                            width: parent.width
+                            height: vehicleList.height + _h * 2
+                            color: qgcPal.windowShadeLight
+                            radius: _w * 0.25
+                            visible: vehicleList.count > 0
+
+                            Column {
+                                id: vehicleList
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                anchors.margins: _h
+                                spacing: _h
+
+                                QGCLabel {
+                                    text: qsTr("Connected Vehicles")
+                                    font.pointSize: ScreenTools.defaultFontPointSize
+                                }
+
+                                Repeater {
+                                    model: areaPlanEditor ? areaPlanEditor.getAvailableVehicles() : []
+                                    delegate: Row {
+                                        spacing: _w
+                                        QGCLabel {
+                                            text: modelData.name
+                                            color: modelData.isActive ? qgcPal.colorGreen : qgcPal.text
+                                        }
+                                        QGCLabel {
+                                            text: modelData.isActive ? qsTr("(Active)") : ""
+                                            color: qgcPal.colorGreen
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Upload controls
+                        Row {
+                            spacing: _w
+                            QGCButton {
+                                text: qsTr("Upload to All")
+                                enabled: areaPlanEditor && areaPlanEditor.getAvailableVehicles().length >= areaPlanEditor.droneCount
+                                onClicked: {
+                                    if (areaPlanEditor) areaPlanEditor.uploadToAllDrones()
+                                }
+                            }
+                            QGCButton {
+                                text: qsTr("Start Mission")
+                                enabled: areaPlanEditor && areaPlanEditor.getAvailableVehicles().length > 0
+                                onClicked: {
+                                    if (areaPlanEditor) areaPlanEditor.startMission()
+                                }
+                            }
+                        }
+                    }
+                }
+
+                    // Add spacing between sections
+                    Rectangle {
+                        width: parent.width
+                        height: _h
+                        color: "transparent"
+                    }
+                }
+
+                // Swarm Configuration Section
+                Rectangle {
+                    width: parent.width
+                    height: swarmConfigColumn.height + _h * 2
+                    color: qgcPal.windowShade
+                    radius: _w * 0.5
+
+                    Column {
+                        id: swarmConfigColumn
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: _h
+                        spacing: _h * 0.8
+
+                        // Section Header
+                        QGCLabel {
+                            text: qsTr("Swarm Configuration")
+                            font.pointSize: ScreenTools.mediumFontPointSize
+                            font.bold: true
+                            width: parent.width
+                            height: _h * 1.2
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        // Description
+                        QGCLabel {
+                            text: qsTr("Configure multi-drone operations and view allocation statistics")
+                            width: parent.width
+                            height: _h * 2
+                            wrapMode: Text.WordWrap
+                            font.pointSize: ScreenTools.smallFontPointSize
+                            color: qgcPal.colorGrey
+                        }
+
+                        // Swarm Size Configuration
+                        Grid {
+                            columns: 2
+                            width: parent.width
+                            rowSpacing: _h * 0.6
+                            columnSpacing: _w
+
+                            QGCLabel {
+                                text: qsTr("Number of Drones:")
+                                width: parent.width * 0.4
+                                height: _h * 1.6
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            QGCTextField {
+                                width: parent.width * 0.5
+                                height: _h * 1.6
+                                text: areaPlanEditor ? areaPlanEditor.droneCount.toString() : "2"
+                                validator: IntValidator { bottom: 1; top: 50 }
+                                onEditingFinished: if (areaPlanEditor && text !== "") areaPlanEditor.setDroneCount(parseInt(text))
+                            }
+
+                            QGCLabel {
+                                text: qsTr("Altitude Separation:")
+                                width: parent.width * 0.4
+                                height: _h * 1.6
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            QGCTextField {
+                                width: parent.width * 0.5
+                                height: _h * 1.6
+                                text: areaPlanEditor ? areaPlanEditor.altitudeBandStep.toString() : "10"
+                                validator: DoubleValidator { bottom: 0.1; top: 10000; decimals: 1 }
+                                onEditingFinished: if (areaPlanEditor && text !== "") areaPlanEditor.setAltitudeBandStep(parseFloat(text))
+                            }
+
+                            QGCLabel {
+                                text: qsTr("Time Offset:")
+                                width: parent.width * 0.4
+                                height: _h * 1.6
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            QGCTextField {
+                                width: parent.width * 0.5
+                                height: _h * 1.6
+                                text: areaPlanEditor ? areaPlanEditor.timeOffsetPerDrone.toString() : "0"
+                                validator: DoubleValidator { bottom: 0; top: 3600; decimals: 1 }
+                                onEditingFinished: if (areaPlanEditor && text !== "") areaPlanEditor.setTimeOffsetPerDrone(parseFloat(text))
+                            }
+                        }
+
+                        // Allocation Statistics
+                        Rectangle {
+                            width: parent.width
+                            height: statsColumn.height + _h
+                            color: qgcPal.windowShadeDark
+                            radius: _w * 0.25
+                            border.color: qgcPal.colorGrey
+                            border.width: 1
+
+                            Column {
+                                id: droneStatsColumn
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                anchors.margins: _h * 0.5
+                                spacing: _h * 0.4
+
+                                QGCLabel {
+                                    text: qsTr("Area Split Statistics")
+                                    font.pointSize: ScreenTools.smallFontPointSize
+                                    font.bold: true
+                                    color: qgcPal.text
+                                }
+
+                                Repeater {
+                                    model: areaPlanEditor ? areaPlanEditor.droneCount : 0
+                                    delegate: Row {
+                                        width: parent.width
+                                        height: _h * 1.4
+                                        spacing: _w
+
+                                        QGCLabel {
+                                            text: qsTr("Drone %1:").arg(modelData)
+                                            width: parent.width * 0.3
+                                            height: parent.height
+                                            verticalAlignment: Text.AlignVCenter
+                                        }
+
+                                        Column {
+                                            width: parent.width * 0.7
+                                            height: parent.height * 2
+                                            spacing: _h * 0.2
+
+                                            QGCLabel {
+                                                text: {
+                                                    if (!areaPlanEditor) return ""
+                                                    var stats = areaPlanEditor.getDroneAllocationStats(modelData)
+                                                    return qsTr("%1 waypoints, %2 m² area")
+                                                        .arg(stats.waypointCount || 0)
+                                                        .arg((stats.areaSize || 0).toFixed(1))
+                                                }
+                                                width: parent.width
+                                                height: parent.height * 0.5
+                                                verticalAlignment: Text.AlignVCenter
+                                                color: qgcPal.colorGrey
+                                            }
+
+                                            QGCLabel {
+                                                text: {
+                                                    if (!areaPlanEditor) return ""
+                                                    var stats = areaPlanEditor.getDroneAllocationStats(modelData)
+                                                    return qsTr("%1 lines, %2 m total distance")
+                                                        .arg(stats.lineCount || 0)
+                                                        .arg((stats.totalDistance || 0).toFixed(1))
+                                                }
+                                                width: parent.width
+                                                height: parent.height * 0.5
+                                                verticalAlignment: Text.AlignVCenter
+                                                color: qgcPal.colorGrey
+                                            }
+
+                                            QGCLabel {
+                                                text: {
+                                                    if (!areaPlanEditor) return ""
+                                                    var stats = areaPlanEditor.getDroneAllocationStats(modelData)
+                                                    return qsTr("Alt +%1 m, T +%2 s, Est. %3 min")
+                                                        .arg((stats.altitudeOffset || 0).toFixed(1))
+                                                        .arg((stats.timeOffset || 0).toFixed(1))
+                                                        .arg((stats.estimatedTime / 60.0 || 0).toFixed(1))
+                                                }
+                                                width: parent.width
+                                                height: parent.height * 0.5
+                                                verticalAlignment: Text.AlignVCenter
+                                                color: qgcPal.colorGrey
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Mission Upload Controls
+                        QGCLabel {
+                            text: qsTr("Mission Upload")
+                            font.pointSize: ScreenTools.smallFontPointSize
+                            font.bold: true
+                            width: parent.width
+                            height: _h
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: _h * 2
+                            spacing: _w
+
+                            QGCComboBox {
+                                id: vehicleSelector
+                                width: parent.width * 0.6
+                                height: parent.height
+                                model: QGroundControl.multiVehicleManager.vehicles
+                                textRole: "id"
+                                onActivated: {
+                                    selectedVehicle = QGroundControl.multiVehicleManager.vehicles.get(currentIndex)
+                                }
+                            }
+
+                            QGCButton {
+                                text: qsTr("Upload Mission")
+                                width: parent.width * 0.35
+                                height: parent.height
+                                enabled: selectedVehicle !== null
+                                onClicked: {
+                                    if (areaPlanEditor && selectedVehicle) {
+                                        areaPlanEditor.uploadPerDroneMissionToVehicle(vehicleSelector.currentIndex)
+                                    }
+                                }
+                            }
+                        }
+
+                        // Validation Status
+                        Rectangle {
+                            width: parent.width
+                            height: validationLabel.height + _h
+                            color: areaPlanEditor && areaPlanEditor.validationError ? "#FFEBEE" : "#E8F5E9"
+                            radius: _w * 0.25
+                            visible: areaPlanEditor !== null
+
+                            QGCLabel {
+                                id: validationLabel
+                                width: parent.width - _w * 2
+                                anchors.centerIn: parent
+                                text: areaPlanEditor && areaPlanEditor.validationError ? 
+                                    areaPlanEditor.validationError : 
+                                    qsTr("Configuration is valid")
+                                wrapMode: Text.WordWrap
+                                color: areaPlanEditor && areaPlanEditor.validationError ? "#D32F2F" : "#2E7D32"
+                            }
+                        }
+                    }
+                }
 					
 					Column {
 						id: missionControlsColumn
@@ -1006,7 +1327,7 @@ Item {
                             spacing: _w
                             // Vehicle selector
                             QGCComboBox {
-                                id: vehicleSelector
+                                id: droneVehicleSelector
                                 width: parent.width * 0.35
                                 height: parent.height
                                 model: QGroundControl.multiVehicleManager.vehicles
@@ -1329,7 +1650,6 @@ Item {
 				}
 			}
 		}
-	}
 
 	Connections {
 		target: areaPlanEditor
@@ -1345,135 +1665,135 @@ Item {
 	}
 
 	// Debug Section
-    Rectangle {
-        // Hide debug tools unless Advanced UI is enabled
-        visible: QGroundControl.corePlugin && QGroundControl.corePlugin.showAdvancedUI
-		anchors.bottom: parent.bottom
-		anchors.left: parent.left
-		anchors.right: parent.right
-        height: debugColumn.height + _h * 2
-        color: qgcPal.windowShade
-        radius: _w * 0.5
+    // Rectangle {
+    //     // Hide debug tools unless Advanced UI is enabled
+    //     visible: QGroundControl.corePlugin && QGroundControl.corePlugin.showAdvancedUI
+	// 	anchors.bottom: parent.bottom
+	// 	anchors.left: parent.left
+	// 	anchors.right: parent.right
+    //     height: debugColumn.height + _h * 2
+    //     color: qgcPal.windowShade
+    //     radius: _w * 0.5
 		
-		Column {
-			id: debugColumn
-			anchors.left: parent.left
-			anchors.right: parent.right
-			anchors.top: parent.top
-            anchors.margins: _h
-            spacing: _h * 0.5
+	// 	Column {
+	// 		id: debugColumn
+	// 		anchors.left: parent.left
+	// 		anchors.right: parent.right
+	// 		anchors.top: parent.top
+    //         anchors.margins: _h
+    //         spacing: _h * 0.5
 
-			QGCLabel {
-				text: qsTr("Debug Tools")
-				font.pointSize: ScreenTools.mediumFontPointSize
-				font.bold: true
-				width: parent.width
-                height: _h * 1.2
-				verticalAlignment: Text.AlignVCenter
-			}
+	// 		QGCLabel {
+	// 			text: qsTr("Debug Tools")
+	// 			font.pointSize: ScreenTools.mediumFontPointSize
+	// 			font.bold: true
+	// 			width: parent.width
+    //             height: _h * 1.2
+	// 			verticalAlignment: Text.AlignVCenter
+	// 		}
 
-			// Test C++ Backend
-			QGCButton {
-				text: qsTr("Test C++ Backend")
-				width: parent.width
-                height: _h * 1.5
-				onClicked: {
-					console.log("Test C++ Backend clicked")
-					if (areaPlanEditor) {
-						console.log("C++ Backend is accessible!")
-						console.log("Current properties:")
-						console.log("  areaWidth:", areaPlanEditor.areaWidth)
-						console.log("  areaHeight:", areaPlanEditor.areaHeight)
-						console.log("  lineSpacing:", areaPlanEditor.lineSpacing)
-						console.log("  numPoints:", areaPlanEditor.numPoints)
-						console.log("  areaCenter:", areaPlanEditor.areaCenter.latitude, areaPlanEditor.areaCenter.longitude)
-						console.log("  isDrawingMode:", areaPlanEditor.isDrawingMode)
+	// 		// Test C++ Backend
+	// 		QGCButton {
+	// 			text: qsTr("Test C++ Backend")
+	// 			width: parent.width
+    //             height: _h * 1.5
+	// 			onClicked: {
+	// 				console.log("Test C++ Backend clicked")
+	// 				if (areaPlanEditor) {
+	// 					console.log("C++ Backend is accessible!")
+	// 					console.log("Current properties:")
+	// 					console.log("  areaWidth:", areaPlanEditor.areaWidth)
+	// 					console.log("  areaHeight:", areaPlanEditor.areaHeight)
+	// 					console.log("  lineSpacing:", areaPlanEditor.lineSpacing)
+	// 					console.log("  numPoints:", areaPlanEditor.numPoints)
+	// 					console.log("  areaCenter:", areaPlanEditor.areaCenter.latitude, areaPlanEditor.areaCenter.longitude)
+	// 					console.log("  isDrawingMode:", areaPlanEditor.isDrawingMode)
 						
-						// Set reasonable defaults if values are zero
-						if (areaPlanEditor.areaWidth <= 0) {
-							areaPlanEditor.setAreaWidth(10.0)
-							console.log("Set areaWidth to 10.0")
-						}
-						if (areaPlanEditor.areaHeight <= 0) {
-							areaPlanEditor.setAreaHeight(10.0)
-							console.log("Set areaHeight to 10.0")
-						}
-						if (areaPlanEditor.lineSpacing <= 0) {
-							areaPlanEditor.setLineSpacing(10.0)
-							console.log("Set lineSpacing to 10.0")
-						}
-						if (areaPlanEditor.numPoints <= 0) {
-							areaPlanEditor.setNumPoints(1)
-							console.log("Set numPoints to 1")
-						}
+	// 					// Set reasonable defaults if values are zero
+	// 					if (areaPlanEditor.areaWidth <= 0) {
+	// 						areaPlanEditor.setAreaWidth(10.0)
+	// 						console.log("Set areaWidth to 10.0")
+	// 					}
+	// 					if (areaPlanEditor.areaHeight <= 0) {
+	// 						areaPlanEditor.setAreaHeight(10.0)
+	// 						console.log("Set areaHeight to 10.0")
+	// 					}
+	// 					if (areaPlanEditor.lineSpacing <= 0) {
+	// 						areaPlanEditor.setLineSpacing(10.0)
+	// 						console.log("Set lineSpacing to 10.0")
+	// 					}
+	// 					if (areaPlanEditor.numPoints <= 0) {
+	// 						areaPlanEditor.setNumPoints(1)
+	// 						console.log("Set numPoints to 1")
+	// 					}
 						
-						console.log("Updated properties:")
-						console.log("  areaWidth:", areaPlanEditor.areaWidth)
-						console.log("  areaHeight:", areaPlanEditor.areaHeight)
-						console.log("  lineSpacing:", areaPlanEditor.lineSpacing)
-						console.log("  numPoints:", areaPlanEditor.numPoints)
-					} else {
-						console.log("ERROR: areaPlanEditor is null!")
-					}
-				}
-			}
+	// 					console.log("Updated properties:")
+	// 					console.log("  areaWidth:", areaPlanEditor.areaWidth)
+	// 					console.log("  areaHeight:", areaPlanEditor.areaHeight)
+	// 					console.log("  lineSpacing:", areaPlanEditor.lineSpacing)
+	// 					console.log("  numPoints:", areaPlanEditor.numPoints)
+	// 				} else {
+	// 					console.log("ERROR: areaPlanEditor is null!")
+	// 				}
+	// 			}
+	// 		}
 
-			// Test Mission Generation
-			QGCButton {
-				text: qsTr("Test Mission Generation")
-				width: parent.width
-                height: _h * 1.5
-				onClicked: {
-					console.log("Test Mission Generation clicked")
-					if (areaPlanEditor) {
-						console.log("Current parameters:")
-						console.log("  areaWidth:", areaPlanEditor.areaWidth)
-						console.log("  areaHeight:", areaPlanEditor.areaHeight)
-						console.log("  lineSpacing:", areaPlanEditor.lineSpacing)
-						console.log("  numPoints:", areaPlanEditor.numPoints)
-						console.log("  areaCenter:", areaPlanEditor.areaCenter.latitude, areaPlanEditor.areaCenter.longitude)
+	// 		// Test Mission Generation
+	// 		QGCButton {
+	// 			text: qsTr("Test Mission Generation")
+	// 			width: parent.width
+    //             height: _h * 1.5
+	// 			onClicked: {
+	// 				console.log("Test Mission Generation clicked")
+	// 				if (areaPlanEditor) {
+	// 					console.log("Current parameters:")
+	// 					console.log("  areaWidth:", areaPlanEditor.areaWidth)
+	// 					console.log("  areaHeight:", areaPlanEditor.areaHeight)
+	// 					console.log("  lineSpacing:", areaPlanEditor.lineSpacing)
+	// 					console.log("  numPoints:", areaPlanEditor.numPoints)
+	// 					console.log("  areaCenter:", areaPlanEditor.areaCenter.latitude, areaPlanEditor.areaCenter.longitude)
 						
-						var waypoints = areaPlanEditor.generateWaypoints()
-						console.log("Generated waypoints:", waypoints.length)
+	// 					var waypoints = areaPlanEditor.generateWaypoints()
+	// 					console.log("Generated waypoints:", waypoints.length)
 						
-						areaPlanEditor.saveMissionFile()
-						console.log("Mission file saved")
-					} else {
-						console.log("ERROR: areaPlanEditor is null!")
-					}
-				}
-			}
+	// 					areaPlanEditor.saveMissionFile()
+	// 					console.log("Mission file saved")
+	// 				} else {
+	// 					console.log("ERROR: areaPlanEditor is null!")
+	// 				}
+	// 			}
+	// 		}
 
-			// Debug: Force Map Items
-			QGCButton {
-				text: qsTr("Debug: Force Map Items")
-				width: parent.width
-                height: _h * 1.5
-				onClicked: {
-					console.log("Debug: Force map items clicked")
-					if (areaPlanEditor) {
-						console.log("Current area state:")
-						console.log("  areaWidth:", areaPlanEditor.areaWidth)
-						console.log("  areaHeight:", areaPlanEditor.areaHeight)
-						console.log("  areaCenter:", areaPlanEditor.areaCenter.latitude, areaPlanEditor.areaCenter.longitude)
-						console.log("  areaCenter valid:", areaPlanEditor.areaCenter.isValid)
+	// 		// Debug: Force Map Items
+	// 		QGCButton {
+	// 			text: qsTr("Debug: Force Map Items")
+	// 			width: parent.width
+    //             height: _h * 1.5
+	// 			onClicked: {
+	// 				console.log("Debug: Force map items clicked")
+	// 				if (areaPlanEditor) {
+	// 					console.log("Current area state:")
+	// 					console.log("  areaWidth:", areaPlanEditor.areaWidth)
+	// 					console.log("  areaHeight:", areaPlanEditor.areaHeight)
+	// 					console.log("  areaCenter:", areaPlanEditor.areaCenter.latitude, areaPlanEditor.areaCenter.longitude)
+	// 					console.log("  areaCenter valid:", areaPlanEditor.areaCenter.isValid)
 						
-						// Force property changes to trigger signals
-						var currentWidth = areaPlanEditor.areaWidth
-						var currentHeight = areaPlanEditor.areaHeight
+	// 					// Force property changes to trigger signals
+	// 					var currentWidth = areaPlanEditor.areaWidth
+	// 					var currentHeight = areaPlanEditor.areaHeight
 						
-						// Temporarily change and restore to trigger signals
-						areaPlanEditor.setAreaWidth(currentWidth + 0.1)
-						areaPlanEditor.setAreaWidth(currentWidth)
-						areaPlanEditor.setAreaHeight(currentHeight + 0.1)
-						areaPlanEditor.setAreaHeight(currentHeight)
+	// 					// Temporarily change and restore to trigger signals
+	// 					areaPlanEditor.setAreaWidth(currentWidth + 0.1)
+	// 					areaPlanEditor.setAreaWidth(currentWidth)
+	// 					areaPlanEditor.setAreaHeight(currentHeight + 0.1)
+	// 					areaPlanEditor.setAreaHeight(currentHeight)
 						
-						console.log("Forced property updates completed")
-					} else {
-						console.log("ERROR: areaPlanEditor is null!")
-					}
-				}
-			}
-		}
-	}
+	// 					console.log("Forced property updates completed")
+	// 				} else {
+	// 					console.log("ERROR: areaPlanEditor is null!")
+	// 				}
+	// 			}
+	// 		}
+	// 	}
+	// }
 }

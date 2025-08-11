@@ -57,6 +57,9 @@ public:
     Q_PROPERTY(int cacheSize READ cacheSize NOTIFY cacheSizeChanged)
     Q_PROPERTY(bool isDrawingMode READ isDrawingMode WRITE setIsDrawingMode NOTIFY isDrawingModeChanged)
     Q_PROPERTY(QObject* planMasterController READ planMasterController WRITE setPlanMasterController NOTIFY planMasterControllerChanged)
+    
+    // Swarm configuration properties
+    // Swarm configuration properties are already declared above
 
     // Property getters
     qreal areaWidth() const { return _areaWidth; }
@@ -138,6 +141,10 @@ public:
     Q_INVOKABLE void uploadToVehicle();
     // Upload a specific drone's mission to a selected vehicle (or active vehicle if null)
     Q_INVOKABLE void uploadPerDroneMissionToVehicle(int droneIndex, QObject* vehicleObject = nullptr);
+    // Upload missions to all connected drones in a coordinated way
+    Q_INVOKABLE void uploadToAllDrones();
+    // Get list of available vehicles for mission upload
+    Q_INVOKABLE QVariantList getAvailableVehicles() const;
     Q_INVOKABLE void startMission();
     Q_INVOKABLE void updateStatus(const QString& message);
     Q_INVOKABLE QGeoCoordinate calculateOffsetCoordinate(const QGeoCoordinate& coord, qreal meters, qreal bearing) const;
@@ -146,6 +153,60 @@ public:
     Q_INVOKABLE Vehicle* getCurrentVehicle() const;
     Q_INVOKABLE MissionManager* getMissionManager() const;
     Q_INVOKABLE MissionController* getMissionController() const;
+    
+    // Formation types
+    enum FormationType {
+        NoFormation,
+        VFormation,
+        LineFormation,
+        CircleFormation,
+        GridFormation
+    };
+    Q_ENUM(FormationType)
+
+    // Swarm coordination methods
+    Q_INVOKABLE bool startCoordinatedTakeoff();
+    Q_INVOKABLE bool startCoordinatedMission();
+    Q_INVOKABLE bool abortCoordinatedMission();
+    Q_INVOKABLE bool setFormationType(FormationType type);
+    Q_INVOKABLE bool adjustFormationSpacing(qreal spacing);
+    Q_INVOKABLE bool assignFormationRoles();
+    Q_INVOKABLE bool startFormationTransition();
+    
+    // Swarm status properties
+    Q_PROPERTY(bool isSwarmReady READ isSwarmReady NOTIFY swarmStatusChanged)
+    Q_PROPERTY(QString swarmStatus READ swarmStatus NOTIFY swarmStatusChanged)
+    Q_PROPERTY(bool isCoordinatedMissionActive READ isCoordinatedMissionActive NOTIFY coordinatedMissionStatusChanged)
+    Q_PROPERTY(FormationType currentFormation READ currentFormation NOTIFY formationChanged)
+    Q_PROPERTY(qreal formationSpacing READ formationSpacing WRITE setFormationSpacing NOTIFY formationSpacingChanged)
+    Q_PROPERTY(bool isFormationTransitioning READ isFormationTransitioning NOTIFY formationTransitioningChanged)
+    
+private:
+    // Swarm coordination helpers
+    bool checkSwarmReadiness() const;
+    void updateSwarmStatus(const QString& status);
+    void sendSwarmCommand(uint16_t command, const QList<Vehicle*>& vehicles);
+    void handleSwarmResponse(Vehicle* vehicle, uint16_t command, uint8_t result);
+    
+    // Formation control methods
+    void calculateFormationPositions();
+    void updateFormationOffsets();
+    void sendFormationCommands();
+    void handleFormationResponse(Vehicle* vehicle, uint16_t command, uint8_t result);
+    QGeoCoordinate calculateFormationPosition(int vehicleIndex, FormationType type) const;
+    
+    // Swarm state
+    QString _swarmStatus;
+    bool _isCoordinatedMissionActive = false;
+    QMap<int, bool> _vehicleReadyStatus;  // Maps vehicle ID to ready status
+    
+    // Formation state
+    FormationType _currentFormation = NoFormation;
+    qreal _formationSpacing = 5.0;  // meters
+    bool _isFormationTransitioning = false;
+    Vehicle* _leaderVehicle = nullptr;
+    QMap<int, QGeoCoordinate> _formationOffsets;  // Maps vehicle ID to formation position offset
+    QMap<int, int> _formationRoles;  // Maps vehicle ID to formation role index
     
     // Mission file saving helper method
     void saveMissionToFile(const QList<MissionItem*>& missionItems, const QString& filename);
@@ -157,6 +218,11 @@ public:
     Q_INVOKABLE bool validateWaypointGeneration();
     Q_INVOKABLE bool validateMissionUpload();
     Q_INVOKABLE bool validateMissionFileSaving();
+
+    // Swarm configuration methods
+    Q_INVOKABLE QVariantMap getDroneAllocationStats(int droneIndex) const;
+    Q_INVOKABLE bool validateSwarmConfiguration() const;
+    // These methods are already declared above
     
     // Error handling and validation methods
     Q_INVOKABLE QString validateInput(const QString& fieldName, const QVariant& value) const;
@@ -202,11 +268,24 @@ signals:
     void cacheSizeChanged();
     void isDrawingModeChanged();
     void planMasterControllerChanged();
-    // Multi-drone signals
+    
+    // Swarm coordination signals
+    void swarmStatusChanged();
+    void coordinatedMissionStatusChanged();
+    
+    // Formation signals
+    void formationChanged();
+    void formationSpacingChanged();
+    void formationTransitioningChanged();
+    void formationRolesChanged();
+    void leaderVehicleChanged();
+    
+    // Swarm configuration signals
+    void isValidChanged();
     void droneCountChanged();
-    void altitudeBandStartChanged();
     void altitudeBandStepChanged();
     void timeOffsetPerDroneChanged();
+    // Multi-drone signals
     void rtlAfterEveryWaypointChanged();
     void loiterAfterRtlChanged();
 
@@ -230,7 +309,28 @@ private:
     int _numPoints = _defaultNumPoints;
     qreal _missionAltitude = _defaultAltitude;
     QGeoCoordinate _areaCenter = QGeoCoordinate(49.82824897481479, 24.033390804256005);
-    QGeoCoordinate _homeLocation = QGeoCoordinate(49.82824897481479, 24.033390804256005);
+    QGeoCoordinate _homeLocation = QGeoCoordinate();
+
+    // Swarm configuration
+    int _droneCount = _defaultDroneCount;
+    qreal _altitudeBandStep = _defaultAltitudeBandStep;
+    qreal _timeOffsetPerDrone = _defaultTimeOffsetPerDrone;
+    QString _validationError;
+    
+    // Cached allocation statistics
+    struct DroneStats {
+        int waypointCount = 0;
+        qreal areaSize = 0.0;
+        qreal lineLength = 0.0;
+        qreal totalDistance = 0.0;
+        qreal estimatedTime = 0.0;
+        qreal altitudeOffset = 0.0;
+        qreal timeOffset = 0.0;
+        int lineCount = 0;
+        QList<QGeoCoordinate> waypoints;
+        QList<int> lineIndices;
+    };
+    QMap<int, DroneStats> _droneStats;(49.82824897481479, 24.033390804256005);
     qreal _areaRotation = 0.0;  // Rotation in degrees, 0 = North
     qreal _loiterTime = 10.0;   // Loiter time in seconds at each waypoint
     QString _validationError;
