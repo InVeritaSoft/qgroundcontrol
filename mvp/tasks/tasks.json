@@ -10,7 +10,7 @@
         "priority": "high",
         "complexity": 5,
         "dependencies": [],
-        "status": "done",
+        "status": "pending",
         "subtasks": [
           {
             "id": 1,
@@ -18,7 +18,7 @@
             "description": "Define a new property 'droneCount' in AreaPlanEditor.h and AreaPlanEditor.cc.",
             "dependencies": [],
             "details": "Include getter, setter, NOTIFY signal, validation (>=1), and QML registration. Default to 2. Wire to QML via `AreaPlanEditor.qml` with ScreenTools-based sizing.\n<info added on 2025-08-08T02:12:56.834Z>\nPrepare implementation plan for new properties in AreaPlanEditor (C++ + QML bindings).\n\nFiles to touch:\n- src/QmlControls/AreaPlanEditor.h/.cc: add properties (droneCount:int default 2; altitudeBandStart:real; altitudeBandStep:real; timeOffsetPerDrone:real; rtlAfterEveryWaypoint:bool; loiterAfterRtl:bool). Add getter/setters + NOTIFY signals + validation fences; emit changes; expose via Q_PROPERTY.\n- src/QmlControls/AreaPlanEditor.qml: add inputs/toggles using QGC controls and ScreenTools. Bind to QGroundControl.areaPlanEditor.*.\n- Ensure PlanView.qml references if necessary.\n\nValidation:\n- droneCount >= 1 (clamp); altitudeBandStart >= 0; altitudeBandStep > 0; timeOffsetPerDrone >= 0.\n\nFollow-ups:\n- Unit tests for defaults and setters.\n- Extend addWaypointsToMission later to use toggles (in subsequent tasks).\n</info added on 2025-08-08T02:12:56.834Z>",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "C++: verify default, set/get, validation clamps; QML: bind change propagates to C++"
           },
           {
@@ -27,7 +27,7 @@
             "description": "Define a new property 'altitudeBandStart' in AreaPlanEditor.h and AreaPlanEditor.cc.",
             "dependencies": [],
             "details": "Include getter, setter, NOTIFY signal, validation (>=0 within firmware limits), and QML registration. Units in meters.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "C++: boundary checks; QML: editingFinished updates C++ and reflects in stats"
           },
           {
@@ -36,7 +36,7 @@
             "description": "Define a new property 'altitudeBandStep' in AreaPlanEditor.h and AreaPlanEditor.cc.",
             "dependencies": [],
             "details": "Include getter, setter, NOTIFY signal, validation (>0), and QML registration. Will be used in altitudeOffset = start + index*step.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "C++: invalid values rejected; unit test formula correctness with sample indices"
           },
           {
@@ -45,7 +45,7 @@
             "description": "Define a new property 'timeOffsetPerDrone' in AreaPlanEditor.h and AreaPlanEditor.cc.",
             "dependencies": [],
             "details": "Include getter, setter, NOTIFY signal, validation (>=0 seconds), and QML registration. Stored as seconds; UI shows seconds.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "C++: bounds; QML: input -> C++ value change observed"
           },
           {
@@ -54,7 +54,7 @@
             "description": "Define a new property 'rtlAfterEveryWaypoint' in AreaPlanEditor.h and AreaPlanEditor.cc.",
             "dependencies": [],
             "details": "Include getter, setter, NOTIFY signal (bool), and QML registration. Will gate RTL insertion in mission build.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "C++: toggling changes behavior in a dry-run builder; QML: toggle reflects and persists"
           },
           {
@@ -63,7 +63,7 @@
             "description": "Define a new property 'loiterAfterRtl' in AreaPlanEditor.h and AreaPlanEditor.cc.",
             "dependencies": [],
             "details": "Include getter, setter, NOTIFY signal (bool), and QML registration. Appends Loiter(Hold) after RTL when true.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "C++: toggle adds/removes loiter after RTL in generated sequence"
           },
           {
@@ -72,7 +72,7 @@
             "description": "Audit the existing 'loiterTime' property usage across C++ and QML and add unit coverage.",
             "dependencies": [],
             "details": "Confirm QML input in `AreaPlanEditor.qml` drives `AreaPlanEditor::setLoiterTime` and is used for MAV_CMD_NAV_LOITER_TIME param1. Add unit test for propagation.\n<info added on 2025-08-08T02:21:14.442Z>\nVerified loiterTime wiring end-to-end: QML input updates AreaPlanEditor::setLoiterTime, which is used as MAV_CMD_NAV_LOITER_TIME param1 during mission generation. Confirmed by code inspection and Debug build success. Will add unit coverage in Task 10 when tests are stabilized.\n</info added on 2025-08-08T02:21:14.442Z>",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "C++: set -> param1 in sequence; QML: editingFinished triggers setter"
           },
           {
@@ -81,7 +81,7 @@
             "description": "Modify the QML file to include new properties and ensure proper bindings.",
             "dependencies": [],
             "details": "Add inputs/toggles for: droneCount, altitudeBandStart, altitudeBandStep, timeOffsetPerDrone, rtlAfterEveryWaypoint, loiterAfterRtl (loiterTime already present). Use `QGCPalette`/`ScreenTools` and no horizontal scrolling.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "Manual: UI -> C++ value changes; lint for qsTr() coverage"
           },
           {
@@ -90,7 +90,7 @@
             "description": "Ensure the new properties are accessible in PlanView.qml.",
             "dependencies": [],
             "details": "Update bindings and UI elements as necessary.\n<info added on 2025-08-08T03:05:12.334Z>\nExposure verified: PlanView binds to QGroundControl.areaPlanEditor and passes planMasterController; AreaPlanEditor.qml includes inputs/toggles for all new properties bound to C++ Q_PROPERTYs. No additional wiring needed; properties accessible in PlanView and map visuals via QGroundControl.areaPlanEditor.\n</info added on 2025-08-08T03:05:12.334Z>",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -99,7 +99,7 @@
             "description": "Write unit tests to verify the new properties' default values, setters, and validation logic.",
             "dependencies": [],
             "details": "Ensure all edge cases are covered.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           }
         ]
@@ -115,7 +115,7 @@
         "dependencies": [
           1
         ],
-        "status": "done",
+        "status": "pending",
         "subtasks": [
           {
             "id": 1,
@@ -123,7 +123,7 @@
             "description": "Create a struct to hold drone assignment details.",
             "dependencies": [],
             "details": "Include fields for index, altitudeOffset, timeOffset, and lines.\n<info added on 2025-08-08T02:57:38.362Z>\nStart: Define DroneAssignment struct and placement.\n\nPlan:\n- Create pure C++ struct in src/MissionManager/ (header-only) to avoid QML coupling:\n  path: src/MissionManager/DroneAssignment.h\n  fields: int droneIndex; double altitudeOffsetM; double timeOffsetS; QVector<int> lineIndices;\n- Add helper functions in a companion .cc (or header-only) under namespace AreaPlan.\n- Unit-testable by including header in test/MissionManager/.\n- No UI changes yet; integration via AreaPlanEditor later.\n\nRisks:\n- Include/path consistency within MissionManager target.\n- Keep it independent from Qt type registrations (no Q_OBJECT).\n</info added on 2025-08-08T02:57:38.362Z>",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -132,7 +132,7 @@
             "description": "Partition the area into stripes along the short axis.",
             "dependencies": [],
             "details": "Handle rotation and uneven divisions.\n<info added on 2025-08-08T02:59:50.365Z>\nStart: Implement stripe-based split helpers.\n\nPlan:\n- Add pure helper API under src/MissionManager/AreaPartition.h/.cc\n  - function splitIntoStripes(const QRectF& area, int stripes, bool alongShortAxis, double rotationDeg) -> std::vector<QLineF>\n  - function assignStripesRoundRobin(int droneCount, int lineCount) -> std::vector<std::vector<int>>\n- No UI yet; keep math isolated; use explicit formulas for stripe width and rotation.\n- Unit tests later in Task 11 & 12.\n\nRisks:\n- Qt types include requirements; prefer std types for containers, Qt geom types are fine.\n- Precision/rounding edge cases; verify bounds and off-by-one.\n</info added on 2025-08-08T02:59:50.365Z>\n<info added on 2025-08-08T03:49:34.022Z>\nImplemented stripe-based split helpers in src/MissionManager/AreaPartition.h with explicit math and no Qt dependencies:\n- splitIntoStripes(cx,cy,width,height,stripeCount,alongShortAxis,rotationDeg) -> std::vector<Line>\n- assignStripesRoundRobin(droneCount,lineCount)\nNext: add thin adapter in AreaPlanEditor to convert stripe Lines into geo coordinates for visualization and downstream assignment integration.\n</info added on 2025-08-08T03:49:34.022Z>",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -141,7 +141,7 @@
             "description": "Optionally assign lines in a round-robin fashion.",
             "dependencies": [],
             "details": "Ensure fairness and bounds guarantees.\n<info added on 2025-08-08T04:03:23.369Z>\nUse existing helper AreaPlan::assignStripesRoundRobin(droneCount, lineCount) to build per-drone index groups. Next wire indices to per-drone assignment structs and prepare adapter that maps stripe index to geo lines for downstream waypoint generation.\n</info added on 2025-08-08T04:03:23.369Z>\n<info added on 2025-08-08T05:13:02.484Z>\nImplemented QML-callable helpers in AreaPlanEditor:\n- computeRoundRobinAssignments() → per-drone line indices based on lineCount = floor(areaHeight/lineSpacing)\n- computeDroneAssignments() → per-drone map with droneIndex, altitudeOffsetM, timeOffsetS, lineIndices\nThese wire into AreaPartition helpers for fair distribution.\n</info added on 2025-08-08T05:13:02.484Z>",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -150,7 +150,7 @@
             "description": "Adjust the partitioning algorithm to handle rotated areas.",
             "dependencies": [],
             "details": "Ensure correct stripe-based split and round-robin assignment.\n<info added on 2025-08-08T07:08:01.360Z>\nPlan: Validate rotation handling using AreaPartition::splitIntoStripes rotationDeg parameter; add simple adapter to pass _areaRotation. Verify with deterministic inputs (width, height, rotation) returning rotated endpoints. Next: add unit tests in Task 11 for rotation-specific cases.\n</info added on 2025-08-08T07:08:01.360Z>\n<info added on 2025-08-08T07:10:34.544Z>\nRotation handling verified.\n\n- AreaPartition::splitIntoStripes(cx,cy,w,h,count,alongShortAxis,rotationDeg) applies rotation about the rectangle center using explicit cos/sin.\n- AreaPlanEditor::computePartitionStripes passes _areaRotation directly to helper.\n- Therefore stripes generated for visualization/assignment reflect current areaRotation.\n- No additional code required for rotation beyond ensuring _areaRotation normalization (already done in setAreaRotation).\n</info added on 2025-08-08T07:10:34.544Z>",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -159,7 +159,7 @@
             "description": "Manage uneven divisions in the area partitioning.",
             "dependencies": [],
             "details": "Ensure balanced and fair assignments.\n<info added on 2025-08-08T07:11:22.801Z>\nPlan:\n- Update assignStripesRoundRobin to favor first K drones with +1 line when remainder exists (already natural via modulo). Add explicit doc comment.\n- Add helper in AreaPlanEditor to compute per-drone counts and expose via QVariantMap for UI/testing.\n- Unit tests in Task 11 to assert distribution properties (diff <= 1, sum equals lineCount).\n</info added on 2025-08-08T07:11:22.801Z>\n<info added on 2025-08-08T07:13:28.273Z>\nImplemented uneven division support:\n- Documented modulo distribution in AreaPartition::assignStripesRoundRobin (diff <= 1, first remainder drones get +1).\n- Added AreaPlanEditor::computePerDroneCounts() exposing per-drone counts + totals for UI/tests.\n</info added on 2025-08-08T07:13:28.273Z>",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -168,7 +168,7 @@
             "description": "Create helper functions to assist in unit testing.",
             "dependencies": [],
             "details": "Ensure helpers are easily testable and provide necessary functionality.\n<info added on 2025-08-08T07:14:23.041Z>\nStart: Add unit-testable helpers for partitioning.\n\nPlan:\n- Provide deterministic helpers with no QML deps (already done in AreaPartition.h).\n- Add wrapper asserts in tests for: (a) rotation endpoints change with angle; (b) RR distribution sum and balance; (c) per-drone counts API consistency.\n- Implement tests under test/MissionManager in Task 11; no new code required for 2.6 beyond ensuring include paths and public headers.\n</info added on 2025-08-08T07:14:23.041Z>",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -177,7 +177,7 @@
             "description": "Ensure the partitioning algorithm integrates well with waypoint generation.",
             "dependencies": [],
             "details": "Verify compatibility and correctness of integration.\n<info added on 2025-08-08T07:17:57.014Z>\nIntegrate per-drone assignments with waypoint generation.\n\nPlan:\n- For each drone group from computeDroneAssignments(), iterate line indices; for each line, generate _numPoints along width with rotation.\n- Apply altitudeOffsetM and timeOffsetS when creating mission items (loiter time stays per-editor setting; time offset to be used in scheduling, not enforced here).\n- Gate RTL/loiter toggles via rtlAfterEveryWaypoint/loiterAfterRtl in the generation step.\n- Add adapter to return per-drone QVariantLists for UI/verification before actual insertion into MissionController (keeps mission side-effects explicit).\n</info added on 2025-08-08T07:17:57.014Z>\n<info added on 2025-08-08T07:26:09.796Z>\nProgress: Implemented per-drone waypoint preview adapter.\n\n- Added Q_INVOKABLE computePerDroneWaypointPreview() to AreaPlanEditor\n- Uses AreaPartition::assignStripesRoundRobin + splitIntoStripes(lineCount)\n- Converts local rotated meter-frame points to geo via calculateOffsetCoordinate()\n- Returns list of {droneIndex, altitudeOffsetM, timeOffsetS, waypoints[]}\n\nNext:\n- Expose preview in QML (optional table/overlay for verification)\n- Add unit tests to assert counts and geo validity\n- Then integrate into MissionController insertion step\n</info added on 2025-08-08T07:26:09.796Z>\n<info added on 2025-08-08T07:29:12.679Z>\nProgress: QML preview UI added.\n\n- Added waypointPreview property and a 'Refresh Preview' button in AreaPlanEditor.qml\n- Displays per-drone counts and offsets using computePerDroneWaypointPreview()\n- Non-intrusive; no mission side effects\n\nNext:\n- Add unit tests to validate per-drone counts/geodesic validity\n- Integrate into MissionController insertion flow or provide per-drone export\n</info added on 2025-08-08T07:29:12.679Z>\n<info added on 2025-08-08T07:35:04.115Z>\nProgress: Added unit test for per-drone preview counts/validity.\n\n- New test _perDronePreviewCounts() verifies total waypoints == lines*numPoints and coordinates are valid\n- Scenario uses 2 drones, 3 lines, 2 points/line\n\nNext:\n- Wire per-drone mission insertion flow using addPerDroneToMission(droneIndex)\n- Consider staggered scheduling using timeOffsetPerDrone in future step\n</info added on 2025-08-08T07:35:04.115Z>",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -186,7 +186,7 @@
             "description": "Create unit tests to verify balanced partitioning.",
             "dependencies": [],
             "details": "Test various scenarios including edge cases.\n<info added on 2025-08-08T07:41:20.945Z>\nStart: Balanced partition unit tests.\n\nPlan:\n- Test assignStripesRoundRobin fairness: max count diff <= 1 for multiple (drones,lines) pairs\n- Test sum preservation: sum(group sizes) == lineCount\n- Test boundary cases: droneCount=1, lineCount=1, extreme ratios (more drones than lines)\n- Add tests in MissionManager suite; no UI\n</info added on 2025-08-08T07:41:20.945Z>",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -195,7 +195,7 @@
             "description": "Create unit tests to verify bounds guarantees.",
             "dependencies": [],
             "details": "Test various scenarios including edge cases.\n<info added on 2025-08-08T07:44:49.789Z>\nStart: Bounds tests for stripes/rotation.\n\nPlan:\n- Verify splitIntoStripes endpoints are within rectangle bounds when rotation=0, and rotated positions differ when rotation!=0\n- Check stripe orthogonality vs chosen axis: alongShortAxis=true → stripes run along narrow dimension; false → along long\n- Edge cases: zero/negative sizes return empty; stripeCount<=0 returns empty\n- Implement in MissionManager tests\n</info added on 2025-08-08T07:44:49.789Z>",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -204,7 +204,7 @@
             "description": "Create unit tests to verify correct handling of rotated areas.",
             "dependencies": [],
             "details": "Test various scenarios including edge cases.\n<info added on 2025-08-08T07:48:52.999Z>\nStart: Rotation handling tests.\n\nPlan:\n- Equivalence: splitIntoStripes(..., rot=0) ≈ rot=360 (epsilon tolerance)\n- Periodicity: rot=θ and rot=θ+360 produce identical endpoints (epsilon)\n- Length invariance: |AB| constant across multiple rotations for same stripe index\n- Monotonic ordering: stripe centers rotate consistently with angle increase\n- Implement in MissionManager tests\n</info added on 2025-08-08T07:48:52.999Z>",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           }
         ]
@@ -213,7 +213,7 @@
         "id": 3,
         "title": "Generate Per-Drone Waypoints",
         "description": "Create waypoints for each assignment with spacing/rotation.",
-        "status": "done",
+        "status": "pending",
         "dependencies": [
           2
         ],
@@ -225,7 +225,7 @@
             "id": 1,
             "title": "Calculate Line Spacing",
             "description": "Determine the spacing between waypoints based on lineSpacing parameter.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Use mathematical formulas to compute the distance between each waypoint.",
             "testStrategy": ""
@@ -234,7 +234,7 @@
             "id": 2,
             "title": "Calculate Number of Points",
             "description": "Determine the number of waypoints based on numPoints parameter.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure the number of points is consistent with the area dimensions and spacing.",
             "testStrategy": ""
@@ -243,7 +243,7 @@
             "id": 3,
             "title": "Calculate Area Rotation",
             "description": "Determine the rotation angle for the area based on areaRotation parameter.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure the rotation is applied correctly to maintain alignment with QML visuals.",
             "testStrategy": ""
@@ -252,7 +252,7 @@
             "id": 4,
             "title": "Generate Waypoints for Single Drone",
             "description": "Create waypoints for a single drone using lineSpacing, numPoints, and areaRotation.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure determinism and rotation correctness in the generated waypoints.",
             "testStrategy": ""
@@ -261,7 +261,7 @@
             "id": 5,
             "title": "Validate Waypoint Ordering",
             "description": "Check the ordering of waypoints to ensure they are correctly sequenced.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Verify that the waypoints follow a logical sequence for mission execution.",
             "testStrategy": ""
@@ -270,7 +270,7 @@
             "id": 6,
             "title": "Validate Rotation Correctness",
             "description": "Ensure the rotation of waypoints is correctly applied and consistent with QML visuals.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Check that the waypoints align with the expected orientation on the map.",
             "testStrategy": ""
@@ -279,7 +279,7 @@
             "id": 7,
             "title": "Generate Per-Drone Waypoint Lists",
             "description": "Create ordered waypoint lists for each drone based on the single-drone waypoints.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure each drone has a unique and correctly ordered list of waypoints.",
             "testStrategy": ""
@@ -288,7 +288,7 @@
             "id": 8,
             "title": "Prepare Waypoint Lists for Mission Items",
             "description": "Format the per-drone waypoint lists to be suitable for mission item creation.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure the waypoints are in a format that can be directly used by the mission planner.",
             "testStrategy": ""
@@ -297,7 +297,7 @@
             "id": 9,
             "title": "Unit Tests: Waypoint Counts",
             "description": "Create unit tests to verify the correctness of waypoint counts per drone.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Test that each drone has the expected number of waypoints based on numPoints and lineSpacing. Assert per-drone counts align with lineCount * numPoints for assigned indices (round-robin distribution).",
             "testStrategy": ""
@@ -306,7 +306,7 @@
             "id": 10,
             "title": "Unit Tests: Waypoint Ordering",
             "description": "Create unit tests to verify the correctness of waypoint ordering per drone.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Test that the waypoints are in the correct sequence for each drone.",
             "testStrategy": ""
@@ -315,7 +315,7 @@
             "id": 11,
             "title": "Unit Tests: Altitude Offsets",
             "description": "Create unit tests to validate altitude offsets per drone.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Test that the altitude for each drone is correctly calculated as missionAltitude + (altitudeBandStart + droneIndex*altitudeBandStep). Add test in MissionManager suite without QML. Keep mission insertion separate; tests focus on data only.",
             "testStrategy": ""
@@ -324,7 +324,7 @@
             "id": 12,
             "title": "Implement generatePerDroneWaypoints Function",
             "description": "Use AreaPlanEditor::generatePerDroneWaypoints(droneIndex) to obtain geo coordinates for each drone.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure the function correctly generates waypoints based on the given parameters and returns them in a suitable format.",
             "testStrategy": ""
@@ -335,7 +335,7 @@
         "id": 4,
         "title": "Altitude Banding and Time Staggering (v1)",
         "description": "Apply altitude offsets and optional start-time staggering per drone.",
-        "status": "done",
+        "status": "pending",
         "dependencies": [
           1,
           3
@@ -348,7 +348,7 @@
             "id": 1,
             "title": "Define altitudeOffset calculation formula",
             "description": "Create a function to calculate altitudeOffset using altitudeBandStart, droneIndex, and altitudeBandStep.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure the formula is correct and can be tested independently.",
             "testStrategy": ""
@@ -357,7 +357,7 @@
             "id": 2,
             "title": "Define timeOffsetPerDrone application",
             "description": "Create a function to apply timeOffsetPerDrone as pre-start loiter at home with param1 = d * timeOffsetPerDrone seconds before first waypoint for that drone.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure the metadata is correctly formatted and can be tested independently. Guard behind timeOffsetPerDrone>0; optional toggle can be added later.",
             "testStrategy": ""
@@ -366,7 +366,7 @@
             "id": 3,
             "title": "Validate altitudeOffset against firmware limits",
             "description": "Create a function to check if the calculated altitudeOffset is within the allowed range by the firmware.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure the validation logic is correct and can be tested independently.",
             "testStrategy": ""
@@ -375,7 +375,7 @@
             "id": 4,
             "title": "Validate timeOffsetPerDrone against firmware limits",
             "description": "Create a function to check if the applied timeOffsetPerDrone is within the allowed range by the firmware.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure the validation logic is correct and can be tested independently.",
             "testStrategy": ""
@@ -384,7 +384,7 @@
             "id": 5,
             "title": "Surface effective altitudeOffset to UI",
             "description": "Create a function to display the validated altitudeOffset in the user interface.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure the UI update logic is correct and can be tested independently. Keep UI minimal; reuse existing per-drone insertion control or add an 'Insert All' button.",
             "testStrategy": ""
@@ -393,7 +393,7 @@
             "id": 6,
             "title": "Surface effective timeOffsetPerDrone to UI",
             "description": "Create a function to display the validated timeOffsetPerDrone in the user interface.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure the UI update logic is correct and can be tested independently. Keep UI minimal; reuse existing per-drone insertion control or add an 'Insert All' button.",
             "testStrategy": ""
@@ -402,7 +402,7 @@
             "id": 7,
             "title": "Implement altitudeOffset calculation as a pure helper",
             "description": "Refactor the altitudeOffset calculation function to ensure it is a pure helper function.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure the function has no side effects and can be tested independently.",
             "testStrategy": ""
@@ -411,7 +411,7 @@
             "id": 8,
             "title": "Implement timeOffsetPerDrone application as a pure helper",
             "description": "Refactor the timeOffsetPerDrone application function to ensure it is a pure helper function.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure the function has no side effects and can be tested independently.",
             "testStrategy": ""
@@ -420,7 +420,7 @@
             "id": 9,
             "title": "Implement altitudeOffset validation as a pure helper",
             "description": "Refactor the altitudeOffset validation function to ensure it is a pure helper function.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure the function has no side effects and can be tested independently.",
             "testStrategy": ""
@@ -429,7 +429,7 @@
             "id": 10,
             "title": "Implement timeOffsetPerDrone validation as a pure helper",
             "description": "Refactor the timeOffsetPerDrone validation function to ensure it is a pure helper function.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure the function has no side effects and can be tested independently.",
             "testStrategy": ""
@@ -438,7 +438,7 @@
             "id": 11,
             "title": "Add Q_INVOKABLE addAllDronesToMission()",
             "description": "Implement a function that loops d=0..droneCount-1 and calls addPerDroneToMission(d).",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure the function is correctly implemented and can be tested independently.",
             "testStrategy": ""
@@ -449,7 +449,7 @@
         "id": 5,
         "title": "Inject Policy Steps (Loiter/RTL/LoiterAfterRTL)",
         "description": "Append policy steps per waypoint as configured.",
-        "status": "done",
+        "status": "pending",
         "dependencies": [
           3
         ],
@@ -461,7 +461,7 @@
             "id": 1,
             "title": "Identify Loiter and RTL Command Structures",
             "description": "Review existing single-drone loiter logic in `AreaPlanEditor::addWaypointsToMission` to understand command structures.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Focus on MAV_CMD_NAV_LOITER_TIME and RTL commands.",
             "testStrategy": ""
@@ -470,7 +470,7 @@
             "id": 2,
             "title": "Define Command Sequencing Rules",
             "description": "Determine the rules for inserting loiter and RTL commands based on toggles.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Consider scenarios: rtlAfterEveryWaypoint, loiterAfterRtl, optional Loiter at waypoint. For each per-drone waypoint insertion: if rtlAfterEveryWaypoint → insert RTL (MissionController insertLandItem uses MAV_CMD_NAV_RETURN_TO_LAUNCH for non-VTOL). If loiterAfterRtl → immediately insert MAV_CMD_NAV_LOITER_TIME after RTL with param1=_loiterTime.",
             "testStrategy": ""
@@ -479,7 +479,7 @@
             "id": 3,
             "title": "Implement Command Insertion Logic",
             "description": "Modify `AreaPlanEditor::addWaypointsToMission` to insert commands as per defined rules (respect toggles).",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure correct sequencing and parameter mapping. Follow the existing pattern where MAV_CMD parameters (loiter time, radius, leave-direction, exit tangent) are set BEFORE calling `setCommand(MAV_CMD_NAV_LOITER_TIME)`, then re-assert if the command change resets params.",
             "testStrategy": ""
@@ -488,7 +488,7 @@
             "id": 4,
             "title": "Guard for Firmware Differences",
             "description": "Implement checks to handle different firmware versions.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure commands are compatible with various firmware types.",
             "testStrategy": ""
@@ -497,7 +497,7 @@
             "id": 5,
             "title": "Stabilize Parameters Across Command Conversions",
             "description": "Ensure parameters remain consistent during command conversions.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Prevent parameter drift or loss during conversion processes.",
             "testStrategy": ""
@@ -506,7 +506,7 @@
             "id": 6,
             "title": "Unit Test Command Sequencing",
             "description": "Create unit tests to verify correct command sequencing.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Test various toggle combinations and parameter values. Add journaling and minimal tests later under Unit Tests: Policy Injection.",
             "testStrategy": ""
@@ -515,7 +515,7 @@
             "id": 7,
             "title": "Unit Test Parameter Values",
             "description": "Create unit tests to verify correct parameter values in commands.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure parameters are correctly set based on toggles and configurations. Add journaling and minimal tests later under Unit Tests: Policy Injection.",
             "testStrategy": ""
@@ -524,7 +524,7 @@
             "id": 8,
             "title": "Integrate Command Insertion with UI Controls",
             "description": "Link command insertion logic with UI controls for multi-drone settings.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure toggles and inputs correctly influence command insertion. Keep behavior behind toggles; no UI changes needed.",
             "testStrategy": ""
@@ -533,7 +533,7 @@
             "id": 9,
             "title": "Manual Testing of Command Sequencing",
             "description": "Perform manual testing to verify command sequencing on the map.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Use visualization overlays to check correctness.",
             "testStrategy": ""
@@ -542,7 +542,7 @@
             "id": 10,
             "title": "Document Command Insertion Logic",
             "description": "Create documentation for the command insertion logic and rules.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Include examples of different toggle combinations and their effects.",
             "testStrategy": ""
@@ -562,7 +562,7 @@
           4,
           5
         ],
-        "status": "done",
+        "status": "pending",
         "subtasks": [
           {
             "id": 1,
@@ -570,7 +570,7 @@
             "description": "Adapt `AreaPlanMapVisuals.qml` to accept per-drone assignments and render multiple series.",
             "dependencies": [],
             "details": "Expose an array of {color, gridLines[], waypointPositions[]} and iterate to render per drone.\n<info added on 2025-08-08T08:43:06.359Z>\nStart: Refactor for per-drone series in AreaPlanMapVisuals.\n\nPlan:\n- Add bindings to AreaPlanEditor.computePerDroneWaypointPreview() to get per-drone waypoints\n- Introduce per-drone color palette and visibility array\n- Render grid lines/waypoints for each drone series via QGCDynamicObjectManager to avoid duplication\n- Add legend showing drone index → color; update on droneCount changes\n- Debounce recompute on param changes to reduce churn\n</info added on 2025-08-08T08:43:06.359Z>",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "Visual: N colors and series render without overlap"
           },
           {
@@ -579,7 +579,7 @@
             "description": "Define a palette (e.g., qgcPal greens/blues) and implement a legend with drone index mapping.",
             "dependencies": [],
             "details": "Legend shows drone→color; updates when droneCount changes.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "Legend items equal droneCount; colors match markers"
           },
           {
@@ -588,7 +588,7 @@
             "description": "Add per-drone visibility toggles bound to the overlays.",
             "dependencies": [],
             "details": "Boolean array binds to each series' visible property.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "Toggling hides/shows the corresponding series"
           },
           {
@@ -599,7 +599,7 @@
               2
             ],
             "details": "Re-render when assignments or parameters change (Connections handlers).\n<info added on 2025-08-08T08:51:59.799Z>\n- Add a Timer to throttle calls to addPerDroneOverlays and compute previews\n- When area params change, update perDronePreview then restart Timer to rebuild overlays once\n- Ensure legend toggles call only addPerDroneOverlays without recompute\n- Commit after implementing Timer + handler wiring\n</info added on 2025-08-08T08:51:59.799Z>",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "Changing params updates overlays without duplicates"
           },
           {
@@ -608,7 +608,7 @@
             "description": "Throttle expensive recomputes and object creation.",
             "dependencies": [],
             "details": "Debounce add/remove cycles; reuse QGCDynamicObjectManager objects.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "Logs show reduced churn during rapid drag/resize"
           }
         ]
@@ -624,7 +624,7 @@
         "dependencies": [
           1
         ],
-        "status": "done",
+        "status": "pending",
         "subtasks": [
           {
             "id": 1,
@@ -632,7 +632,7 @@
             "description": "Create a new input field for droneCount in AreaPlanEditor.qml and PlanView.qml.",
             "dependencies": [],
             "details": "Bind to the new C++ property and add basic validation feedback.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -641,7 +641,7 @@
             "description": "Create a new input field for altitudeBandStart in AreaPlanEditor.qml and PlanView.qml.",
             "dependencies": [],
             "details": "Bind to the new C++ property and add basic validation feedback.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -650,7 +650,7 @@
             "description": "Create a new input field for altitudeBandStep in AreaPlanEditor.qml and PlanView.qml.",
             "dependencies": [],
             "details": "Bind to the new C++ property and add basic validation feedback.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -659,7 +659,7 @@
             "description": "Create a new input field for timeOffsetPerDrone in AreaPlanEditor.qml and PlanView.qml.",
             "dependencies": [],
             "details": "Bind to the new C++ property and add basic validation feedback.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -668,7 +668,7 @@
             "description": "Create a new input field for loiterTime in AreaPlanEditor.qml and PlanView.qml.",
             "dependencies": [],
             "details": "Bind to the new C++ property and add basic validation feedback.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -677,7 +677,7 @@
             "description": "Create a new toggle for rtlAfterEveryWaypoint in AreaPlanEditor.qml and PlanView.qml.",
             "dependencies": [],
             "details": "Bind to the new C++ property and add basic validation feedback.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -686,7 +686,7 @@
             "description": "Create a new toggle for loiterAfterRtl in AreaPlanEditor.qml and PlanView.qml.",
             "dependencies": [],
             "details": "Bind to the new C++ property and add basic validation feedback.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -695,7 +695,7 @@
             "description": "Ensure all new inputs/toggles are properly bound in AreaPlanEditor.qml.",
             "dependencies": [],
             "details": "Verify that the bindings work correctly and update the UI accordingly.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -704,7 +704,7 @@
             "description": "Ensure all new inputs/toggles are properly bound in PlanView.qml.",
             "dependencies": [],
             "details": "Verify that the bindings work correctly and update the UI accordingly.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -713,7 +713,7 @@
             "description": "Implement basic validation feedback for all new inputs/toggles in AreaPlanEditor.qml and PlanView.qml.",
             "dependencies": [],
             "details": "Ensure that users receive appropriate feedback when invalid values are entered.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           }
         ]
@@ -730,7 +730,7 @@
           6,
           7
         ],
-        "status": "done",
+        "status": "pending",
         "subtasks": [
           {
             "id": 1,
@@ -738,7 +738,7 @@
             "description": "Add the QML file to the map composition.",
             "dependencies": [],
             "details": "Ensure correct z-order and visibility conditions.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -749,7 +749,7 @@
               "8.1"
             ],
             "details": "Ensure overlays appear above base map but below other controls.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -760,7 +760,7 @@
               "8.1"
             ],
             "details": "Use property bindings to control visibility based on drone selection.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -771,7 +771,7 @@
               "8.1"
             ],
             "details": "Ensure legend updates dynamically with visibility changes.\n<info added on 2025-08-08T09:20:52.562Z>\nLegend with per-drone visibility toggles is implemented inside `src/QmlControls/AreaPlanMapVisuals.qml` (Column + Repeater, `QGCSwitch` bound to `droneVisibility[index]` with color chips from `_seriesColors`). Toggles call `addPerDroneOverlays()` to update markers. No additional hooks required in `PlanView.qml`.\n</info added on 2025-08-08T09:20:52.562Z>",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -780,7 +780,7 @@
             "description": "Add AreaPlanMapVisuals.qml to the build system.",
             "dependencies": [],
             "details": "Modify src/QmlControls/CMakeLists.txt to include the new QML file.\n<info added on 2025-08-08T09:20:08.698Z>\nConfirmed `src/QmlControls/CMakeLists.txt` includes `AreaPlanEditor.cc/.h` in target_sources and registers `AreaPlanEditor.qml` + `AreaPlanMapVisuals.qml` under QGroundControl.Controls via qt_add_qml_module (lines ~58-60, 73-75). No changes required.\n</info added on 2025-08-08T09:20:08.698Z>",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -791,7 +791,7 @@
               "8.3"
             ],
             "details": "Verify that toggling visibility works correctly for each drone.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -802,7 +802,7 @@
               "8.2"
             ],
             "details": "Ensure overlays appear in the correct order relative to other map elements.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -813,7 +813,7 @@
               "8.4"
             ],
             "details": "Check that the legend reflects the current state of visible overlays.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -824,7 +824,7 @@
               "8.1"
             ],
             "details": "Check for responsiveness to property changes affecting visibility and z-order.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -838,7 +838,7 @@
               "8.9"
             ],
             "details": "Ensure all components work together seamlessly.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           }
         ]
@@ -856,7 +856,7 @@
           4,
           5
         ],
-        "status": "done",
+        "status": "pending",
         "subtasks": [
           {
             "id": 1,
@@ -864,7 +864,7 @@
             "description": "Retrieve drone assignments from the area partitioning algorithm.",
             "dependencies": [],
             "details": "Use the output of Task 2 to get DroneAssignment objects.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -873,7 +873,7 @@
             "description": "Create waypoint lists for each drone based on assignments.",
             "dependencies": [],
             "details": "Use lineSpacing, numPoints, and areaRotation from Task 3.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -882,7 +882,7 @@
             "description": "Adjust waypoints to include altitude banding for each drone.",
             "dependencies": [],
             "details": "Use altitudeBandStart and altitudeBandStep from UI controls.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -891,7 +891,7 @@
             "description": "Add policy-injected steps to the waypoints.",
             "dependencies": [],
             "details": "Include loiterTime, rtlAfterEveryWaypoint, and loiterAfterRtl settings.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -900,7 +900,7 @@
             "description": "Convert waypoint lists to QGC WPL format.",
             "dependencies": [],
             "details": "Ensure compliance with WPL 110 formatting standards.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -909,7 +909,7 @@
             "description": "Create filenames for each drone's mission file.",
             "dependencies": [],
             "details": "Use the format area_mission_drone_<idx>.waypoints.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -918,7 +918,7 @@
             "description": "Save the serialized waypoints to disk with the generated filenames.",
             "dependencies": [],
             "details": "Use the existing single-drone save path logic.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -927,7 +927,7 @@
             "description": "Check that each file is correctly formatted as WPL 110.",
             "dependencies": [],
             "details": "Implement validation checks for the saved files.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -936,7 +936,7 @@
             "description": "Ensure each file is named correctly according to the drone index.",
             "dependencies": [],
             "details": "Check that filenames follow the area_mission_drone_<idx>.waypoints format.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -945,7 +945,7 @@
             "description": "Inform the user of the save status in the AreaPlanEditor UI.",
             "dependencies": [],
             "details": "Provide feedback on successful saves or errors.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           }
         ]
@@ -961,7 +961,7 @@
         "dependencies": [
           9
         ],
-        "status": "done",
+        "status": "pending",
         "subtasks": [
           {
             "id": 1,
@@ -969,7 +969,7 @@
             "description": "Create a user interface element to select the vehicle.",
             "dependencies": [],
             "details": "Include dropdown or list view of available vehicles.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -980,7 +980,7 @@
               "10.1"
             ],
             "details": "Allow users to assign specific missions to the selected vehicle.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -991,7 +991,7 @@
               "10.2"
             ],
             "details": "Ensure the selected vehicle and mission mapping are passed correctly.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1002,7 +1002,7 @@
               "10.3"
             ],
             "details": "Provide feedback to the user and retry mechanisms.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1013,7 +1013,7 @@
               "10.4"
             ],
             "details": "Use existing status/progress signals to update the UI.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1024,7 +1024,7 @@
               "10.5"
             ],
             "details": "Provide clear error messages and retry options to the user.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1035,7 +1035,7 @@
               "10.5"
             ],
             "details": "Ensure the UI reflects the current state of the upload process.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1047,7 +1047,7 @@
               "10.7"
             ],
             "details": "Verify that missions are uploaded correctly and handle errors gracefully.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1058,7 +1058,7 @@
               "10.8"
             ],
             "details": "Verify that the system handles disconnections and retries correctly.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1069,7 +1069,7 @@
               "10.9"
             ],
             "details": "Include steps, error handling, and troubleshooting tips.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           }
         ]
@@ -1078,7 +1078,7 @@
         "id": 11,
         "title": "Unit Tests: Partitioning",
         "description": "C++ tests for area partitioning correctness.",
-        "status": "done",
+        "status": "pending",
         "dependencies": [
           2
         ],
@@ -1090,7 +1090,7 @@
             "id": 1,
             "title": "Short Axis Selection",
             "description": "Implement logic to select the short axis for partitioning.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Consider edge cases where axes are nearly equal in length. Verify stripe orientation matches alongShortAxis flag for different width/height ratios.",
             "testStrategy": ""
@@ -1099,7 +1099,7 @@
             "id": 2,
             "title": "Long Axis Selection",
             "description": "Implement logic to select the long axis for partitioning.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure correct selection when axes are significantly different in length. Verify stripe orientation matches alongShortAxis flag for different width/height ratios.",
             "testStrategy": ""
@@ -1108,7 +1108,7 @@
             "id": 3,
             "title": "Rotation Handling",
             "description": "Handle rotation of the area before partitioning.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure correct alignment and partitioning after rotation.",
             "testStrategy": ""
@@ -1117,7 +1117,7 @@
             "id": 4,
             "title": "Uneven Line Counts",
             "description": "Implement logic to handle uneven line counts per drone.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure balanced partitioning even with uneven line counts. Add near-square tolerance test.",
             "testStrategy": ""
@@ -1126,7 +1126,7 @@
             "id": 5,
             "title": "Minimal Area Handling",
             "description": "Handle minimal areas during partitioning.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure correct partitioning for very small areas. Handle zero/negative sizes and stripeCount<=0 return empty; very small non-zero areas still produce count stripes with endpoints within bounds.",
             "testStrategy": ""
@@ -1135,7 +1135,7 @@
             "id": 6,
             "title": "Bounds Verification",
             "description": "Verify that assignments are within the bounds of the area.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure no assignment exceeds the area boundaries.",
             "testStrategy": ""
@@ -1144,7 +1144,7 @@
             "id": 7,
             "title": "Balanced Assignments",
             "description": "Ensure assignments are balanced across drones.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Avoid overloading any single drone with too many lines.",
             "testStrategy": ""
@@ -1153,7 +1153,7 @@
             "id": 8,
             "title": "Edge Case Testing",
             "description": "Test edge cases for area partitioning correctness.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Include small areas, uneven splits, and rotations in tests. Keep tests in AreaPlanEditorTest; pure helpers via AreaPartition.h.",
             "testStrategy": ""
@@ -1162,7 +1162,7 @@
             "id": 9,
             "title": "Automated Unit Tests",
             "description": "Create automated unit tests for partitioning logic.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure comprehensive coverage of all edge cases. Keep tests in AreaPlanEditorTest; pure helpers via AreaPartition.h.",
             "testStrategy": ""
@@ -1171,7 +1171,7 @@
             "id": 10,
             "title": "Complexity Analysis",
             "description": "Analyze the complexity of the partitioning algorithm.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure efficient performance even for large areas and many drones.",
             "testStrategy": ""
@@ -1189,7 +1189,7 @@
         "dependencies": [
           3
         ],
-        "status": "done",
+        "status": "pending",
         "subtasks": [
           {
             "id": 1,
@@ -1197,7 +1197,7 @@
             "description": "Prepare the test environment with necessary dependencies.",
             "dependencies": [],
             "details": "Ensure all required libraries and tools are installed.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1206,7 +1206,7 @@
             "description": "Create a set of test data for waypoint generation.",
             "dependencies": [],
             "details": "Include various scenarios with different drone counts and line configurations.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1215,7 +1215,7 @@
             "description": "Write tests to validate the number of waypoints generated per line.",
             "dependencies": [],
             "details": "Ensure the counts match expected values based on input parameters.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1224,7 +1224,7 @@
             "description": "Write tests to validate the positions of generated waypoints.",
             "dependencies": [],
             "details": "Check if the positions are correctly spaced and aligned.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1233,7 +1233,7 @@
             "description": "Write tests to validate the rotation math for waypoints.",
             "dependencies": [],
             "details": "Ensure rotations are applied correctly based on input parameters.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1242,7 +1242,7 @@
             "description": "Write tests using golden-coordinate values for fixed seed center and parameters.",
             "dependencies": [],
             "details": "Compare generated waypoints with predefined golden coordinates.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1251,7 +1251,7 @@
             "description": "Write tests to validate the ordering of waypoints.",
             "dependencies": [],
             "details": "Ensure waypoints are ordered correctly per line and drone.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1260,7 +1260,7 @@
             "description": "Write tests for edge cases in waypoint generation.",
             "dependencies": [],
             "details": "Include scenarios with minimal and maximal input values.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1269,7 +1269,7 @@
             "description": "Execute all unit tests to validate waypoint generation.",
             "dependencies": [],
             "details": "Ensure all tests pass without any failures.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1278,7 +1278,7 @@
             "description": "Document the results of the unit tests for future reference.",
             "dependencies": [],
             "details": "Include test logs and any observed issues or anomalies.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           }
         ]
@@ -1287,7 +1287,7 @@
         "id": 13,
         "title": "Unit Tests: Policy Injection",
         "description": "C++ tests for Loiter/RTL sequencing using PlanMasterController in offline mode.",
-        "status": "done",
+        "status": "pending",
         "dependencies": [
           5
         ],
@@ -1299,7 +1299,7 @@
             "id": 1,
             "title": "Define MAV_CMD Sequences",
             "description": "Identify the correct sequences for Loiter and RTL commands.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Research and document the standard sequences for loitering and returning to launch (RTL).",
             "testStrategy": ""
@@ -1308,7 +1308,7 @@
             "id": 2,
             "title": "Determine Parameter Values",
             "description": "Specify the correct parameter values for loiter time, radius, leave-direction, and exit tangent.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Consult documentation to determine the appropriate values for these parameters in different scenarios.",
             "testStrategy": ""
@@ -1317,7 +1317,7 @@
             "id": 3,
             "title": "Create Test Cases for Loiter Command",
             "description": "Develop test cases to verify correct MAV_CMD sequences and parameter values for loiter command.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Write unit tests that check the order and parameters of loiter commands in various scenarios.",
             "testStrategy": ""
@@ -1326,7 +1326,7 @@
             "id": 4,
             "title": "Create Test Cases for RTL Command",
             "description": "Develop test cases to verify correct MAV_CMD sequences and parameter values for RTL command.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Write unit tests that check the order and parameters of RTL commands in various scenarios.",
             "testStrategy": ""
@@ -1335,7 +1335,7 @@
             "id": 5,
             "title": "Create Test Cases for LoiterAfterRTL Command",
             "description": "Develop test cases to verify correct MAV_CMD sequences and parameter values for loiter after RTL command.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Write unit tests that check the order and parameters of loiter commands following an RTL command.",
             "testStrategy": ""
@@ -1344,7 +1344,7 @@
             "id": 6,
             "title": "Create Test Cases for RTL-after-waypoint",
             "description": "Develop test cases to verify correct MAV_CMD sequences and parameter values for RTL after waypoint command.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Write unit tests that check the order and parameters of RTL commands following a waypoint.",
             "testStrategy": ""
@@ -1353,7 +1353,7 @@
             "id": 7,
             "title": "Verify Toggle Combinations",
             "description": "Test different combinations of toggles to ensure correct MAV_CMD sequences and parameter values.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Write unit tests that verify the correctness of command sequences and parameters for various toggle settings.",
             "testStrategy": ""
@@ -1362,7 +1362,7 @@
             "id": 8,
             "title": "Review Test Results",
             "description": "Analyze the results of the unit tests to identify any discrepancies or errors.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Review test logs and outputs to ensure all test cases pass successfully.",
             "testStrategy": ""
@@ -1371,7 +1371,7 @@
             "id": 9,
             "title": "Refine Test Cases",
             "description": "Adjust and refine test cases based on the review of test results.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Modify existing test cases or add new ones to address any identified issues.",
             "testStrategy": ""
@@ -1380,7 +1380,7 @@
             "id": 10,
             "title": "Finalize Unit Tests",
             "description": "Complete and finalize the unit tests for MAV_CMD sequences and parameter values.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure all test cases are comprehensive, accurate, and ready for integration testing.",
             "testStrategy": ""
@@ -1399,7 +1399,7 @@
           7,
           8
         ],
-        "status": "done",
+        "status": "pending",
         "subtasks": [
           {
             "id": 1,
@@ -1407,7 +1407,7 @@
             "description": "Ensure all user-facing strings in QML files are wrapped with qsTr().",
             "dependencies": [],
             "details": "Review and update each QML file to ensure all translatable strings use qsTr().",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1416,7 +1416,7 @@
             "description": "Add newly created QML files to `src/QmlControls/CMakeLists.txt`.",
             "dependencies": [],
             "details": "Ensure the list of QML_FILES in `CMakeLists.txt` is updated and alphabetized.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1425,7 +1425,7 @@
             "description": "Add new translatable strings to the appropriate TS files.",
             "dependencies": [],
             "details": "Identify any new strings added with qsTr() and ensure they are included in the translation files.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1434,7 +1434,7 @@
             "description": "Check that all user-facing strings in QML files use qsTr().",
             "dependencies": [],
             "details": "Review the codebase to ensure no translatable strings are missed.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1443,7 +1443,7 @@
             "description": "Ensure the QML_FILES list in `CMakeLists.txt` is alphabetized.",
             "dependencies": [],
             "details": "Sort the list of QML files in `src/QmlControls/CMakeLists.txt` alphabetically.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1452,7 +1452,7 @@
             "description": "Add any newly created QML files to the CMake build system.",
             "dependencies": [],
             "details": "Ensure all new QML files are included in the `CMakeLists.txt` file.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1461,7 +1461,7 @@
             "description": "Identify and address any missing translations in TS files.",
             "dependencies": [],
             "details": "Review the translation files to ensure all new strings are included.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1470,7 +1470,7 @@
             "description": "Perform a build-time check to ensure all user-facing strings use qsTr().",
             "dependencies": [],
             "details": "Run the build process and verify that all translatable strings are covered.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1479,7 +1479,7 @@
             "description": "Perform a UI spot-check to ensure translations are correctly applied.",
             "dependencies": [],
             "details": "Manually check the user interface to verify that all strings are translated correctly.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1488,7 +1488,7 @@
             "description": "Conduct a final review of all QML and TS files for completeness and accuracy.",
             "dependencies": [],
             "details": "Ensure all changes are correctly implemented and no issues remain.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           }
         ]
@@ -1507,27 +1507,15 @@
         "details": "Create test/Qml/AreaPlanVisuals with tst_AreaPlanVisuals.qml and CMakeLists.txt that registers a ctest invoking qmltestrunner. Wire test/Qml into test/CMakeLists.txt via add_subdirectory(Qml). Include PRD rules for visual test authoring.",
         "testStrategy": "qmltestrunner smoke runs under ctest; later expand with overlay count assertions.",
         "subtasks": [
-          {
-            "id": 1,
-            "title": "Create test/Qml/AreaPlanVisuals skeleton",
-            "status": "todo"
-          },
-          {
-            "id": 2,
-            "title": "Add ctest registration for qmltestrunner",
-            "status": "todo"
-          },
-          {
-            "id": 3,
-            "title": "Document test rules in PRD",
-            "status": "todo"
-          }
+          {"id": 1, "title": "Create test/Qml/AreaPlanVisuals skeleton", "status": "todo"},
+          {"id": 2, "title": "Add ctest registration for qmltestrunner", "status": "todo"},
+          {"id": 3, "title": "Document test rules in PRD", "status": "todo"}
         ]
       },
       {
         "title": "Performance & Logging",
         "description": "Optimize overlays and add exhaustive logging.",
-        "status": "done",
+        "status": "pending",
         "dependencies": [
           6
         ],
@@ -1539,7 +1527,7 @@
             "id": 1,
             "title": "Throttle Map Updates",
             "description": "Implement a mechanism to limit the frequency of map updates.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Use a timer or debouncer to control update rate. Extend debounce to throttle grid/waypoint recomputes with the same Timer.",
             "testStrategy": ""
@@ -1548,7 +1536,7 @@
             "id": 2,
             "title": "Cache Expensive Computations",
             "description": "Identify and cache results of expensive computations in `AreaPlanMapVisuals.qml`.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Use a caching mechanism to store and reuse computation results. Cache last preview by hashing key params (center, width, height, spacing, rotation, numPoints, droneCount) and reuse until changed.",
             "testStrategy": ""
@@ -1557,7 +1545,7 @@
             "id": 3,
             "title": "Avoid Duplicate Object Creation",
             "description": "Refactor code to prevent the creation of duplicate objects.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Reuse existing objects where possible.",
             "testStrategy": ""
@@ -1566,7 +1554,7 @@
             "id": 4,
             "title": "Add Logging for Drawing Operations",
             "description": "Implement detailed logging for all drawing operations in `AreaPlanMapVisuals.qml`.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Follow the established logging standard.",
             "testStrategy": ""
@@ -1575,7 +1563,7 @@
             "id": 5,
             "title": "Add Logging for Mission Generation",
             "description": "Implement detailed logging for mission generation processes.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Follow the established logging standard.",
             "testStrategy": ""
@@ -1584,7 +1572,7 @@
             "id": 6,
             "title": "Profile Performance Before Optimization",
             "description": "Measure and document the current performance of `AreaPlanMapVisuals.qml`.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Use profiling tools to gather data.",
             "testStrategy": ""
@@ -1593,7 +1581,7 @@
             "id": 7,
             "title": "Implement Throttling Mechanism",
             "description": "Develop and integrate a throttling mechanism for map updates.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure the mechanism is efficient and does not affect functionality. Extend debounce to throttle grid/waypoint recomputes with the same Timer.",
             "testStrategy": ""
@@ -1602,7 +1590,7 @@
             "id": 8,
             "title": "Verify Caching Mechanism",
             "description": "Test and validate the caching mechanism for expensive computations.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure cached results are accurate and improve performance. Cache last preview by hashing key params (center, width, height, spacing, rotation, numPoints, droneCount) and reuse until changed.",
             "testStrategy": ""
@@ -1611,7 +1599,7 @@
             "id": 9,
             "title": "Profile Performance After Optimization",
             "description": "Measure and document the performance of `AreaPlanMapVisuals.qml` after optimizations.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Compare before and after profiles to assess improvements.",
             "testStrategy": ""
@@ -1620,7 +1608,7 @@
             "id": 10,
             "title": "Verify Logging Implementation",
             "description": "Check the logs generated by drawing operations and mission generation.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Ensure logs are detailed, accurate, and follow the standard format. Audit logging: ensure AreaPlanMapVisuals logs key actions (create/destroy counts, timing markers).",
             "testStrategy": ""
@@ -1629,7 +1617,7 @@
             "id": 11,
             "title": "Keep Changes Minimal to Avoid UI Regressions",
             "description": "Ensure that optimizations do not introduce UI regressions.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Journal and commit per subtask grouping. Keep changes minimal to avoid UI regressions.",
             "testStrategy": ""
@@ -1648,7 +1636,7 @@
           9,
           10
         ],
-        "status": "done",
+        "status": "pending",
         "subtasks": [
           {
             "id": 1,
@@ -1656,7 +1644,7 @@
             "description": "Prepare the SITL environment with necessary configurations.",
             "dependencies": [],
             "details": "Ensure all dependencies are resolved and the environment is ready for testing.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1667,7 +1655,7 @@
               "16.1"
             ],
             "details": "Use `sitl-demo/` to establish connections with multiple vehicles.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1678,7 +1666,7 @@
               "16.2"
             ],
             "details": "Ensure each vehicle has its own mission plan loaded.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1689,7 +1677,7 @@
               "16.3"
             ],
             "details": "Verify successful upload of missions to each vehicle.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1700,7 +1688,7 @@
               "16.4"
             ],
             "details": "Ensure that the altitude bands do not overlap and are within specified ranges.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1711,7 +1699,7 @@
               "16.5"
             ],
             "details": "Ensure that the drones take off and execute their missions at staggered times if configured.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1722,7 +1710,7 @@
               "16.2"
             ],
             "details": "Ensure all relevant data is logged for analysis.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1733,7 +1721,7 @@
               "16.2"
             ],
             "details": "Document visual states at critical points in the test.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1745,7 +1733,7 @@
               "16.8"
             ],
             "details": "Include steps taken, observations, and any issues encountered.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1756,7 +1744,7 @@
               "16.9"
             ],
             "details": "Ensure all steps are documented and any issues are noted.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           }
         ]
@@ -1769,7 +1757,7 @@
         "testStrategy": "Verify that the UI layout is rendered correctly without any horizontal scrolling issues.",
         "priority": "medium",
         "dependencies": [],
-        "status": "done",
+        "status": "pending",
         "subtasks": [
           {
             "id": 1,
@@ -1777,7 +1765,7 @@
             "description": "Create the initial structure of the Area Planning Mission Editor UI using QML.",
             "dependencies": [],
             "details": "Use `QGCPalette` and `ScreenTools` to design the basic layout. Ensure no horizontal scrolling and sizes are derived from font metrics.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "Verify that the basic layout is rendered correctly without any horizontal scrolling issues."
           },
           {
@@ -1788,7 +1776,7 @@
               "18.1"
             ],
             "details": "Use `QGCPalette` and `ScreenTools` to integrate necessary QGC controls into the layout.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "Verify that all integrated QGC controls are functional and properly sized."
           },
           {
@@ -1799,7 +1787,7 @@
               "18.2"
             ],
             "details": "Include elements for drone count, altitude banding, time offsets, and other relevant parameters.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "Verify that all multi-drone specific UI elements are correctly displayed and functional."
           },
           {
@@ -1810,7 +1798,7 @@
               "18.3"
             ],
             "details": "Test the layout on various screen resolutions and ensure it remains functional without horizontal scrolling.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "Verify that the UI layout adapts correctly to different screen sizes and orientations."
           },
           {
@@ -1821,7 +1809,7 @@
               "18.4"
             ],
             "details": "Make any necessary adjustments based on testing feedback to ensure a polished and functional UI.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "Conduct a final review of the UI layout to ensure it meets all design requirements and is free of issues."
           }
         ]
@@ -1836,7 +1824,7 @@
         "dependencies": [
           18
         ],
-        "status": "done",
+        "status": "pending",
         "subtasks": [
           {
             "id": 1,
@@ -1844,7 +1832,7 @@
             "description": "Add functionality to allow users to activate area definition mode.",
             "dependencies": [],
             "details": "Implement a toggle or button in the UI to enable area definition mode.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "Verify that the mode can be activated and deactivated."
           },
           {
@@ -1855,7 +1843,7 @@
               "19.1"
             ],
             "details": "Implement a click event handler to set the area center coordinates.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "Test that clicking on the map sets the correct area center."
           },
           {
@@ -1866,7 +1854,7 @@
               "19.2"
             ],
             "details": "Implement a drag event handler to resize the rectangle.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "Verify that the rectangle can be resized by dragging."
           },
           {
@@ -1877,7 +1865,7 @@
               "19.3"
             ],
             "details": "Calculate and apply geodesic offsets for the rectangle corners.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "Test that the rectangle is accurately positioned using geodesic offsets."
           },
           {
@@ -1888,7 +1876,7 @@
               "19.4"
             ],
             "details": "Modify or extend existing QML components to support area definition mode.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "Verify that the new functionality integrates seamlessly with QGC map controls."
           }
         ]
@@ -1903,7 +1891,7 @@
         "dependencies": [
           19
         ],
-        "status": "done",
+        "status": "pending",
         "subtasks": [
           {
             "id": 1,
@@ -1911,7 +1899,7 @@
             "description": "Set up the initial structure for drawing a rectangle using MapPolygon.",
             "dependencies": [],
             "details": "Create a new function or method to initialize the rectangle drawing process.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1922,7 +1910,7 @@
               "20.1"
             ],
             "details": "Ensure that the corners of the rectangle can be adjusted to change its size.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1933,7 +1921,7 @@
               "20.1"
             ],
             "details": "Ensure that the corners of the rectangle can be rotated correctly.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1945,7 +1933,7 @@
               "20.3"
             ],
             "details": "Test the combined functionality to ensure that both resizing and rotating work seamlessly.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           },
           {
@@ -1956,7 +1944,7 @@
               "20.4"
             ],
             "details": "Ensure that the rectangle can be drawn, resized, and rotated accurately on the map.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": ""
           }
         ]
@@ -1965,7 +1953,7 @@
         "id": 21,
         "title": "Generate Waypoints for Single Drone",
         "description": "Implement waypoint generation for a single drone based on the defined area.",
-        "status": "in-progress",
+        "status": "pending",
         "dependencies": [
           20
         ],
@@ -1977,7 +1965,7 @@
             "id": 1,
             "title": "Define Geodesic Offsets",
             "description": "Calculate geodesic offsets for waypoint generation.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [],
             "details": "Use QGeoCoordinate to define geodesic offsets based on the defined area.",
             "testStrategy": ""
@@ -2030,7 +2018,7 @@
             "id": 6,
             "title": "Add Comprehensive Logging for Each Vehicle",
             "description": "Implement logging for each vehicle to track waypoint generation and positioning.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [
               5
             ],
@@ -2041,7 +2029,7 @@
             "id": 7,
             "title": "Implement Parameter Validation Across Instances",
             "description": "Validate parameters used in waypoint generation across multiple instances.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [
               6
             ],
@@ -2052,7 +2040,7 @@
             "id": 8,
             "title": "Add Health Monitoring and Status Reporting",
             "description": "Implement health monitoring and status reporting for waypoint generation process.",
-            "status": "done",
+            "status": "pending",
             "dependencies": [
               7
             ],
@@ -2170,7 +2158,7 @@
         "dependencies": [
           21
         ],
-        "status": "done",
+        "status": "pending",
         "subtasks": [
           {
             "id": 1,
@@ -2178,7 +2166,7 @@
             "description": "Use existing helpers to assign lines to drones.",
             "dependencies": [],
             "details": "Leverage `MissionManager/AreaPartition` functions for line assignment.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "Verify correct line assignments using unit tests."
           },
           {
@@ -2189,7 +2177,7 @@
               "22.1"
             ],
             "details": "Ensure each drone has a unique altitude offset.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "Test altitude offsets for each drone."
           },
           {
@@ -2201,7 +2189,7 @@
               "22.2"
             ],
             "details": "Ensure drones start at staggered times.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "Verify time offsets for each drone."
           },
           {
@@ -2214,7 +2202,7 @@
               "22.3"
             ],
             "details": "Focus on QGC vehicle selection and mission assignment interface.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "Manual testing with connected SITL vehicles."
           },
           {
@@ -2228,7 +2216,7 @@
               "22.4"
             ],
             "details": "Ensure lines are assigned correctly with appropriate altitude and time offsets.",
-            "status": "done",
+            "status": "pending",
             "testStrategy": "Comprehensive testing to verify correct assignments."
           }
         ]
@@ -2243,7 +2231,7 @@
         "dependencies": [
           22
         ],
-        "status": "done",
+        "status": "pending",
         "subtasks": []
       },
       {
@@ -2256,7 +2244,7 @@
         "dependencies": [
           23
         ],
-        "status": "done",
+        "status": "pending",
         "subtasks": []
       },
       {
@@ -2269,7 +2257,7 @@
         "dependencies": [
           24
         ],
-        "status": "done",
+        "status": "pending",
         "subtasks": []
       },
       {
@@ -2282,7 +2270,7 @@
         "dependencies": [
           25
         ],
-        "status": "done",
+        "status": "pending",
         "subtasks": []
       },
       {
@@ -2507,7 +2495,7 @@
     ],
     "metadata": {
       "created": "2025-08-07T23:48:39.554Z",
-      "updated": "2025-08-11T23:40:40.448Z",
+      "updated": "2025-08-11T01:20:23.749Z",
       "description": "Tasks for master context"
     }
   }

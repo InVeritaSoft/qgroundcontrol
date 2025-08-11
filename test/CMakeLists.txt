@@ -64,6 +64,9 @@ add_custom_target(check
     USES_TERMINAL
 )
 
+# QML visual tests
+add_subdirectory(Qml)
+
 function(add_qgc_test test_name)
     add_test(
         NAME ${test_name}
