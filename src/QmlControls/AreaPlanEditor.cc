@@ -560,6 +560,8 @@ QList<QVariant> AreaPlanEditor::generateWaypoints()
         return res;
     };
 
+    auto clamp = [](qreal v, qreal lo, qreal hi){ return v < lo ? lo : (v > hi ? hi : v); };
+
     // Y coordinates for each line (evenly distributed from -halfH to +halfH)
     for (int li = 0; li < lineCount; ++li) {
         qreal y;
@@ -577,6 +579,10 @@ QList<QVariant> AreaPlanEditor::generateWaypoints()
             } else {
                 x = -halfW + (static_cast<qreal>(pi) * (_areaWidth / (_numPoints - 1)));
             }
+
+            // Clamp to bounds in local space (safety against FP drift)
+            x = clamp(x, -halfW, halfW);
+            y = clamp(y, -halfH, halfH);
 
             // Apply rotation around center
             const QPointF r = rotateXY(x, y);
