@@ -55,6 +55,21 @@ Item {
     readonly property real waypointBaseSize: ScreenTools.defaultFontPixelHeight * 1.5
     readonly property real waypointLabelSize: ScreenTools.defaultFontPixelHeight * 0.8
 
+    // Altitude-band visual mapping helpers
+    function _altitudeColor(offset) {
+        // Positive offset -> blue band, negative -> red, near zero -> light gray
+        if (offset === undefined || offset === null) return "#BDBDBD";
+        if (offset > 0.5) return "#1E88E5";       // blue for higher band
+        if (offset < -0.5) return "#E53935";      // red for lower band
+        return "#BDBDBD";                         // neutral
+    }
+    function _altitudeThickness(offset) {
+        // Thickness from 1..5 px based on magnitude (per 3 m)
+        var mag = Math.abs(offset || 0);
+        var t = 1 + Math.min(4, Math.floor(mag / 3));
+        return Math.max(1, t);
+    }
+
     function _makePreviewKey() {
         if (!areaPlanEditor) return "";
         var c = areaPlanEditor.areaCenter || QtPositioning.coordinate();
@@ -117,6 +132,21 @@ Item {
 
     // Reuse cache for per-drone marker objects to avoid churn
     property var _perDroneMarkerObjects: [] // array of arrays of MapQuickItem
+    property var _perDroneGridObjects: [] // array of arrays of MapPolyline
+
+    // Preview data and visibility controls
+    property var perDronePreview: [] // array of {droneIndex, altitudeOffsetM, timeOffsetS, waypoints[]}
+    property var droneVisibility: [] // bool per drone
+    property var _seriesColors: droneColors
+    // Cache keys for preview change detection
+    property string _lastPreviewKey: ""
+    property var _lastPreviewData: null
+
+    // Diagnostic counters for tests/validation
+    property int lastGridLineCount: 0
+    property int lastWaypointMarkerCount: 0
+    property int lastPerDroneMarkerCount: 0
+    property int lastRectangleCornerCount: 0
 
     QGCPalette { id: qgcPal; colorGroupEnabled: enabled }
 
@@ -450,8 +480,11 @@ Item {
 			z: _zorderPoints
 			anchorPoint.x: sourceItem.width / 2
 			anchorPoint.y: sourceItem.height / 2
+			// Per-marker properties
+			property int droneIndex: 0
+			property real altitudeOffset: 0
 
-            sourceItem: Item {
+			sourceItem: Item {
                 width: waypointBaseSize
                 height: width
 
@@ -460,7 +493,7 @@ Item {
                     id: waypointCircle
                     anchors.fill: parent
                     radius: width / 2
-                    color: droneColors[Math.min(droneIndex, droneColors.length - 1)]
+                    color: droneColors[Math.min(missionPoints.droneIndex, droneColors.length - 1)]
                     border.color: waypointBorderColor
                     border.width: Math.max(2, Math.round(ScreenTools.defaultFontPixelWidth * 0.5))
                     opacity: 0.8
@@ -472,9 +505,9 @@ Item {
                         height: width
                         radius: width / 2
                         color: "transparent"
-                        border.color: waypointBorderColor
-                        border.width: 1
-                        opacity: 0.6
+                        border.color: _altitudeColor(missionPoints.altitudeOffset)
+                        border.width: _altitudeThickness(missionPoints.altitudeOffset)
+                        opacity: 0.8
 
                         // Altitude indicator
                         Rectangle {
@@ -482,15 +515,15 @@ Item {
                             width: parent.width * 0.8
                             height: width
                             radius: width / 2
-                            color: Qt.darker(droneColors[Math.min(droneIndex, droneColors.length - 1)], 1.3)
-                            opacity: 0.4
+                            color: _altitudeColor(missionPoints.altitudeOffset)
+                            opacity: 0.25
                         }
                     }
 
                     // Drone index label
                     Text {
                         anchors.centerIn: parent
-                        text: (droneIndex + 1).toString()
+                        text: (missionPoints.droneIndex).toString()
                         color: waypointBorderColor
                         font.pixelSize: waypointLabelSize
                         font.bold: true
@@ -629,8 +662,9 @@ Item {
 		// Always try to add map items
 		console.log("AreaPlanMapVisuals: Adding map items, visible:", visible, "opacity:", opacity)
 
-		console.log("Rectangle corners count:", rectangleCorners.length)
-		console.log("Area center valid:", areaPlanEditor ? areaPlanEditor.areaCenter.isValid : false)
+        console.log("Rectangle corners count:", rectangleCorners.length)
+        lastRectangleCornerCount = rectangleCorners.length
+        console.log("Area center valid:", areaPlanEditor ? areaPlanEditor.areaCenter.isValid : false)
 		console.log("Area dimensions:", areaPlanEditor ? areaPlanEditor.areaWidth + "x" + areaPlanEditor.areaHeight : "null")
 
 			// Create all map items
@@ -677,7 +711,8 @@ Item {
 		// Remove existing grid lines first
 		removeGridLines()
 
-		console.log("AreaPlanMapVisuals: Creating", gridLines.length, "grid lines")
+        console.log("AreaPlanMapVisuals: Creating", gridLines.length, "grid lines")
+        lastGridLineCount = gridLines.length
 
 		// Create new grid lines based on current parameters
 		for (var i = 0; i < gridLines.length; i++) {
@@ -710,8 +745,9 @@ Item {
 		}
 
 		// Get per-drone waypoint data
-		var perDroneData = areaPlanEditor.computePerDroneWaypointPreview()
-		console.log("AreaPlanMapVisuals: Creating waypoints for", perDroneData.length, "drones")
+        var perDroneData = areaPlanEditor.computePerDroneWaypointPreview()
+        console.log("AreaPlanMapVisuals: Creating waypoints for", perDroneData.length, "drones")
+        lastWaypointMarkerCount = 0
 
 		// Create waypoint markers for each drone
 		for (var droneIndex = 0; droneIndex < perDroneData.length; droneIndex++) {
@@ -723,10 +759,11 @@ Item {
 
 			for (var i = 0; i < waypoints.length; i++) {
 				var waypointMarker = _objMgrWaypointMarkers.createObject(waypointMarkerComponent, mapControl, true)
-				if (waypointMarker) {
-					waypointMarker.coordinate = waypoints[i]
-					waypointMarker.droneIndex = droneIndex
-					waypointMarker.altitudeOffset = altOffset
+                if (waypointMarker) {
+                    waypointMarker.coordinate = waypoints[i]
+                    waypointMarker.droneIndex = droneIndex
+                    waypointMarker.altitudeOffset = altOffset
+                    lastWaypointMarkerCount += 1
 					console.log("AreaPlanMapVisuals: Created waypoint", i, "for drone", droneIndex, 
 						"at:", waypoints[i].latitude, waypoints[i].longitude, 
 						"alt:", waypoints[i].altitude)
@@ -744,15 +781,64 @@ Item {
 		_objMgrWaypointMarkers.destroyObjects()
 	}
 
-    // Placeholder for future swarm-related functions
+    // Create per-drone overlays (markers and optional lines) based on preview
+    function addPerDroneOverlays() {
+        if (!areaPlanEditor || !areaPlanEditor.computePerDroneWaypointPreview || !mapControl) {
+            return
+        }
+        removePerDroneOverlays()
+        // Ensure preview data
+        if (!perDronePreview || perDronePreview.length === 0) {
+            perDronePreview = areaPlanEditor.computePerDroneWaypointPreview()
+        }
+        // Build markers per visible drone
+        lastPerDroneMarkerCount = 0
+        for (var d = 0; d < perDronePreview.length; d++) {
+            if (droneVisibility && droneVisibility.length > d && droneVisibility[d] === false) {
+                continue
+            }
+            var group = perDronePreview[d]
+            if (!group || !group.waypoints) continue
+            var markersForDrone = []
+            for (var i = 0; i < group.waypoints.length; i++) {
+                var wp = group.waypoints[i]
+                var marker = _objMgrPerDroneMarkers.createObject(waypointMarkerComponent, mapControl, true)
+                if (marker) {
+                    marker.coordinate = wp
+                    marker.droneIndex = group.droneIndex || d
+                    marker.altitudeOffset = group.altitudeOffsetM || 0
+                    lastPerDroneMarkerCount += 1
+                    markersForDrone.push(marker)
+                }
+            }
+            _perDroneMarkerObjects.push(markersForDrone)
+        }
+    }
 
-	function removeMapItems() {
+    function removePerDroneOverlays() {
+        _objMgrPerDroneMarkers.destroyObjects()
+        _objMgrPerDroneGrid.destroyObjects()
+        _perDroneMarkerObjects = []
+        _perDroneGridObjects = []
+    }
+
+    function removeMapItems() {
 		console.log("AreaPlanMapVisuals: Removing all map items")
 		_objMgrRectangle.destroyObjects()
 		_objMgrCenterMarker.destroyObjects()
 		removeGridLines()
 		removeWaypointMarkers()
 	}
+
+    // Force a full rebuild of map items and overlays
+    function forceRefreshAll() {
+        console.log("AreaPlanMapVisuals: Force refresh initiated")
+        removePerDroneOverlays()
+        removeMapItems()
+        addMapItems()
+        addPerDroneOverlays()
+        console.log("AreaPlanMapVisuals: Force refresh completed")
+    }
 
 	// Monitor visibility and property changes
 	onVisibleChanged: {
@@ -788,6 +874,8 @@ Item {
                 _updatePreviewIfChanged()
                 _overlayDebounce.restart()
             }
+            // Refresh grid lines to reflect new geometry
+            addGridLines()
 		}
 
 		function onAreaHeightChanged() {
@@ -796,6 +884,7 @@ Item {
                 _updatePreviewIfChanged()
                 _overlayDebounce.restart()
             }
+            addGridLines()
 		}
 
 		function onAreaCenterChanged() {
@@ -804,6 +893,7 @@ Item {
                 _updatePreviewIfChanged()
                 _overlayDebounce.restart()
             }
+            addGridLines()
 		}
 
 		function onAreaRotationChanged() {
@@ -812,23 +902,74 @@ Item {
                 _updatePreviewIfChanged()
                 _overlayDebounce.restart()
             }
+            addGridLines()
 		}
 
 		function onLineSpacingChanged() {
 			console.log("AreaPlanMapVisuals: Line spacing changed")
             if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) {
-                perDronePreview = areaPlanEditor.computePerDroneWaypointPreview()
-                addPerDroneOverlays()
+                _updatePreviewIfChanged()
+                _overlayDebounce.restart()
             }
+            addGridLines()
 		}
 
 		function onNumPointsChanged() {
 			console.log("AreaPlanMapVisuals: Number of points changed")
             if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) {
-                perDronePreview = areaPlanEditor.computePerDroneWaypointPreview()
-                addPerDroneOverlays()
+                _updatePreviewIfChanged()
+                _overlayDebounce.restart()
             }
 		}
+		function onDroneCountChanged() {
+            console.log("AreaPlanMapVisuals: Drone count changed")
+            if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) {
+                _updatePreviewIfChanged()
+                _overlayDebounce.restart()
+            }
+        }
+        function onAltitudeBandStartChanged() {
+            console.log("AreaPlanMapVisuals: Altitude band start changed")
+            if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) {
+                _updatePreviewIfChanged()
+                _overlayDebounce.restart()
+            }
+        }
+        function onAltitudeBandStepChanged() {
+            console.log("AreaPlanMapVisuals: Altitude band step changed")
+            if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) {
+                _updatePreviewIfChanged()
+                _overlayDebounce.restart()
+            }
+        }
+        function onTimeOffsetPerDroneChanged() {
+            console.log("AreaPlanMapVisuals: Time offset per drone changed")
+            if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) {
+                _updatePreviewIfChanged()
+                _overlayDebounce.restart()
+            }
+        }
+        function onMissionAltitudeChanged() {
+            console.log("AreaPlanMapVisuals: Mission altitude changed")
+            if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) {
+                _updatePreviewIfChanged()
+                _overlayDebounce.restart()
+            }
+        }
+        function onPerTargetSeparationSChanged() {
+            console.log("AreaPlanMapVisuals: Per-target separation changed")
+            if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) {
+                _updatePreviewIfChanged()
+                _overlayDebounce.restart()
+            }
+        }
+        function onLandAtTargetReturnChanged() {
+            console.log("AreaPlanMapVisuals: Land-at-target policy changed")
+            if (areaPlanEditor && areaPlanEditor.computePerDroneWaypointPreview) {
+                _updatePreviewIfChanged()
+                _overlayDebounce.restart()
+            }
+        }
 	}
 
 	// Monitor drawing mode changes
@@ -880,8 +1021,28 @@ Item {
                         addPerDroneOverlays()
                     }
                 }
-                QGCLabel { text: qsTr("Drone %1").arg(index) }
+                QGCLabel {
+                    text: {
+                        var group = perDronePreview && perDronePreview.length > index ? perDronePreview[index] : null
+                        var alt = group && group.altitudeOffsetM !== undefined ? group.altitudeOffsetM : 0
+                        var sign = alt > 0 ? "+" : ""
+                        return qsTr("Aircraft %1 — Altitude offset: %2%3 m").arg(index).arg(sign).arg(Math.round(alt))
+                    }
+                }
             }
+        }
+    }
+
+    // Force refresh overlay button
+    Row {
+        id: refreshRow
+        anchors.right: parent.right
+        anchors.top: legend.visible ? legend.bottom : parent.top
+        anchors.margins: ScreenTools.defaultFontPixelWidth
+        spacing: ScreenTools.defaultFontPixelWidth * 0.5
+        QGCButton {
+            text: qsTr("Force Refresh")
+            onClicked: forceRefreshAll()
         }
     }
 
@@ -889,7 +1050,7 @@ Item {
     MouseArea {
 		id: mapAreaMouseArea
 		anchors.fill: parent
-        enabled: interactive && isDrawingMode  // Only enable shape manipulation in drawing mode
+        enabled: interactive && isDrawingMode  // Only enable shape manipulation in drawing mode; map remains pannable otherwise
 		hoverEnabled: true
 		preventStealing: true
 		z: 999  // High z-order but below the rectangle MouseArea

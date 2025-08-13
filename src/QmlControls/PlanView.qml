@@ -36,7 +36,7 @@ Item {
     readonly property real  _margin:                    ScreenTools.defaultFontPixelHeight * 0.5
     readonly property real  _toolsMargin:               ScreenTools.defaultFontPixelWidth * 0.75
     readonly property real  _radius:                    ScreenTools.defaultFontPixelWidth  * 0.5
-    readonly property real  _rightPanelWidth:           Math.min(width / 2.5, ScreenTools.defaultFontPixelWidth * 60)  // Increased width for better content visibility
+    readonly property real  _rightPanelWidth:           Math.min(width / 1.25, ScreenTools.defaultFontPixelWidth * 130)  // Make right panel (tab content) wider
     readonly property var   _defaultVehicleCoordinate:  QtPositioning.coordinate(37.803784, -122.462276)
     readonly property bool  _waypointsOnlyMode:         QGroundControl.corePlugin.options.missionWaypointsOnly
 
@@ -88,6 +88,14 @@ Item {
         map:                        editorMap
         usePlannedHomePosition:     true
         planMasterController:       _planMasterController
+    }
+
+    Component.onCompleted: {
+        if (QGroundControl.areaPlanEditor) {
+            // Pass the MissionController instance expected by the backend
+            QGroundControl.areaPlanEditor.planMasterController = _missionController
+            console.log("PlanView: Bound MissionController to AreaPlanEditor backend")
+        }
     }
 
     onVisibleChanged: {
@@ -909,8 +917,9 @@ Item {
                 Component.onCompleted: {
                     // Pass the plan master controller to the area plan editor
                     if (QGroundControl.areaPlanEditor) {
-                        QGroundControl.areaPlanEditor.planMasterController = planMasterController
-                        console.log("AreaPlanEditor: PlanMasterController set")
+                        // NOTE: Use the existing _planMasterController object here.
+                        QGroundControl.areaPlanEditor.planMasterController = _missionController
+                        console.log("AreaPlanEditor: MissionController set")
                     }
                 }
             }

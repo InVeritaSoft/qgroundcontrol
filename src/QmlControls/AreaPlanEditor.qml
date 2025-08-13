@@ -11,6 +11,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtPositioning
+import Qt.labs.settings 1.1
 
 import QGroundControl
 import QGroundControl.Controls
@@ -23,27 +24,135 @@ Item {
 	property var areaPlanEditor: null
     // Selected vehicle (object) for upload
     property var selectedVehicle: QGroundControl.multiVehicleManager.activeVehicle
-    // Mapping: droneIndex -> vehicle object
+    // Mapping: droneIndex -> vehicle object (rebuilt from persisted IDs)
     property var vehicleMapping: ({})
     // Per-drone preview data: array of { droneIndex, altitudeOffsetM, timeOffsetS, waypoints[] }
     property var waypointPreview: []
+    // Simple list model for dropdowns (labels) and parallel storage of objects
+    property var vehicleLabels: []              // ["Vehicle <id>", ...]
+    property var vehicleObjects: []             // [vehicleObj, ...]
+    // Track which droneIndex mission was uploaded for (green indicator)
+    property var uploadedMap: ({})              // { droneIndex: true }
+
+    // Persisted mapping (vehicle IDs), stored per session/user
+    Settings {
+        id: areaMapSettings
+        category: "AreaPlanEditor"
+        property var savedMap: ({}) // { droneIndex: vehicleId }
+    }
+
+    // Helper: find current vehicle object by numeric id
+    function getVehicleById(id) {
+        if (id === undefined || id === null) return null
+        for (var i = 0; i < vehicleObjects.length; i++) {
+            var v = vehicleObjects[i]
+            if (v && v.id === id) return v
+        }
+        return null
+    }
+
+    // Helper: set mapping for a drone, updating both runtime and persisted state
+    function setMappingForDrone(droneIndex, veh) {
+        vehicleMapping[droneIndex] = veh || null
+        var sm = areaMapSettings.savedMap || {}
+        sm[droneIndex] = veh ? veh.id : null
+        areaMapSettings.savedMap = sm
+    }
+
+    // Rebind runtime mapping from persisted IDs (run on app start and when vehicles change)
+    function rebindMappingsFromSaved() {
+        var sm = areaMapSettings.savedMap
+        if (!sm) return
+        for (var k in sm) {
+            if (!sm.hasOwnProperty(k)) continue
+            var id = sm[k]
+            var obj = getVehicleById(id)
+            vehicleMapping[k] = obj
+        }
+    }
+
+    function refreshVehicleList() {
+        var labels = []
+        var objs = []
+        var mv = QGroundControl.multiVehicleManager
+        if (mv && mv.vehicles) {
+            var n = mv.vehicles.count
+            for (var i = 0; i < n; i++) {
+                var veh = mv.vehicles.get(i)
+                if (veh) {
+                    var label = veh.id !== undefined ? (qsTr("Vehicle %1").arg(veh.id)) : qsTr("Vehicle")
+                    labels.push(label)
+                    objs.push(veh)
+                }
+            }
+        }
+        vehicleLabels = labels
+        vehicleObjects = objs
+        // Attempt to rebind runtime mappings to current vehicle objects after list refresh
+        rebindMappingsFromSaved()
+    }
 
     // Sizing helpers (no hardcoded sizes)
     readonly property real _h: ScreenTools.defaultFontPixelHeight
     readonly property real _w: ScreenTools.defaultFontPixelWidth
 
 
-	Component.onCompleted: {
+    Component.onCompleted: {
 		console.log("AreaPlanEditor: Component completed")
 		areaPlanEditor = QGroundControl.areaPlanEditor
 		console.log("AreaPlanEditor backend:", !!areaPlanEditor)
+        refreshVehicleList()
+        rebindMappingsFromSaved()
 		if (areaPlanEditor) {
 			console.log("AreaPlanEditor properties:")
 			console.log("  areaWidth:", areaPlanEditor.areaWidth)
 			console.log("  areaHeight:", areaPlanEditor.areaHeight)
 			console.log("  isDrawingMode:", areaPlanEditor.isDrawingMode)
+            // Initialize preview data
+            waypointPreview = areaPlanEditor.computePerDroneWaypointPreview()
 		}
 	}
+
+    // Keep waypoint preview in sync with editor changes
+    // Safe validator shim to avoid errors if backend doesn't expose validateInput
+    function _safeValidate(fieldName, value) {
+        try {
+            if (areaPlanEditor && areaPlanEditor.validateInput) {
+                return areaPlanEditor.validateInput(fieldName, value)
+            }
+        } catch (e) {}
+        return ""
+    }
+
+    Connections {
+        target: areaPlanEditor
+        function onMissionUploaded(droneIndex, vehicle) {
+            // Mark uploaded for this drone
+            uploadedMap[droneIndex] = true
+        }
+        function _refreshPreview() { if (areaPlanEditor) waypointPreview = areaPlanEditor.computePerDroneWaypointPreview() }
+        function onDroneCountChanged() { _refreshPreview() }
+        function onAltitudeBandStartChanged() { _refreshPreview() }
+        function onAltitudeBandStepChanged() { _refreshPreview() }
+        function onTimeOffsetPerDroneChanged() { _refreshPreview() }
+        function onMissionAltitudeChanged() { _refreshPreview() }
+        function onAreaWidthChanged() { _refreshPreview() }
+        function onAreaHeightChanged() { _refreshPreview() }
+        function onAreaCenterChanged() { _refreshPreview() }
+        function onAreaRotationChanged() { _refreshPreview() }
+        function onLineSpacingChanged() { _refreshPreview() }
+        function onNumPointsChanged() { _refreshPreview() }
+    }
+
+    // Keep vehicle list in sync with connections
+    Connections {
+        target: QGroundControl.multiVehicleManager
+        function onActiveVehicleChanged() { refreshVehicleList() }
+    }
+    Connections {
+        target: QGroundControl.multiVehicleManager ? QGroundControl.multiVehicleManager.vehicles : null
+        function onCountChanged() { refreshVehicleList() }
+    }
 
     QGCPalette {
         id: qgcPal
@@ -108,6 +217,7 @@ Item {
 							width: parent.width
                             rowSpacing: _h * 0.6
                             columnSpacing: _w
+                            property color _err: '#E53935'
 
 							QGCLabel { 
 								text: qsTr("Area Width (Meters):")
@@ -115,22 +225,24 @@ Item {
                                 height: _h * 1.6
 								verticalAlignment: Text.AlignVCenter
 							}
-							QGCTextField {
-								id: widthTextField
-								text: areaPlanEditor ? areaPlanEditor.areaWidth.toString() : "10"
-								width: parent.width * 0.5
-                                height: _h * 1.6
-								validator: DoubleValidator {
-									bottom: 1
-									top: 1000
-									decimals: 1
-								}
-								onEditingFinished: {
-									if (areaPlanEditor && text !== "") {
-										areaPlanEditor.areaWidth = parseFloat(text)
-									}
-								}
-							}
+							Column {
+                                width: parent.width * 0.5
+                                spacing: _h * 0.2
+                                QGCTextField {
+                                    id: widthTextField
+                                    text: areaPlanEditor ? areaPlanEditor.areaWidth.toString() : "10"
+                                    height: _h * 1.6
+                                    validator: DoubleValidator { bottom: 1; top: 1000; decimals: 1 }
+                                    onEditingFinished: {
+                                        if (areaPlanEditor && text !== "") {
+var err = _safeValidate("areaWidth", parseFloat(text))
+                                            widthError.text = err
+                                            if (err === "") areaPlanEditor.areaWidth = parseFloat(text)
+                                        }
+                                    }
+                                }
+                                QGCLabel { id: widthError; color: parent.parent._err; visible: text.length>0; text: "" }
+                            }
 
                             // --- Multi-drone parameters ---
                             QGCLabel {
@@ -139,12 +251,23 @@ Item {
                                 height: _h * 1.6
                                 verticalAlignment: Text.AlignVCenter
                             }
-                            QGCTextField {
+                            Column {
                                 width: parent.width * 0.5
-                                height: _h * 1.6
-                                text: areaPlanEditor ? areaPlanEditor.droneCount.toString() : "2"
-                                validator: IntValidator { bottom: 1; top: 50 }
-                                onEditingFinished: if (areaPlanEditor && text !== "") areaPlanEditor.setDroneCount(parseInt(text))
+                                spacing: _h * 0.2
+                                QGCTextField {
+                                    id: droneCountField
+                                    height: _h * 1.6
+                                    text: areaPlanEditor ? areaPlanEditor.droneCount.toString() : "2"
+                                    validator: IntValidator { bottom: 1; top: 50 }
+                                    onEditingFinished: {
+                                        if (areaPlanEditor && text !== "") {
+var err = _safeValidate("droneCount", parseInt(text))
+                                            droneCountError.text = err
+                                            if (err === "") areaPlanEditor.setDroneCount(parseInt(text))
+                                        }
+                                    }
+                                }
+                                QGCLabel { id: droneCountError; color: parent.parent._err; visible: text.length>0; text: "" }
                             }
 
                             QGCLabel {
@@ -153,12 +276,24 @@ Item {
                                 height: _h * 1.6
                                 verticalAlignment: Text.AlignVCenter
                             }
-                            QGCTextField {
+                            Column {
                                 width: parent.width * 0.5
-                                height: _h * 1.6
-                                text: areaPlanEditor ? areaPlanEditor.altitudeBandStart.toString() : "0"
-                                validator: DoubleValidator { bottom: 0; top: 10000; decimals: 1 }
-                                onEditingFinished: if (areaPlanEditor && text !== "") areaPlanEditor.setAltitudeBandStart(parseFloat(text))
+                                spacing: _h * 0.2
+                                QGCTextField {
+                                    id: bandStartField
+                                    height: _h * 1.6
+                                    text: areaPlanEditor ? areaPlanEditor.altitudeBandStart.toString() : "0"
+                                    validator: DoubleValidator { bottom: 0; top: 10000; decimals: 1 }
+                                    onEditingFinished: {
+                                        if (areaPlanEditor && text !== "") {
+var err = _safeValidate("missionAltitude", parseFloat(text))
+                                            // missionAltitude validator is generic numeric; accept >=0 here
+                                            bandStartError.text = ""  // no hard error at UI level
+                                            areaPlanEditor.setAltitudeBandStart(parseFloat(text))
+                                        }
+                                    }
+                                }
+                                QGCLabel { id: bandStartError; color: parent.parent._err; visible: text.length>0; text: "" }
                             }
 
                             QGCLabel {
@@ -167,12 +302,23 @@ Item {
                                 height: _h * 1.6
                                 verticalAlignment: Text.AlignVCenter
                             }
-                            QGCTextField {
+                            Column {
                                 width: parent.width * 0.5
-                                height: _h * 1.6
-                                text: areaPlanEditor ? areaPlanEditor.altitudeBandStep.toString() : "10"
-                                validator: DoubleValidator { bottom: 0.1; top: 10000; decimals: 1 }
-                                onEditingFinished: if (areaPlanEditor && text !== "") areaPlanEditor.setAltitudeBandStep(parseFloat(text))
+                                spacing: _h * 0.2
+                                QGCTextField {
+                                    id: bandStepField
+                                    height: _h * 1.6
+                                    text: areaPlanEditor ? areaPlanEditor.altitudeBandStep.toString() : "10"
+                                    validator: DoubleValidator { bottom: 0.1; top: 10000; decimals: 1 }
+                                    onEditingFinished: {
+                                        if (areaPlanEditor && text !== "") {
+var err = _safeValidate("altitudeBandStep", parseFloat(text))
+                                            bandStepError.text = err
+                                            if (err === "") areaPlanEditor.setAltitudeBandStep(parseFloat(text))
+                                        }
+                                    }
+                                }
+                                QGCLabel { id: bandStepError; color: parent.parent._err; visible: text.length>0; text: "" }
                             }
 
                             QGCLabel {
@@ -181,12 +327,31 @@ Item {
                                 height: _h * 1.6
                                 verticalAlignment: Text.AlignVCenter
                             }
+                            Column {
+                                width: parent.width * 0.5
+                                spacing: _h * 0.2
+                                QGCTextField {
+                                    id: timeOffsetField
+                                    height: _h * 1.6
+                                    text: areaPlanEditor ? areaPlanEditor.timeOffsetPerDrone.toString() : "0"
+                                    validator: DoubleValidator { bottom: 0; top: 3600; decimals: 1 }
+                                    onEditingFinished: if (areaPlanEditor && text !== "") areaPlanEditor.setTimeOffsetPerDrone(parseFloat(text))
+                                }
+                                QGCLabel { text: qsTr("Start staggering per aircraft"); color: qgcPal.colorGrey }
+                            }
+
+                            QGCLabel {
+                                text: qsTr("Per-Target Separation (s):")
+                                width: parent.width * 0.4
+                                height: _h * 1.6
+                                verticalAlignment: Text.AlignVCenter
+                            }
                             QGCTextField {
                                 width: parent.width * 0.5
                                 height: _h * 1.6
-                                text: areaPlanEditor ? areaPlanEditor.timeOffsetPerDrone.toString() : "0"
+                                text: areaPlanEditor ? areaPlanEditor.perTargetSeparationS.toString() : "5"
                                 validator: DoubleValidator { bottom: 0; top: 3600; decimals: 1 }
-                                onEditingFinished: if (areaPlanEditor && text !== "") areaPlanEditor.setTimeOffsetPerDrone(parseFloat(text))
+                                onEditingFinished: if (areaPlanEditor && text !== "") areaPlanEditor.setPerTargetSeparationS(parseFloat(text))
                             }
 
                             QGCLabel {
@@ -214,28 +379,43 @@ Item {
                                 checked: areaPlanEditor ? areaPlanEditor.loiterAfterRtl : false
                                 onClicked: if (areaPlanEditor) areaPlanEditor.setLoiterAfterRtl(checked)
                             }
+
+                            QGCLabel {
+                                text: qsTr("Land at Target then Return:")
+                                width: parent.width * 0.4
+                                height: _h * 1.6
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            QGCSwitch {
+                                width: parent.width * 0.5
+                                height: _h * 1.6
+                                checked: areaPlanEditor ? areaPlanEditor.landAtTargetReturn : false
+                                onClicked: if (areaPlanEditor) areaPlanEditor.setLandAtTargetReturn(checked)
+                            }
 							QGCLabel { 
 								text: qsTr("Area Height (Meters):")
 								width: parent.width * 0.4
                                 height: _h * 1.6
 								verticalAlignment: Text.AlignVCenter
 							}
-							QGCTextField {
-								id: heightTextField
-								text: areaPlanEditor ? areaPlanEditor.areaHeight.toString() : "10"
-								width: parent.width * 0.5
-                                height: _h * 1.6
-								validator: DoubleValidator {
-									bottom: 1
-									top: 1000
-									decimals: 1
-								}
-								onEditingFinished: {
-									if (areaPlanEditor && text !== "") {
-										areaPlanEditor.areaHeight = parseFloat(text)
-									}
-								}
-							}
+							Column {
+                                width: parent.width * 0.5
+                                spacing: _h * 0.2
+                                QGCTextField {
+                                    id: heightTextField
+                                    text: areaPlanEditor ? areaPlanEditor.areaHeight.toString() : "10"
+                                    height: _h * 1.6
+                                    validator: DoubleValidator { bottom: 1; top: 1000; decimals: 1 }
+                                    onEditingFinished: {
+                                        if (areaPlanEditor && text !== "") {
+var err = _safeValidate("areaHeight", parseFloat(text))
+                                            heightError.text = err
+                                            if (err === "") areaPlanEditor.areaHeight = parseFloat(text)
+                                        }
+                                    }
+                                }
+                                QGCLabel { id: heightError; color: parent.parent._err; visible: text.length>0; text: "" }
+                            }
 
 							QGCLabel { 
 								text: qsTr("Line Spacing (Meters):")
@@ -243,22 +423,24 @@ Item {
                                 height: _h * 1.6
 								verticalAlignment: Text.AlignVCenter
 							}
-							QGCTextField {
-								id: lineSpacingTextField
-								text: areaPlanEditor ? areaPlanEditor.lineSpacing.toString() : "10"
-								width: parent.width * 0.5
-                                height: _h * 1.6
-								validator: DoubleValidator {
-									bottom: 1
-									top: 500
-									decimals: 1
-								}
-								onEditingFinished: {
-									if (areaPlanEditor && text !== "") {
-										areaPlanEditor.lineSpacing = parseFloat(text)
-									}
-								}
-							}
+							Column {
+                                width: parent.width * 0.5
+                                spacing: _h * 0.2
+                                QGCTextField {
+                                    id: lineSpacingTextField
+                                    text: areaPlanEditor ? areaPlanEditor.lineSpacing.toString() : "10"
+                                    height: _h * 1.6
+                                    validator: DoubleValidator { bottom: 1; top: 500; decimals: 1 }
+                                    onEditingFinished: {
+                                        if (areaPlanEditor && text !== "") {
+var err = _safeValidate("lineSpacing", parseFloat(text))
+                                            lineSpacingError.text = err
+                                            if (err === "") areaPlanEditor.lineSpacing = parseFloat(text)
+                                        }
+                                    }
+                                }
+                                QGCLabel { id: lineSpacingError; color: parent.parent._err; visible: text.length>0; text: "" }
+                            }
 
 							QGCLabel { 
 								text: qsTr("Waypoints Per Line:")
@@ -266,21 +448,24 @@ Item {
                                 height: _h * 1.6
 								verticalAlignment: Text.AlignVCenter
 							}
-							QGCTextField {
-								id: numPointsTextField
-								text: areaPlanEditor ? areaPlanEditor.numPoints.toString() : "1"
-								width: parent.width * 0.5
-                                height: _h * 1.6
-								validator: IntValidator {
-									bottom: 1
-									top: 50
-								}
-								onEditingFinished: {
-									if (areaPlanEditor && text !== "") {
-										areaPlanEditor.numPoints = parseInt(text)
-									}
-								}
-							}
+							Column {
+                                width: parent.width * 0.5
+                                spacing: _h * 0.2
+                                QGCTextField {
+                                    id: numPointsTextField
+                                    text: areaPlanEditor ? areaPlanEditor.numPoints.toString() : "1"
+                                    height: _h * 1.6
+                                    validator: IntValidator { bottom: 1; top: 50 }
+                                    onEditingFinished: {
+                                        if (areaPlanEditor && text !== "") {
+var err = _safeValidate("numPoints", parseInt(text))
+                                            numPointsError.text = err
+                                            if (err === "") areaPlanEditor.numPoints = parseInt(text)
+                                        }
+                                    }
+                                }
+                                QGCLabel { id: numPointsError; color: parent.parent._err; visible: text.length>0; text: "" }
+                            }
 
 							QGCLabel { 
 								text: qsTr("Mission Altitude (Meters):")
@@ -950,6 +1135,13 @@ Item {
 							onClicked: if (areaPlanEditor) areaPlanEditor.saveMissionFile()
 						}
 
+                        QGCButton {
+                            text: qsTr("Clear Mission Items")
+                            width: parent.width
+                            height: _h * 2.2
+                            onClicked: if (areaPlanEditor) areaPlanEditor.clearMission()
+                        }
+
                         // Per-Drone Mission Insertion (non-aggregated)
                         Row {
                             width: parent.width
@@ -957,10 +1149,11 @@ Item {
                             spacing: _w
 
                             QGCLabel {
-                                text: qsTr("Insert Drone # to Mission:")
+                                text: qsTr("Insert Aircraft Number\ninto Mission:")
                                 width: parent.width * 0.45
                                 height: parent.height
                                 verticalAlignment: Text.AlignVCenter
+                                wrapMode: Text.WordWrap
                             }
                             QGCTextField {
                                 id: droneIndexField
@@ -1005,35 +1198,44 @@ Item {
                             height: _h * 2
                             spacing: _w
                             // Vehicle selector
-                            QGCComboBox {
-                                id: droneVehicleSelector
+                            // Guarded vehicle selector for upload
+                            Item {
                                 width: parent.width * 0.35
                                 height: parent.height
-                                model: QGroundControl.multiVehicleManager.vehicles
-                                textRole: "id"
-                                onActivated: {
-                                    // model is ListModel of Vehicle QObjects; get(index) returns object wrapper
-                                    var veh = QGroundControl.multiVehicleManager.vehicles.get(currentIndex)
-                                    selectedVehicle = veh
-                                }
-                                Component.onCompleted: {
-                                    if (QGroundControl.multiVehicleManager.activeVehicle) {
-                                        // Try to set currentIndex to active vehicle
-                                        for (var i = 0; i < QGroundControl.multiVehicleManager.vehicles.count; i++) {
-                                            if (QGroundControl.multiVehicleManager.vehicles.get(i) === QGroundControl.multiVehicleManager.activeVehicle) {
-                                                currentIndex = i
-                                                selectedVehicle = QGroundControl.multiVehicleManager.activeVehicle
-                                                break
+                                property int _vehCount: vehicleLabels.length
+                                QGCComboBox {
+                                    id: droneVehicleSelector
+                                    anchors.fill: parent
+                                    visible: parent._vehCount > 0
+                                    model: vehicleLabels
+                                    // choose active vehicle if present
+                                    currentIndex: (function(){
+                                        if (QGroundControl.multiVehicleManager.activeVehicle) {
+                                            for (var i = 0; i < vehicleObjects.length; i++) {
+                                                if (vehicleObjects[i] === QGroundControl.multiVehicleManager.activeVehicle) return i
                                             }
+                                        }
+                                        return parent._vehCount > 0 ? 0 : -1
+                                    })()
+                                    onActivated: {
+                                        if (currentIndex >= 0 && currentIndex < vehicleObjects.length) {
+                                            selectedVehicle = vehicleObjects[currentIndex]
                                         }
                                     }
                                 }
+                                QGCLabel {
+                                    anchors.centerIn: parent
+                                    visible: parent._vehCount === 0
+                                    color: qgcPal.colorGrey
+                                    text: qsTr("No vehicles")
+                                }
                             }
                             QGCLabel {
-                                text: qsTr("Upload Drone # → Vehicle:")
+                                text: qsTr("Upload Aircraft Number\n to Vehicle:")
                                 width: parent.width * 0.25
                                 height: parent.height
                                 verticalAlignment: Text.AlignVCenter
+                                wrapMode: Text.WordWrap
                             }
                             QGCTextField {
                                 id: uploadDroneIndexField
@@ -1061,6 +1263,40 @@ Item {
                             }
                         }
 
+                        // Quick planning status
+                        Row {
+                            width: parent.width
+                            height: _h * 1.6
+                            spacing: _w
+                            QGCLabel {
+                                text: qsTr("Planned aircraft: %1").arg(areaPlanEditor ? areaPlanEditor.droneCount : 0)
+                                width: parent.width * 0.33
+                                height: parent.height
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            QGCLabel {
+                                text: qsTr("Connected vehicles: %1").arg(QGroundControl.multiVehicleManager.vehicles.count)
+                                width: parent.width * 0.33
+                                height: parent.height
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            QGCLabel {
+                                text: {
+                                    var mapped = 0
+                                    for (var k in vehicleMapping) if (vehicleMapping.hasOwnProperty(k) && vehicleMapping[k]) mapped++
+                                    return qsTr("Mapped: %1").arg(mapped)
+                                }
+                                width: parent.width * 0.33
+                                height: parent.height
+                                verticalAlignment: Text.AlignVCenter
+                                color: (function(){
+                                    var planned = areaPlanEditor ? areaPlanEditor.droneCount : 0
+                                    var m=0; for (var k in vehicleMapping) if (vehicleMapping[k]) m++
+                                    return (m < planned) ? qgcPal.colorOrange : qgcPal.text
+                                })()
+                            }
+                        }
+
                         // Per-Drone Vehicle Mapping
                         Rectangle {
                             width: parent.width
@@ -1078,10 +1314,84 @@ Item {
                                 anchors.margins: _h * 0.5
                                 spacing: _h * 0.4
 
+                                // Safety confirm dialog
+                                property var _pendingAction: null
+                                    Dialog {
+                                    id: confirmDialog
+                                    modal: true
+                                    title: qsTr("Confirm Action")
+                                    standardButtons: Dialog.Ok | Dialog.Cancel
+                                    onAccepted: { if (perDroneMapColumn._pendingAction) { perDroneMapColumn._pendingAction(); perDroneMapColumn._pendingAction = null } }
+                                    onRejected: { perDroneMapColumn._pendingAction = null }
+                                    contentItem: Column {
+                                        padding: _h * 0.5
+                                        spacing: _h * 0.5
+                                        QGCLabel { id: confirmText; wrapMode: Text.WordWrap }
+                                    }
+                                    Keys.onEscapePressed: confirmDialog.close()
+                                }
+                                function confirmAndRun(msg, fn) {
+                                    confirmText.text = msg
+                                    perDroneMapColumn._pendingAction = fn
+                                    confirmDialog.open()
+                                }
+
+                                // Helper to schedule delayed starts
+                                function scheduleStart(veh, delaySec) {
+                                    var t = Qt.createQmlObject('import QtQuick 2.15; Timer { property var _veh; interval: ' + Math.max(0, Math.floor(delaySec * 1000)) + '; repeat: false; }', perDroneMapColumn, 'StartTimer')
+                                    t._veh = veh
+                                    t.triggered.connect(function(){ if (areaPlanEditor) areaPlanEditor.startMissionOnVehicle(t._veh); t.destroy() })
+                                    t.start()
+                                }
+
                                 QGCLabel {
                                     text: qsTr("Per-Drone Vehicle Mapping")
                                     font.pointSize: ScreenTools.smallFontPointSize
                                     font.bold: true
+                                }
+                                Row {
+                                    width: parent.width
+                                    height: _h * 1.6
+                                    spacing: _w
+                                    QGCButton {
+                                        text: qsTr("Map All")
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: qsTr("Map Aircraft 0..N to first N connected vehicles")
+                                        enabled: vehicleObjects.length > 0 && waypointPreview && waypointPreview.length > 0
+                                        onClicked: {
+                                            if (waypointPreview && vehicleObjects.length > 0) {
+                                                var count = Math.min(waypointPreview.length, vehicleObjects.length)
+                                                for (var i = 0; i < count; i++) {
+                                                    var veh = vehicleObjects[i]
+                                                    setMappingForDrone(waypointPreview[i].droneIndex, veh)
+                                                }
+                                                if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Mapped %1 aircraft to %2 vehicles").arg(count).arg(count))
+                                            }
+                                        }
+                                    }
+                                    QGCButton {
+                                        text: qsTr("Unmap All")
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: qsTr("Clear all aircraft-to-vehicle mappings")
+                                        enabled: (function(){
+                                            if (!waypointPreview) return false
+                                            var sm = areaMapSettings.savedMap
+                                            if (!sm) return false
+                                            for (var i = 0; i < waypointPreview.length; i++) {
+                                                if (sm[waypointPreview[i].droneIndex]) return true
+                                            }
+                                            return false
+                                        })()
+                                        onClicked: {
+                                            if (waypointPreview) {
+                                                for (var i = 0; i < waypointPreview.length; i++) {
+                                                    var di = waypointPreview[i].droneIndex
+                                                    setMappingForDrone(di, null)
+                                                }
+                                                if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Cleared all mappings"))
+                                            }
+                                        }
+                                    }
                                 }
 
                                 // Build rows dynamically from preview (one row per drone)
@@ -1093,51 +1403,342 @@ Item {
                                         spacing: _w
 
                                         QGCLabel {
-                                            text: qsTr("Drone %1").arg(modelData.droneIndex)
-                                            width: parent.width * 0.2
+                                            text: qsTr("Aircraft %1").arg(modelData.droneIndex)
+                                            width: parent.width * 0.15
                                             height: parent.height
                                             verticalAlignment: Text.AlignVCenter
                                         }
 
-                                        QGCComboBox {
-                                            id: vehicleCombo
-                                            width: parent.width * 0.45
+                                        // Vehicle selector (guarded for empty vehicle list)
+                                        Item {
+                                            width: parent.width * 0.30
                                             height: parent.height
-                                            model: QGroundControl.multiVehicleManager.vehicles
-                                            textRole: "id"
-                                            onActivated: {
-                                                var veh = QGroundControl.multiVehicleManager.vehicles.get(currentIndex)
-                                                vehicleMapping[modelData.droneIndex] = veh
+                                            visible: true
+                                            property int _vehCount: vehicleLabels.length
+                                            QGCComboBox {
+                                                id: vehicleCombo
+                                                anchors.fill: parent
+                                                visible: parent._vehCount > 0
+                                                model: vehicleLabels
+                                                currentIndex: parent._vehCount > 0 ? 0 : -1
+                                                onActivated: {
+                                                    if (currentIndex >= 0 && currentIndex < vehicleObjects.length) {
+                                                        var veh = vehicleObjects[currentIndex]
+                                                        // Do not auto-commit mapping on selection; wait for explicit Map click
+                                                    }
+                                                }
                                             }
+                                            QGCLabel {
+                                                anchors.centerIn: parent
+                                                visible: parent._vehCount === 0
+                                                color: qgcPal.colorGrey
+                                                text: qsTr("No vehicles")
+                                            }
+                                        }
+
+                                        // Explicit map button for user confirmation
+                                        QGCButton {
+                                            text: qsTr("Map")
+                                            width: _w * 10
+                                            height: parent.height
+                                            enabled: (function(){
+                                                var count = vehicleLabels.length
+                                                return count > 0 && vehicleCombo.currentIndex >= 0 && vehicleCombo.currentIndex < vehicleObjects.length
+                                            })()
+                                            onClicked: {
+                                                if (vehicleCombo.currentIndex >= 0 && vehicleCombo.currentIndex < vehicleObjects.length) {
+                                                    var veh = vehicleObjects[vehicleCombo.currentIndex]
+                                                    setMappingForDrone(modelData.droneIndex, veh)
+                                                    if (areaPlanEditor) {
+                                                        var vid = (veh && typeof veh.id !== 'undefined') ? veh.id : "?"
+                                                        areaPlanEditor.updateStatus(qsTr("Mapped Aircraft %1 to Vehicle %2").arg(modelData.droneIndex).arg(vid))
+                                                    }
+                                                }
+                                            }
+                                            Keys.onReturnPressed: clicked()
+                                            Keys.onEnterPressed: clicked()
+                                            focus: true
+                                            ToolTip.visible: hovered
+                                            ToolTip.text: qsTr("Assign selected vehicle to this aircraft")
+                                        }
+
+                                        // Status summary (live via vehicle properties)
+                                        QGCLabel {
+                                            width: parent.width * 0.25
+                                            height: parent.height
+                                            verticalAlignment: Text.AlignVCenter
+                                            color: qgcPal.colorGrey
+                                            text: {
+                                                var veh = vehicleMapping[modelData.droneIndex]
+                                                var sm = areaMapSettings.savedMap || {}
+                                                var hadId = sm[modelData.droneIndex] !== undefined && sm[modelData.droneIndex] !== null
+                                                if (!veh) return hadId ? qsTr("Vehicle disconnected") : qsTr("No vehicle mapped")
+                                                var arm = veh.armed === true ? qsTr("ARMED") : qsTr("DISARMED")
+                                                var fm = veh.flightMode ? veh.flightMode : "?"
+                                                return qsTr("%1 | %2").arg(arm).arg(fm)
+                                            }
+                                        }
+                                        QGCButton {
+                                            text: qsTr("Unmap")
+                                            width: _w * 10
+                                            height: parent.height
+                                            enabled: (function(){
+                                                var sm = areaMapSettings.savedMap || {}
+                                                return sm[modelData.droneIndex] !== undefined && sm[modelData.droneIndex] !== null
+                                            })()
+                                            onClicked: {
+                                                setMappingForDrone(modelData.droneIndex, null)
+                                                if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Unmapped Aircraft %1").arg(modelData.droneIndex))
+                                            }
+                                            ToolTip.visible: hovered
+                                            ToolTip.text: qsTr("Clear mapping for this aircraft")
                                         }
 
                                         QGCButton {
                                             text: qsTr("Upload")
-                                            width: parent.width * 0.25
+                                            width: parent.width * 0.2
                                             height: parent.height
                                             onClicked: {
                                                 if (areaPlanEditor) {
                                                     var veh = vehicleMapping[modelData.droneIndex]
                                                     if (veh) {
+                                                        // Reset status to pending until signal arrives
+                                                        uploadedMap[modelData.droneIndex] = false
                                                         areaPlanEditor.uploadPerDroneMissionToVehicle(modelData.droneIndex, veh)
                                                     }
                                                 }
                                             }
                                         }
+                                        // Upload status indicator
+                                        Rectangle {
+                                            width: _w * 2
+                                            height: _w * 2
+                                            radius: _w
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            color: uploadedMap[modelData.droneIndex] ? "#3CB371" : qgcPal.windowShade
+                                            border.color: qgcPal.colorGrey
+                                            border.width: 1
+                                            ToolTip.visible: hovered
+                                            ToolTip.text: uploadedMap[modelData.droneIndex] ? qsTr("Relative mission uploaded") : qsTr("Not uploaded yet")
+                                        }
                                     }
                                 }
 
-                                QGCButton {
-                                    text: qsTr("Upload All Mapped")
+                                Row {
                                     width: parent.width
                                     height: _h * 2
-                                    onClicked: {
-                                        if (areaPlanEditor && waypointPreview && waypointPreview.length > 0) {
-                                            for (var i = 0; i < waypointPreview.length; i++) {
-                                                var d = waypointPreview[i]
-                                                var veh = vehicleMapping[d.droneIndex]
-                                                if (veh) {
-                                                    areaPlanEditor.uploadPerDroneMissionToVehicle(d.droneIndex, veh)
+                                    spacing: _w
+                                    QGCButton {
+                                        text: qsTr("Upload All Mapped")
+                                        onClicked: {
+                                            if (areaPlanEditor && waypointPreview && waypointPreview.length > 0) {
+                                                for (var i = 0; i < waypointPreview.length; i++) {
+                                                    var d = waypointPreview[i]
+                                                    var veh = vehicleMapping[d.droneIndex]
+                                                    if (veh) areaPlanEditor.uploadPerDroneMissionToVehicle(d.droneIndex, veh)
+                                                }
+                                            }
+                                        }
+                                    }
+                                    QGCButton {
+                                        text: qsTr("Sync Missions (All Mapped)")
+                                        onClicked: {
+                                            if (areaPlanEditor && waypointPreview) {
+                                                for (var i = 0; i < waypointPreview.length; i++) {
+                                                    var d = waypointPreview[i]
+                                                    var veh = vehicleMapping[d.droneIndex]
+                                                    if (veh) areaPlanEditor.uploadPerDroneMissionToVehicle(d.droneIndex, veh)
+                                                }
+                                            }
+                                        }
+                                    }
+                                    // Start all mapped missions with optional stagger
+                                    QGCTextField {
+                                        id: staggerField
+                                        width: _w * 10
+                                        height: parent.height
+                                        text: "3"
+                                        validator: DoubleValidator { bottom: 0; top: 3600; decimals: 1 }
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: qsTr("Stagger seconds between mission starts")
+                                    }
+                                    QGCButton {
+                                        text: qsTr("Start All Mapped (Staggered)")
+                                        onClicked: {
+                                            var stagger = parseFloat(staggerField.text)
+                                            if (isNaN(stagger) || stagger < 0) stagger = 0
+                                            perDroneMapColumn.confirmAndRun(qsTr("Start missions on all mapped vehicles?\nStagger: %1 s").arg(stagger), function(){
+                                                if (waypointPreview) {
+                                                    for (var i = 0; i < waypointPreview.length; i++) {
+                                                        var d = waypointPreview[i]
+                                                        var veh = vehicleMapping[d.droneIndex]
+                                                        if (veh) perDroneMapColumn.scheduleStart(veh, i * stagger)
+                                                    }
+                                                }
+                                            })
+                                        }
+                                    }
+                                }
+
+                                // Helpers for per-vehicle gating similar to FlyView
+                                function _hasMissionItems() {
+                                    if (!areaPlanEditor) return false
+                                    var mc = areaPlanEditor.getMissionController()
+                                    return mc && mc.containsItems
+                                }
+                                function _canStartMissionFor(veh) {
+                                    if (!veh) return false
+                                    if (veh.flying === true) return false
+                                    // Require at least 1m relative altitude before mission start
+                                    var altOk = (veh.altitudeRelative !== undefined) ? (veh.altitudeRelative >= 1.0) : true
+                                    // Health and arming report gating
+                                    var rep = veh.healthAndArmingCheckReport
+                                    var ok = (!rep || rep.supported === false || rep.canStartMission === true)
+                                    return ok && altOk && _hasMissionItems()
+                                }
+
+                                // Per-vehicle controls
+                                Column {
+                                    width: parent.width
+                                    spacing: _h * 0.25
+                                    QGCLabel { text: qsTr("Per-Aircraft Controls"); font.bold: true }
+                                    Repeater {
+                                        model: waypointPreview
+                                        delegate: Row {
+                                            width: parent.width
+                                            height: _h * 1.8
+                                            spacing: _w
+                                            QGCLabel { text: qsTr("Aircraft %1").arg(modelData.droneIndex); width: parent.width * 0.15; verticalAlignment: Text.AlignVCenter }
+                                            QGCButton {
+                                                text: qsTr("Arm")
+                                                enabled: {
+                                                    var veh = vehicleMapping[modelData.droneIndex]
+                                                    return !!veh && !Boolean(veh.armed)
+                                                }
+                                                onClicked: {
+                                                    var veh = vehicleMapping[modelData.droneIndex]
+                                                    if (veh && areaPlanEditor) {
+                                                        perDroneMapColumn.confirmAndRun(qsTr("Arm vehicle %1?").arg(veh.id), function(){ areaPlanEditor.armVehicle(veh, true) })
+                                                    }
+                                                }
+                                                ToolTip.visible: hovered && !enabled
+                                                ToolTip.text: {
+                                                    var veh = vehicleMapping[modelData.droneIndex]
+                                                    if (!veh) return qsTr("No vehicle mapped")
+                                                    if (Boolean(veh.armed)) return qsTr("Already armed")
+                                                    return qsTr("Unavailable")
+                                                }
+                                            }
+                                            QGCButton {
+                                                text: qsTr("Disarm")
+                                                enabled: {
+                                                    var veh = vehicleMapping[modelData.droneIndex]
+                                                    return !!veh && Boolean(veh.armed)
+                                                }
+                                                onClicked: {
+                                                    var veh = vehicleMapping[modelData.droneIndex]
+                                                    if (veh && areaPlanEditor) areaPlanEditor.armVehicle(veh, false)
+                                                }
+                                                ToolTip.visible: hovered && !enabled
+                                                ToolTip.text: {
+                                                    var veh = vehicleMapping[modelData.droneIndex]
+                                                    if (!veh) return qsTr("No vehicle mapped")
+                                                    if (!Boolean(veh.armed)) return qsTr("Already disarmed")
+                                                    return qsTr("Unavailable")
+                                                }
+                                            }
+                                            QGCButton {
+                                                text: qsTr("Takeoff")
+                                                enabled: {
+                                                    var veh = vehicleMapping[modelData.droneIndex]
+                                                    return !!veh && veh.takeoffVehicleSupported === true && veh.flying === false
+                                                }
+                                                onClicked: {
+                                                    var veh = vehicleMapping[modelData.droneIndex]
+                                                    if (veh && areaPlanEditor) areaPlanEditor.takeoffVehicle(veh, areaPlanEditor ? areaPlanEditor.missionAltitude : 10)
+                                                }
+                                                ToolTip.visible: hovered && !enabled
+                                                ToolTip.text: {
+                                                    var veh = vehicleMapping[modelData.droneIndex]
+                                                    if (!veh) return qsTr("No vehicle mapped")
+                                                    if (veh.flying === true) return qsTr("Already flying")
+                                                    if (veh.takeoffVehicleSupported !== true) return qsTr("Takeoff not supported")
+                                                    return qsTr("Unavailable")
+                                                }
+                                            }
+                                            QGCButton {
+                                                text: qsTr("Start Mission")
+                                                enabled: {
+                                                    var veh = vehicleMapping[modelData.droneIndex]
+                                                    return _canStartMissionFor(veh)
+                                                }
+                                                onClicked: {
+                                                    var veh = vehicleMapping[modelData.droneIndex]
+                                                    if (veh && areaPlanEditor) {
+                                                        perDroneMapColumn.confirmAndRun(qsTr("Start mission on vehicle %1?").arg(veh.id), function(){ areaPlanEditor.startMissionOnVehicle(veh) })
+                                                    }
+                                                }
+                                                ToolTip.visible: hovered && !enabled
+                                                ToolTip.text: qsTr("Cannot start: ensure mission is uploaded and health checks pass")
+                                            }
+                                            QGCButton {
+                                                text: qsTr("Pause")
+                                                enabled: {
+                                                    var veh = vehicleMapping[modelData.droneIndex]
+                                                    return !!veh && veh.pauseVehicleSupported === true && veh.flying === true
+                                                }
+                                                onClicked: {
+                                                    var veh = vehicleMapping[modelData.droneIndex]
+                                                    if (veh && areaPlanEditor) areaPlanEditor.pauseMissionOnVehicle(veh)
+                                                }
+                                                ToolTip.visible: hovered && !enabled
+                                                ToolTip.text: {
+                                                    var veh = vehicleMapping[modelData.droneIndex]
+                                                    if (!veh) return qsTr("No vehicle mapped")
+                                                    if (veh.pauseVehicleSupported !== true) return qsTr("Pause not supported")
+                                                    if (veh.flying !== true) return qsTr("Vehicle not flying")
+                                                    return qsTr("Unavailable")
+                                                }
+                                            }
+                                            QGCButton {
+                                                text: qsTr("Land")
+                                                enabled: {
+                                                    var veh = vehicleMapping[modelData.droneIndex]
+                                                    // Enable if we have a vehicle, it's armed (or flying), and guided/land supported if exposed
+                                                    var armed = Boolean(veh && veh.armed)
+                                                    var flying = Boolean(veh && veh.flying)
+                                                    var guidedOk = (veh && (veh.guidedModeSupported === true || veh.landModeSupported === true))
+                                                    return (!!veh) && (armed || flying) && (guidedOk || true)
+                                                }
+                                                onClicked: {
+                                                    var veh = vehicleMapping[modelData.droneIndex]
+                                                    if (veh && areaPlanEditor) areaPlanEditor.landVehicle(veh)
+                                                }
+                                                ToolTip.visible: hovered && !enabled
+                                                ToolTip.text: {
+                                                    var veh = vehicleMapping[modelData.droneIndex]
+                                                    if (!veh) return qsTr("No vehicle mapped")
+                                                    if (!Boolean(veh.armed) && !Boolean(veh.flying)) return qsTr("Not armed or flying")
+                                                    return qsTr("Unavailable")
+                                                }
+                                            }
+                                            QGCButton {
+                                                text: qsTr("RTL")
+                                                enabled: {
+                                                    var veh = vehicleMapping[modelData.droneIndex]
+                                                    return !!veh && veh.guidedModeSupported === true && veh.armed === true
+                                                }
+                                                onClicked: {
+                                                    var veh = vehicleMapping[modelData.droneIndex]
+                                                    if (veh && areaPlanEditor) areaPlanEditor.rtlVehicle(veh)
+                                                }
+                                                ToolTip.visible: hovered && !enabled
+                                                ToolTip.text: {
+                                                    var veh = vehicleMapping[modelData.droneIndex]
+                                                    if (!veh) return qsTr("No vehicle mapped")
+                                                    if (veh.guidedModeSupported !== true) return qsTr("Guided/RTL not supported")
+                                                    if (!Boolean(veh.armed)) return qsTr("Vehicle not armed")
+                                                    return qsTr("Unavailable")
                                                 }
                                             }
                                         }
@@ -1267,7 +1868,7 @@ Item {
                                         spacing: _w
 
                                         QGCLabel {
-                                            text: qsTr("Drone %1").arg(modelData.droneIndex)
+                                            text: qsTr("Aircraft %1").arg(modelData.droneIndex)
                                             width: parent.width * 0.3
                                             height: parent.height
                                             verticalAlignment: Text.AlignVCenter

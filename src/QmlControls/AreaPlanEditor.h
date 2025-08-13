@@ -46,8 +46,13 @@ public:
     Q_PROPERTY(qreal altitudeBandStart    READ altitudeBandStart    WRITE setAltitudeBandStart    NOTIFY altitudeBandStartChanged)
     Q_PROPERTY(qreal altitudeBandStep     READ altitudeBandStep     WRITE setAltitudeBandStep     NOTIFY altitudeBandStepChanged)
     Q_PROPERTY(qreal timeOffsetPerDrone   READ timeOffsetPerDrone   WRITE setTimeOffsetPerDrone   NOTIFY timeOffsetPerDroneChanged)
+    Q_PROPERTY(qreal perTargetSeparationS READ perTargetSeparationS WRITE setPerTargetSeparationS NOTIFY perTargetSeparationSChanged)
     Q_PROPERTY(bool  rtlAfterEveryWaypoint READ rtlAfterEveryWaypoint WRITE setRtlAfterEveryWaypoint NOTIFY rtlAfterEveryWaypointChanged)
     Q_PROPERTY(bool  loiterAfterRtl       READ loiterAfterRtl       WRITE setLoiterAfterRtl       NOTIFY loiterAfterRtlChanged)
+    // Business-flow timings
+    Q_PROPERTY(qreal targetHoldTimeS READ targetHoldTimeS WRITE setTargetHoldTimeS NOTIFY targetHoldTimeSChanged)
+    Q_PROPERTY(qreal homeTurnaroundWaitS READ homeTurnaroundWaitS WRITE setHomeTurnaroundWaitS NOTIFY homeTurnaroundWaitSChanged)
+    Q_PROPERTY(bool  payloadReleaseEnabled READ payloadReleaseEnabled WRITE setPayloadReleaseEnabled NOTIFY payloadReleaseEnabledChanged)
     Q_PROPERTY(QString validationError READ validationError NOTIFY validationErrorChanged)
     Q_PROPERTY(bool isProcessing READ isProcessing NOTIFY isProcessingChanged)
     Q_PROPERTY(int progressValue READ progressValue NOTIFY progressValueChanged)
@@ -57,6 +62,8 @@ public:
     Q_PROPERTY(int cacheSize READ cacheSize NOTIFY cacheSizeChanged)
     Q_PROPERTY(bool isDrawingMode READ isDrawingMode WRITE setIsDrawingMode NOTIFY isDrawingModeChanged)
     Q_PROPERTY(QObject* planMasterController READ planMasterController WRITE setPlanMasterController NOTIFY planMasterControllerChanged)
+    // Policy: land at target then return home (base)
+    Q_PROPERTY(bool landAtTargetReturn READ landAtTargetReturn WRITE setLandAtTargetReturn NOTIFY landAtTargetReturnChanged)
     
     // Swarm configuration properties
     // Swarm configuration properties are already declared above
@@ -80,14 +87,19 @@ public:
     int cacheSize() const { return _cacheSize; }
     bool isDrawingMode() const { return _isDrawingMode; }
     QObject* planMasterController() const { return _planMasterController; }
+    bool landAtTargetReturn() const { return _landAtTargetReturn; }
 
     // Multi-drone getters
     int   droneCount() const { return _droneCount; }
     qreal altitudeBandStart() const { return _altitudeBandStart; }
     qreal altitudeBandStep() const { return _altitudeBandStep; }
     qreal timeOffsetPerDrone() const { return _timeOffsetPerDrone; }
+    qreal perTargetSeparationS() const { return _perTargetSeparationS; }
     bool  rtlAfterEveryWaypoint() const { return _rtlAfterEveryWaypoint; }
     bool  loiterAfterRtl() const { return _loiterAfterRtl; }
+    qreal targetHoldTimeS() const { return _targetHoldTimeS; }
+    qreal homeTurnaroundWaitS() const { return _homeTurnaroundWaitS; }
+    bool  payloadReleaseEnabled() const { return _payloadReleaseEnabled; }
 
     // Property setters
     Q_INVOKABLE void setAreaWidth(qreal width);
@@ -101,14 +113,20 @@ public:
     Q_INVOKABLE void setLoiterTime(qreal time);
     Q_INVOKABLE void setIsDrawingMode(bool drawingMode);
     Q_INVOKABLE void setPlanMasterController(QObject* controller);
+    Q_INVOKABLE void setLandAtTargetReturn(bool enabled);
 
     // Multi-drone setters
     Q_INVOKABLE void setDroneCount(int count);
     Q_INVOKABLE void setAltitudeBandStart(qreal startMeters);
     Q_INVOKABLE void setAltitudeBandStep(qreal stepMeters);
     Q_INVOKABLE void setTimeOffsetPerDrone(qreal seconds);
+    Q_INVOKABLE void setPerTargetSeparationS(qreal seconds);
     Q_INVOKABLE void setRtlAfterEveryWaypoint(bool enabled);
     Q_INVOKABLE void setLoiterAfterRtl(bool enabled);
+    // Business-flow setters
+    Q_INVOKABLE void setTargetHoldTimeS(qreal seconds);
+    Q_INVOKABLE void setHomeTurnaroundWaitS(qreal seconds);
+    Q_INVOKABLE void setPayloadReleaseEnabled(bool enabled);
 
     // Mission planning functions
     Q_INVOKABLE void moveAreaNorth();
@@ -138,6 +156,7 @@ public:
     Q_INVOKABLE void saveMissionFile();
     // Save separate WPL files per-drone using current multi-drone configuration
     Q_INVOKABLE void savePerDroneMissionFiles();
+    Q_INVOKABLE void clearMission();
     Q_INVOKABLE void uploadToVehicle();
     // Upload a specific drone's mission to a selected vehicle (or active vehicle if null)
     Q_INVOKABLE void uploadPerDroneMissionToVehicle(int droneIndex, QObject* vehicleObject = nullptr);
@@ -148,6 +167,17 @@ public:
     Q_INVOKABLE void startMission();
     Q_INVOKABLE void updateStatus(const QString& message);
     Q_INVOKABLE QGeoCoordinate calculateOffsetCoordinate(const QGeoCoordinate& coord, qreal meters, qreal bearing) const;
+    
+    // Per-vehicle mission and control helpers
+    Q_INVOKABLE void armVehicle(QObject* vehicleObject, bool arm);
+    Q_INVOKABLE void takeoffVehicle(QObject* vehicleObject, qreal altitude);
+    Q_INVOKABLE void landVehicle(QObject* vehicleObject);
+    Q_INVOKABLE void startMissionOnVehicle(QObject* vehicleObject);
+    Q_INVOKABLE void pauseMissionOnVehicle(QObject* vehicleObject);
+    Q_INVOKABLE void rtlVehicle(QObject* vehicleObject);
+    Q_INVOKABLE QVariantMap getVehicleStatus(QObject* vehicleObject) const;
+    // Insert helper commands
+    void insertGripperRelease(MissionController* mission, const QGeoCoordinate& atCoord);
     
     // Mission upload helper methods
     Q_INVOKABLE Vehicle* getCurrentVehicle() const;
@@ -223,7 +253,7 @@ private:
     
     // Mission workflow testing methods
     Q_INVOKABLE void testCompleteWorkflow();
-    Q_INVOKABLE bool validateAreaParameters() const;
+    Q_INVOKABLE bool validateAreaParameters();
     Q_INVOKABLE bool validateWaypointGeneration();
     Q_INVOKABLE bool validateMissionUpload();
     Q_INVOKABLE bool validateMissionFileSaving();
@@ -259,6 +289,8 @@ private:
 
 signals:
     void areaWidthChanged();
+    // Emitted when a per-drone mission upload is initiated/completed for a vehicle
+    void missionUploaded(int droneIndex, QObject* vehicle);
     void areaHeightChanged();
     void lineSpacingChanged();
     void numPointsChanged();
@@ -277,6 +309,7 @@ signals:
     void cacheSizeChanged();
     void isDrawingModeChanged();
     void planMasterControllerChanged();
+    void landAtTargetReturnChanged();
     
     // Swarm coordination signals
     void swarmStatusChanged();
@@ -296,9 +329,14 @@ signals:
     void altitudeBandStartChanged();
     void altitudeBandStepChanged();
     void timeOffsetPerDroneChanged();
+    void perTargetSeparationSChanged();
     // Multi-drone signals
     void rtlAfterEveryWaypointChanged();
     void loiterAfterRtlChanged();
+    // Business-flow signals
+    void targetHoldTimeSChanged();
+    void homeTurnaroundWaitSChanged();
+    void payloadReleaseEnabledChanged();
 
 private:
 
@@ -312,6 +350,7 @@ private:
     static constexpr qreal _defaultAltitudeBandStart = 0.0;
     static constexpr qreal _defaultAltitudeBandStep  = 10.0;
     static constexpr qreal _defaultTimeOffsetPerDrone = 0.0; // seconds
+    static constexpr qreal _defaultPerTargetSeparationS = 5.0; // seconds
 
     // Properties
     qreal _areaWidth = _defaultAreaWidth;
@@ -346,11 +385,13 @@ private:
     int _cacheSize = 0;
     bool _isDrawingMode = false;
     QObject* _planMasterController = nullptr;
+    bool _landAtTargetReturn = false;
     // Multi-drone fields
     int   _droneCount = _defaultDroneCount;
     qreal _altitudeBandStart = _defaultAltitudeBandStart;
     qreal _altitudeBandStep = _defaultAltitudeBandStep;
     qreal _timeOffsetPerDrone = _defaultTimeOffsetPerDrone;
+    qreal _perTargetSeparationS = _defaultPerTargetSeparationS;
     bool  _rtlAfterEveryWaypoint = false;
     bool  _loiterAfterRtl = false;
     QString _validationError;
@@ -361,4 +402,9 @@ private:
     QVariantMap _performanceMetrics;
     int _cacheHits = 0;
     int _cacheMisses = 0;
-}; 
+    
+    // Business-flow fields
+    qreal _targetHoldTimeS = 10.0;         // default 10s hold at target
+    qreal _homeTurnaroundWaitS = 30.0;     // default 30s wait at home between trips
+    bool  _payloadReleaseEnabled = false;  // default disabled
+};
