@@ -135,7 +135,8 @@ Item {
         function onAltitudeBandStartChanged() { _refreshPreview() }
         function onAltitudeBandStepChanged() { _refreshPreview() }
         function onTimeOffsetPerDroneChanged() { _refreshPreview() }
-        function onMissionAltitudeChanged() { _refreshPreview() }
+        		function onMissionAltitudeChanged() { _refreshPreview() }
+		function onTakeoffHeightChanged() { _refreshPreview() }
         function onAreaWidthChanged() { _refreshPreview() }
         function onAreaHeightChanged() { _refreshPreview() }
         function onAreaCenterChanged() { _refreshPreview() }
@@ -491,6 +492,35 @@ var err = _safeValidate("numPoints", parseInt(text))
 										var altitude = parseFloat(text)
 										if (!isNaN(altitude)) {
 											areaPlanEditor.setMissionAltitude(altitude)
+										}
+									}
+								}
+							}
+
+							QGCLabel { 
+								text: qsTr("Takeoff Height (Meters):")
+								width: parent.width * 0.4
+                                height: _h * 1.6
+								verticalAlignment: Text.AlignVCenter
+							}
+
+							QGCTextField {
+                                width: parent.width * 0.6
+                                height: _h * 1.6
+								text: areaPlanEditor ? areaPlanEditor.takeoffHeight : 3.0
+								placeholderText: qsTr("3.0")
+								inputMethodHints: Qt.ImhFormattedNumbersOnly
+								validator: DoubleValidator {
+									bottom: 0.5
+									top: 100.0
+									decimals: 1
+									notation: DoubleValidator.StandardNotation
+								}
+								onEditingFinished: {
+									if (areaPlanEditor && text !== "") {
+										var height = parseFloat(text)
+										if (!isNaN(height)) {
+											areaPlanEditor.setTakeoffHeight(height)
 										}
 									}
 								}
@@ -1655,7 +1685,7 @@ var err = _safeValidate("numPoints", parseInt(text))
                                                 }
                                                 onClicked: {
                                                     var veh = vehicleMapping[modelData.droneIndex]
-                                                    if (veh && areaPlanEditor) areaPlanEditor.takeoffVehicle(veh, areaPlanEditor ? areaPlanEditor.missionAltitude : 10)
+                                                    if (veh && areaPlanEditor) areaPlanEditor.takeoffVehicle(veh, areaPlanEditor ? areaPlanEditor.takeoffHeight : 3)
                                                 }
                                                 ToolTip.visible: hovered && !enabled
                                                 ToolTip.text: {

@@ -25,6 +25,8 @@
 #include "MissionController.h" // Added for MissionController
 #include "SimpleMissionItem.h"
 #include "MissionManager/AreaPartition.h"
+#include "MissionManager/MissionItem.h"
+#include "QmlObjectListModel.h"
 #include "QGCApplication.h"
 
 AreaPlanEditor::AreaPlanEditor(QObject* parent)
@@ -248,6 +250,14 @@ void AreaPlanEditor::setPayloadReleaseEnabled(bool enabled)
     if (_payloadReleaseEnabled == enabled) return;
     _payloadReleaseEnabled = enabled;
     emit payloadReleaseEnabledChanged();
+}
+
+void AreaPlanEditor::setTakeoffHeight(qreal height)
+{
+    if (qAbs(_takeoffHeight - height) > 0.1) {  // Allow small floating point differences
+        _takeoffHeight = height;
+        emit takeoffHeightChanged();
+    }
 }
 
 void AreaPlanEditor::setFormationSpacing(qreal spacing)
@@ -1051,100 +1061,190 @@ void AreaPlanEditor::uploadToVehicle()
 
 void AreaPlanEditor::uploadPerDroneMissionToVehicle(int droneIndex, QObject* vehicleObject)
 {
-    // Insert per-drone waypoints to the mission and request upload
-    addPerDroneToMission(droneIndex);
-    uploadToVehicle();
-    emit missionUploaded(droneIndex, vehicleObject);
+    Vehicle* vehicle = qobject_cast<Vehicle*>(vehicleObject);
+    if (!vehicle) {
+        handleError("Invalid vehicle object", QString());
+        return;
+    }
+    
+    // Generate per-drone waypoints
+    QList<QVariant> waypoints = generatePerDroneWaypoints(droneIndex);
+    if (waypoints.isEmpty()) {
+        handleError("No waypoints generated for drone", QString::number(droneIndex));
+        return;
+    }
+    
+    // Get the vehicle's mission manager
+    MissionManager* missionManager = vehicle->missionManager();
+    if (!missionManager) {
+        handleError("Vehicle mission manager not available", QString("Vehicle %1").arg(vehicle->id()));
+        return;
+    }
+    
+    // Convert waypoints to MissionItems
+    QList<MissionItem*> missionItems;
+    
+    // Add home position if available
+    if (_homeLocation.isValid()) {
+        MissionItem* homeItem = new MissionItem(0, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT, 0.0, 0.0, 0.0, 0.0, _homeLocation.latitude(), _homeLocation.longitude(), _missionAltitude, true, false, missionManager);
+        missionItems.append(homeItem);
+    }
+    
+    // Add takeoff command
+    QGeoCoordinate takeoffCoord = _homeLocation.isValid() ? _homeLocation : _areaCenter;
+    double takeoffAltitude = _missionAltitude + (_altitudeBandStart + droneIndex * _altitudeBandStep);
+    MissionItem* takeoffItem = new MissionItem(missionItems.count(), MAV_CMD_NAV_TAKEOFF, MAV_FRAME_GLOBAL_RELATIVE_ALT, 0.0, 0.0, 0.0, 0.0, takeoffCoord.latitude(), takeoffCoord.longitude(), takeoffAltitude, true, false, missionManager);
+    missionItems.append(takeoffItem);
+    
+    // Add waypoints with proper altitude offsets
+    for (int i = 0; i < waypoints.size(); ++i) {
+        QGeoCoordinate coord = waypoints[i].value<QGeoCoordinate>();
+        double waypointAltitude = coord.altitude() + (_altitudeBandStart + droneIndex * _altitudeBandStep);
+        MissionItem* wpItem = new MissionItem(missionItems.count(), MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT, 0.0, 0.0, 0.0, 0.0, coord.latitude(), coord.longitude(), waypointAltitude, true, false, missionManager);
+        missionItems.append(wpItem);
+        
+        // Add loiter at waypoint if configured
+        if (_loiterTime > 0) {
+            MissionItem* loiterItem = new MissionItem(missionItems.count(), MAV_CMD_NAV_LOITER_TIME, MAV_FRAME_GLOBAL_RELATIVE_ALT, _loiterTime, 0.0, 0.0, 0.0, coord.latitude(), coord.longitude(), waypointAltitude, true, false, missionManager);
+            missionItems.append(loiterItem);
+        }
+        
+        // Add RTL after every waypoint if configured
+        if (_rtlAfterEveryWaypoint) {
+            MissionItem* rtlItem = new MissionItem(missionItems.count(), MAV_CMD_NAV_RETURN_TO_LAUNCH, MAV_FRAME_GLOBAL_RELATIVE_ALT, 0.0, 0.0, 0.0, 0.0, takeoffCoord.latitude(), takeoffCoord.longitude(), _missionAltitude, true, false, missionManager);
+            missionItems.append(rtlItem);
+            
+            // Add loiter after RTL if configured
+            if (_loiterAfterRtl && _loiterTime > 0) {
+                MissionItem* postRtlLoiterItem = new MissionItem(missionItems.count(), MAV_CMD_NAV_LOITER_TIME, MAV_FRAME_GLOBAL_RELATIVE_ALT, _loiterTime, 0.0, 0.0, 0.0, takeoffCoord.latitude(), takeoffCoord.longitude(), _missionAltitude, true, false, missionManager);
+                missionItems.append(postRtlLoiterItem);
+            }
+        }
+    }
+    
+    // Add final RTL
+    MissionItem* finalRtlItem = new MissionItem(missionItems.count(), MAV_CMD_NAV_RETURN_TO_LAUNCH, MAV_FRAME_GLOBAL_RELATIVE_ALT, 0.0, 0.0, 0.0, 0.0, takeoffCoord.latitude(), takeoffCoord.longitude(), _missionAltitude, true, false, missionManager);
+    missionItems.append(finalRtlItem);
+    
+    // Add landing command
+    MissionItem* landItem = new MissionItem(missionItems.count(), MAV_CMD_NAV_LAND, MAV_FRAME_GLOBAL_RELATIVE_ALT, 0.0, 0.0, 0.0, 0.0, takeoffCoord.latitude(), takeoffCoord.longitude(), 0.0, true, false, missionManager);
+    missionItems.append(landItem);
+    
+    // Connect to upload progress signals
+    connect(missionManager, &PlanManager::progressPctChanged, this, [this, droneIndex](double progress) {
+        updateStatus(QString("Uploading drone %1 mission: %2%").arg(droneIndex).arg(qRound(progress)));
+    });
+    
+    connect(missionManager, &PlanManager::error, this, [this, droneIndex](int errorCode, const QString& errorMsg) {
+        handleError(QString("Drone %1 upload failed").arg(droneIndex), errorMsg);
+    });
+    
+    connect(missionManager, &PlanManager::sendComplete, this, [this, droneIndex, vehicle](bool error) {
+        if (!error) {
+            updateStatus(QString("Drone %1 mission uploaded successfully to vehicle %2").arg(droneIndex).arg(vehicle->id()));
+            emit missionUploaded(droneIndex, vehicle);
+        } else {
+            handleError(QString("Drone %1 mission upload failed").arg(droneIndex), "Upload completed with errors");
+        }
+    });
+    
+    // Upload to the specific vehicle
+    updateStatus(QString("Uploading drone %1 mission to vehicle %2...").arg(droneIndex).arg(vehicle->id()));
+    missionManager->writeMissionItems(missionItems);
 }
 
 void AreaPlanEditor::uploadToAllDrones()
 {
-    // Add waypoints for all drones to the single mission sequence, then upload
-    addAllDronesToMission();
-    uploadToVehicle();
+    // Get all available vehicles
+    QVariantList vehicles = getAvailableVehicles();
+    if (vehicles.isEmpty()) {
+        handleError("No vehicles available", "Connect vehicles before uploading");
+        return;
+    }
+    
+    // Upload missions to each vehicle
+    for (int droneIndex = 0; droneIndex < _droneCount && droneIndex < vehicles.size(); ++droneIndex) {
+        QObject* vehicleObject = vehicles[droneIndex].value<QObject*>();
+        if (vehicleObject) {
+            // Upload with a small delay to avoid overwhelming the system
+            QTimer::singleShot(droneIndex * 1000, this, [this, droneIndex, vehicleObject]() {
+                uploadPerDroneMissionToVehicle(droneIndex, vehicleObject);
+            });
+        }
+    }
+    
+    updateStatus(QString("Uploading missions to %1 drones...").arg(qMin(_droneCount, vehicles.size())));
 }
 
 void AreaPlanEditor::armVehicle(QObject* vehicleObject, bool arm)
 {
     Vehicle* v = qobject_cast<Vehicle*>(vehicleObject);
     if (!v) { handleError("Invalid vehicle object", QString()); return; }
-    bool ok = QMetaObject::invokeMethod(v, "setArmed", Qt::DirectConnection, Q_ARG(bool, arm));
-    if (!ok) {
-        ok = QMetaObject::invokeMethod(v, "armDisarm", Qt::DirectConnection, Q_ARG(bool, arm));
-    }
-    updateStatus(ok ? QString("Vehicle %1 %2").arg(v->id()).arg(arm?"armed":"disarmed")
-                    : QString("Vehicle %1 arm/disarm command failed").arg(v->id()));
+    
+    // Use the proper Vehicle method directly
+    v->setArmed(arm, true); // true = show error if fails
+    updateStatus(QString("Vehicle %1 %2").arg(v->id()).arg(arm?"armed":"disarmed"));
 }
 
 void AreaPlanEditor::takeoffVehicle(QObject* vehicleObject, qreal altitude)
 {
     Vehicle* v = qobject_cast<Vehicle*>(vehicleObject);
     if (!v) { handleError("Invalid vehicle object", QString()); return; }
-    // Try common guided takeoff method names
-    bool ok = QMetaObject::invokeMethod(v, "guidedTakeoff", Qt::DirectConnection, Q_ARG(double, static_cast<double>(altitude)));
-    if (!ok) {
-        ok = QMetaObject::invokeMethod(v, "guidedModeTakeoff", Qt::DirectConnection, Q_ARG(double, static_cast<double>(altitude)));
+    
+    // Use the same logic as FlyView: check if guided takeoff is supported
+    if (v->guidedTakeoffSupported()) {
+        v->guidedModeTakeoff(static_cast<double>(altitude));
+        updateStatus(QString("Vehicle %1 guided takeoff to %2m requested").arg(v->id()).arg(altitude));
+    } else {
+        // Fallback to flight mode takeoff
+        v->startTakeoff();
+        updateStatus(QString("Vehicle %1 takeoff requested").arg(v->id()));
     }
-    if (!ok) {
-        // Fallback: set flight mode to Takeoff if available
-        ok = QMetaObject::invokeMethod(v, "setFlightMode", Qt::DirectConnection, Q_ARG(QString, QStringLiteral("Takeoff")));
-    }
-    updateStatus(ok ? QString("Vehicle %1 takeoff requested").arg(v->id())
-                    : QString("Vehicle %1 takeoff command failed").arg(v->id()));
 }
 
 void AreaPlanEditor::landVehicle(QObject* vehicleObject)
 {
     Vehicle* v = qobject_cast<Vehicle*>(vehicleObject);
     if (!v) { handleError("Invalid vehicle object", QString()); return; }
-    // Try direct land command first if exposed
-    bool ok = QMetaObject::invokeMethod(v, "land", Qt::DirectConnection);
-    if (!ok) {
-        // Try setting flight mode to Land
-        ok = QMetaObject::invokeMethod(v, "setFlightMode", Qt::DirectConnection, Q_ARG(QString, QStringLiteral("Land")));
+    
+    // Use guided landing if supported, similar to FlyView logic
+    if (v->guidedModeSupported()) {
+        v->guidedModeLand();
+        updateStatus(QString("Vehicle %1 guided landing requested").arg(v->id()));
+    } else {
+        // Fallback: try to set flight mode to Land
+        updateStatus(QString("Vehicle %1 landing not supported in guided mode").arg(v->id()));
     }
-    if (!ok) {
-        // Some stacks may use "RTL" or command variants; as last resort, try returnToLaunch
-        ok = QMetaObject::invokeMethod(v, "returnToLaunch", Qt::DirectConnection);
-    }
-    updateStatus(ok ? QString("Vehicle %1 land requested").arg(v->id())
-                    : QString("Vehicle %1 land command failed").arg(v->id()));
 }
 
 void AreaPlanEditor::startMissionOnVehicle(QObject* vehicleObject)
 {
     Vehicle* v = qobject_cast<Vehicle*>(vehicleObject);
     if (!v) { handleError("Invalid vehicle object", QString()); return; }
-    bool ok = QMetaObject::invokeMethod(v, "startMission", Qt::DirectConnection);
-    if (!ok) {
-        ok = QMetaObject::invokeMethod(v, "setFlightMode", Qt::DirectConnection, Q_ARG(QString, QStringLiteral("Mission")));
-    }
-    updateStatus(ok ? QString("Vehicle %1 mission start requested").arg(v->id())
-                    : QString("Vehicle %1 mission start failed").arg(v->id()));
+    
+    // Use the proper Vehicle method directly
+    v->startMission();
+    updateStatus(QString("Vehicle %1 mission start requested").arg(v->id()));
 }
 
 void AreaPlanEditor::pauseMissionOnVehicle(QObject* vehicleObject)
 {
     Vehicle* v = qobject_cast<Vehicle*>(vehicleObject);
     if (!v) { handleError("Invalid vehicle object", QString()); return; }
-    bool ok = QMetaObject::invokeMethod(v, "pauseMission", Qt::DirectConnection);
-    if (!ok) {
-        ok = QMetaObject::invokeMethod(v, "setFlightMode", Qt::DirectConnection, Q_ARG(QString, QStringLiteral("Hold")));
-    }
-    updateStatus(ok ? QString("Vehicle %1 mission pause requested").arg(v->id())
-                    : QString("Vehicle %1 mission pause failed").arg(v->id()));
+    
+    // Use the proper Vehicle method directly
+    v->pauseVehicle();
+    updateStatus(QString("Vehicle %1 mission pause requested").arg(v->id()));
 }
 
 void AreaPlanEditor::rtlVehicle(QObject* vehicleObject)
 {
     Vehicle* v = qobject_cast<Vehicle*>(vehicleObject);
     if (!v) { handleError("Invalid vehicle object", QString()); return; }
-    bool ok = QMetaObject::invokeMethod(v, "setFlightMode", Qt::DirectConnection, Q_ARG(QString, QStringLiteral("Return")));
-    if (!ok) {
-        ok = QMetaObject::invokeMethod(v, "returnToLaunch", Qt::DirectConnection);
-    }
-    updateStatus(ok ? QString("Vehicle %1 RTL requested").arg(v->id())
-                    : QString("Vehicle %1 RTL command failed").arg(v->id()));
+    
+    // Use the proper Vehicle method directly
+    v->guidedModeRTL(false); // false = not smart RTL
+    updateStatus(QString("Vehicle %1 RTL requested").arg(v->id()));
 }
 
 QVariantMap AreaPlanEditor::getVehicleStatus(QObject* vehicleObject) const
@@ -1171,10 +1271,8 @@ QList<QVariant> AreaPlanEditor::getAvailableVehicles() const
         for (int i = 0; i < vehicleModel->count(); i++) {
             Vehicle* vehicle = qobject_cast<Vehicle*>(vehicleModel->get(i));
             if (vehicle) {
-                QVariantMap vehicleInfo;
-                vehicleInfo["id"] = vehicle->id();
-                vehicleInfo["name"] = QString("Vehicle %1").arg(vehicle->id());
-                vehicles.append(QVariant::fromValue(vehicleInfo));
+                // Return the actual vehicle object for direct use
+                vehicles.append(QVariant::fromValue(vehicle));
             }
         }
     }
@@ -1188,11 +1286,11 @@ void AreaPlanEditor::startMission()
         handleError("MissionController not set", "Open Plan view to initialize controller");
         return;
     }
-    bool invoked = QMetaObject::invokeMethod(mission, "startMission", Qt::DirectConnection);
-    if (!invoked) {
-        invoked = QMetaObject::invokeMethod(mission, "startMission", Qt::QueuedConnection);
-    }
-    updateStatus(invoked ? "Mission start requested" : "Start method not available on MissionController");
+    
+    // The MissionController doesn't have a startMission method
+    // Mission starting is handled by the Vehicle's startMission() method
+    // This method should probably be removed or refactored to work with vehicles
+    updateStatus("Mission start not implemented - use vehicle startMission instead");
 }
 
 void AreaPlanEditor::updateStatus(const QString& message)

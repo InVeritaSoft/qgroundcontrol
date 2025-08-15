@@ -53,6 +53,7 @@ public:
     Q_PROPERTY(qreal targetHoldTimeS READ targetHoldTimeS WRITE setTargetHoldTimeS NOTIFY targetHoldTimeSChanged)
     Q_PROPERTY(qreal homeTurnaroundWaitS READ homeTurnaroundWaitS WRITE setHomeTurnaroundWaitS NOTIFY homeTurnaroundWaitSChanged)
     Q_PROPERTY(bool  payloadReleaseEnabled READ payloadReleaseEnabled WRITE setPayloadReleaseEnabled NOTIFY payloadReleaseEnabledChanged)
+    Q_PROPERTY(qreal takeoffHeight READ takeoffHeight WRITE setTakeoffHeight NOTIFY takeoffHeightChanged)
     Q_PROPERTY(QString validationError READ validationError NOTIFY validationErrorChanged)
     Q_PROPERTY(bool isProcessing READ isProcessing NOTIFY isProcessingChanged)
     Q_PROPERTY(int progressValue READ progressValue NOTIFY progressValueChanged)
@@ -100,6 +101,7 @@ public:
     qreal targetHoldTimeS() const { return _targetHoldTimeS; }
     qreal homeTurnaroundWaitS() const { return _homeTurnaroundWaitS; }
     bool  payloadReleaseEnabled() const { return _payloadReleaseEnabled; }
+    qreal takeoffHeight() const { return _takeoffHeight; }
 
     // Property setters
     Q_INVOKABLE void setAreaWidth(qreal width);
@@ -127,6 +129,7 @@ public:
     Q_INVOKABLE void setTargetHoldTimeS(qreal seconds);
     Q_INVOKABLE void setHomeTurnaroundWaitS(qreal seconds);
     Q_INVOKABLE void setPayloadReleaseEnabled(bool enabled);
+    Q_INVOKABLE void setTakeoffHeight(qreal height);
 
     // Mission planning functions
     Q_INVOKABLE void moveAreaNorth();
@@ -337,6 +340,7 @@ signals:
     void targetHoldTimeSChanged();
     void homeTurnaroundWaitSChanged();
     void payloadReleaseEnabledChanged();
+    void takeoffHeightChanged();
 
 private:
 
@@ -407,4 +411,5 @@ private:
     qreal _targetHoldTimeS = 10.0;         // default 10s hold at target
     qreal _homeTurnaroundWaitS = 30.0;     // default 30s wait at home between trips
     bool  _payloadReleaseEnabled = false;  // default disabled
+    qreal _takeoffHeight = 3.0;            // default takeoff height in meters
 };
