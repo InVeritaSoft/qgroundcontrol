@@ -177,6 +177,7 @@ public:
     Q_INVOKABLE void landVehicle(QObject* vehicleObject);
     Q_INVOKABLE void startMissionOnVehicle(QObject* vehicleObject);
     Q_INVOKABLE void pauseMissionOnVehicle(QObject* vehicleObject);
+    Q_INVOKABLE void continueMissionOnVehicle(QObject* vehicleObject);
     Q_INVOKABLE void rtlVehicle(QObject* vehicleObject);
     Q_INVOKABLE QVariantMap getVehicleStatus(QObject* vehicleObject) const;
     // Insert helper commands

@@ -1731,6 +1731,25 @@ var err = _safeValidate("numPoints", parseInt(text))
                                                 }
                                             }
                                             QGCButton {
+                                                text: qsTr("Continue")
+                                                enabled: {
+                                                    var veh = vehicleMapping[modelData.droneIndex]
+                                                    return !!veh && veh.flying === true && veh.pauseVehicleSupported === true
+                                                }
+                                                onClicked: {
+                                                    var veh = vehicleMapping[modelData.droneIndex]
+                                                    if (veh && areaPlanEditor) areaPlanEditor.continueMissionOnVehicle(veh)
+                                                }
+                                                ToolTip.visible: hovered && !enabled
+                                                ToolTip.text: {
+                                                    var veh = vehicleMapping[modelData.droneIndex]
+                                                    if (!veh) return qsTr("No vehicle mapped")
+                                                    if (veh.flying !== true) return qsTr("Vehicle not flying")
+                                                    if (veh.pauseVehicleSupported !== true) return qsTr("Continue not supported")
+                                                    return qsTr("Unavailable")
+                                                }
+                                            }
+                                            QGCButton {
                                                 text: qsTr("Land")
                                                 enabled: {
                                                     var veh = vehicleMapping[modelData.droneIndex]
@@ -1791,6 +1810,20 @@ var err = _safeValidate("numPoints", parseInt(text))
                             height: _h * 2.2
 							enabled: false // TODO: Implement mission start
 							onClicked: if (areaPlanEditor) areaPlanEditor.startMission()
+						}
+						
+						QGCButton {
+							text: qsTr("Continue Mission")
+							width: parent.width
+                            height: _h * 2.2
+							enabled: {
+								var vehicle = QGroundControl.multiVehicleManager.activeVehicle
+								return vehicle && vehicle.flying === true && vehicle.pauseVehicleSupported === true
+							}
+							onClicked: {
+								var vehicle = QGroundControl.multiVehicleManager.activeVehicle
+								if (vehicle && areaPlanEditor) areaPlanEditor.continueMissionOnVehicle(vehicle)
+							}
 						}
 					}
 				}

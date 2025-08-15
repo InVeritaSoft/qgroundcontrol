@@ -856,6 +856,7 @@ void AreaPlanEditor::addPerDroneToMission(int droneIndex)
         qWarning() << "AreaPlanEditor::addPerDroneToMission: MissionController not set";
         return;
     }
+    
     // Ensure mission has MissionSettings
     if (mission->visualItems()->count() == 0) {
         // Trigger init by inserting and removing a dummy to create settings if needed
@@ -869,10 +870,13 @@ void AreaPlanEditor::addPerDroneToMission(int droneIndex)
     const QVariantList wps = generatePerDroneWaypoints(droneIndex);
     for (int idx = 0; idx < wps.size(); ++idx) {
         QGeoCoordinate c = wps[idx].value<QGeoCoordinate>();
+        
         // Slotting to avoid conflicts at start and between cycles
         qreal startDelay = (idx == 0) ? (droneIndex * _timeOffsetPerDrone) : _perTargetSeparationS;
         if (startDelay > 0.0) {
-            VisualMissionItem* hold = mission->insertSimpleMissionItem(_homeLocation.isValid() ? _homeLocation : c, -1, false);
+            // Use the first waypoint location for hold, not home location
+            QGeoCoordinate holdLocation = c;
+            VisualMissionItem* hold = mission->insertSimpleMissionItem(holdLocation, -1, false);
             if (SimpleMissionItem* h = qobject_cast<SimpleMissionItem*>(hold)) {
                 h->setCommand(MAV_CMD_NAV_LOITER_TIME);
                 h->missionItem().setParam1(startDelay);
@@ -881,6 +885,7 @@ void AreaPlanEditor::addPerDroneToMission(int droneIndex)
                 }
             }
         }
+        
         if (_landAtTargetReturn) {
             // Land at target
             mission->insertLandItem(c, -1, false);
@@ -956,8 +961,10 @@ void AreaPlanEditor::addWaypointsToMission()
         qWarning() << "AreaPlanEditor::addWaypointsToMission: MissionController not set";
         return;
     }
+    
     // Ensure mission has MissionSettings initialized
     if (mission->visualItems()->count() == 0) {
+        // Only insert a temporary item to trigger MissionSettings creation
         VisualMissionItem* tmp = mission->insertSimpleMissionItem(_areaCenter, -1, false);
         if (mission->visualItems()->count() > 1) {
             mission->removeVisualItem(1);
@@ -1245,6 +1252,23 @@ void AreaPlanEditor::rtlVehicle(QObject* vehicleObject)
     // Use the proper Vehicle method directly
     v->guidedModeRTL(false); // false = not smart RTL
     updateStatus(QString("Vehicle %1 RTL requested").arg(v->id()));
+}
+
+void AreaPlanEditor::continueMissionOnVehicle(QObject* vehicleObject)
+{
+    Vehicle* v = qobject_cast<Vehicle*>(vehicleObject);
+    if (!v) { 
+        handleError("Invalid vehicle object", QString()); 
+        return; 
+    }
+    
+    // Use the mission flight mode to continue/resume mission
+    if (v->flightModeSetAvailable()) {
+        v->setFlightMode(v->missionFlightMode());
+        updateStatus(QString("Vehicle %1 mission continue/resume requested").arg(v->id()));
+    } else {
+        handleError("Flight mode change not available", QString("Vehicle %1 does not support flight mode changes").arg(v->id()));
+    }
 }
 
 QVariantMap AreaPlanEditor::getVehicleStatus(QObject* vehicleObject) const
