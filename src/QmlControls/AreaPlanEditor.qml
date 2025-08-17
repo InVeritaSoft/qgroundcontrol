@@ -7,6 +7,51 @@
  *
  ****************************************************************************/
 
+/**
+ * @file AreaPlanEditor.qml
+ * @brief Multi-Drone Area Planning Mission Editor for QGroundControl
+ * 
+ * This component provides a comprehensive interface for planning and executing
+ * area coverage missions using single or multiple drones. It integrates with
+ * the QGC mission system to generate, visualize, and upload coordinated missions.
+ * 
+ * @section Architecture
+ * - Frontend: QML-based UI with property bindings to C++ backend
+ * - Backend: AreaPlanEditor C++ class (src/QmlControls/AreaPlanEditor.h/.cc)
+ * - Integration: MissionController, Vehicle Manager, and QGC core systems
+ * 
+ * @section Key Features
+ * - Interactive area definition with real-time visualization
+ * - Multi-drone mission planning with altitude bands and time staggering
+ * - Configurable mission policies (RTL, loiter, payload release)
+ * - Per-drone mission generation and vehicle mapping
+ * - Mission file export and direct vehicle upload
+ * 
+ * @section Usage Flow
+ * 1. Define area center and dimensions
+ * 2. Configure line spacing and waypoint density
+ * 3. Set multi-drone parameters (count, altitude bands, timing)
+ * 4. Generate and preview waypoints
+ * 5. Save missions and upload to vehicles
+ * 
+ * @section Dependencies
+ * - Qt 6.8.3+ with QtLocation and QtPositioning
+ * - QGroundControl core components
+ * - AreaPlanMapVisuals.qml for map visualization
+ * - C++ backend for calculations and mission generation
+ * 
+ * @section Developer Notes
+ * - All user-facing text uses qsTr() for internationalization
+ * - Sizing follows ScreenTools patterns for consistency
+ * - Colors use QGCPalette for theme compatibility
+ * - Property bindings ensure real-time UI updates
+ * - Error handling with user-friendly messages
+ * 
+ * @author QGroundControl Team
+ * @version 1.0
+ * @date 2025
+ */
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -17,87 +62,261 @@ import QGroundControl
 import QGroundControl.Controls
 import QGroundControl.ScreenTools
 
+/**
+ * @brief Main Area Plan Editor component
+ * 
+ * This is the root component that provides the complete area planning interface.
+ * It manages the connection between the QML UI and the C++ backend, handles
+ * vehicle mapping, and coordinates all mission planning operations.
+ */
 Item {
 	id: _root
 
-	// Reference to the C++ backend
+	// ============================================================================
+	// CORE BACKEND INTEGRATION
+	// ============================================================================
+	
+	/**
+	 * @brief Reference to the C++ backend AreaPlanEditor instance
+	 * 
+	 * This property provides access to all backend functionality including:
+	 * - Area parameter management (width, height, spacing, rotation)
+	 * - Waypoint generation algorithms
+	 * - Mission creation and validation
+	 * - Vehicle communication and upload
+	 * 
+	 * The backend is initialized by QGroundControl core and provides
+	 * the Q_PROPERTY and Q_INVOKABLE API for all operations.
+	 */
 	property var areaPlanEditor: null
-    // Selected vehicle (object) for upload
-    property var selectedVehicle: QGroundControl.multiVehicleManager.activeVehicle
-    // Mapping: droneIndex -> vehicle object (rebuilt from persisted IDs)
-    property var vehicleMapping: ({})
-    // Per-drone preview data: array of { droneIndex, altitudeOffsetM, timeOffsetS, waypoints[] }
-    property var waypointPreview: []
-    // Simple list model for dropdowns (labels) and parallel storage of objects
-    property var vehicleLabels: []              // ["Vehicle <id>", ...]
-    property var vehicleObjects: []             // [vehicleObj, ...]
-    // Track which droneIndex mission was uploaded for (green indicator)
-    property var uploadedMap: ({})              // { droneIndex: true }
+	// ============================================================================
+	// VEHICLE MANAGEMENT & MAPPING
+	// ============================================================================
+	
+	/**
+	 * @brief Currently selected vehicle for mission upload
+	 * 
+	 * This property automatically tracks the active vehicle from the
+	 * QGC multi-vehicle manager. It's used as the default target
+	 * for single-drone mission uploads.
+	 */
+	property var selectedVehicle: QGroundControl.multiVehicleManager.activeVehicle
+	
+	/**
+	 * @brief Mapping between drone indices and vehicle objects
+	 * 
+	 * This object maps each drone index (0, 1, 2, ...) to its assigned
+	 * vehicle object. The mapping is persisted across sessions and
+	 * automatically rebuilt when vehicles reconnect.
+	 * 
+	 * Structure: { "0": vehicleObj, "1": vehicleObj, ... }
+	 */
+	property var vehicleMapping: ({})
+	
+	/**
+	 * @brief Per-drone waypoint preview data
+	 * 
+	 * This array contains preview information for each drone's mission,
+	 * including waypoint coordinates, altitude offsets, and timing.
+	 * 
+	 * Structure: [
+	 *   { droneIndex: 0, altitudeOffsetM: 0, timeOffsetS: 0, waypoints: [...] },
+	 *   { droneIndex: 1, altitudeOffsetM: 10, timeOffsetS: 5, waypoints: [...] },
+	 *   ...
+	 * ]
+	 */
+	property var waypointPreview: []
+	
+	/**
+	 * @brief Vehicle labels for UI dropdowns
+	 * 
+	 * Human-readable labels for each connected vehicle, used in
+	 * the drone-to-vehicle mapping interface.
+	 * 
+	 * Example: ["Vehicle 1", "Vehicle 2", "Vehicle 3"]
+	 */
+	property var vehicleLabels: []
+	
+	/**
+	 * @brief Vehicle objects for programmatic access
+	 * 
+	 * Parallel array to vehicleLabels containing the actual
+	 * vehicle objects for each connected vehicle.
+	 * 
+	 * Example: [vehicleObj1, vehicleObj2, vehicleObj3]
+	 */
+	property var vehicleObjects: []
+	
+	/**
+	 * @brief Upload status tracking for each drone
+	 * 
+	 * Tracks which drone missions have been successfully uploaded
+	 * to their assigned vehicles. Used for visual feedback in the UI.
+	 * 
+	 * Structure: { "0": true, "1": false, "2": true }
+	 */
+	property var uploadedMap: ({})
 
-    // Persisted mapping (vehicle IDs), stored per session/user
-    Settings {
-        id: areaMapSettings
-        category: "AreaPlanEditor"
-        property var savedMap: ({}) // { droneIndex: vehicleId }
-    }
+	// ============================================================================
+	// PERSISTENCE & SETTINGS
+	// ============================================================================
+	
+	/**
+	 * @brief Persistent storage for vehicle-drone mappings
+	 * 
+	 * This Settings object automatically persists the mapping between
+	 * drone indices and vehicle IDs across application sessions.
+	 * The data is stored in the user's QGC settings and automatically
+	 * restored when the application restarts.
+	 */
+	Settings {
+		id: areaMapSettings
+		category: "AreaPlanEditor"
+		
+		/**
+		 * @brief Saved mapping of drone indices to vehicle IDs
+		 * 
+		 * Structure: { "0": "vehicleId1", "1": "vehicleId2", ... }
+		 * This mapping is automatically saved and restored across sessions.
+		 */
+		property var savedMap: ({})
+	}
 
-    // Helper: find current vehicle object by numeric id
-    function getVehicleById(id) {
-        if (id === undefined || id === null) return null
-        for (var i = 0; i < vehicleObjects.length; i++) {
-            var v = vehicleObjects[i]
-            if (v && v.id === id) return v
-        }
-        return null
-    }
+	// ============================================================================
+	// VEHICLE MANAGEMENT HELPER FUNCTIONS
+	// ============================================================================
+	
+	/**
+	 * @brief Find vehicle object by its numeric ID
+	 * 
+	 * @param id The vehicle ID to search for
+	 * @return The vehicle object if found, null otherwise
+	 * 
+	 * This function searches through the vehicleObjects array to find
+	 * a vehicle with the specified ID. Used for rebuilding mappings
+	 * from persisted data when vehicles reconnect.
+	 */
+	function getVehicleById(id) {
+		if (id === undefined || id === null) return null
+		for (var i = 0; i < vehicleObjects.length; i++) {
+			var v = vehicleObjects[i]
+			if (v && v.id === id) return v
+		}
+		return null
+	}
 
-    // Helper: set mapping for a drone, updating both runtime and persisted state
-    function setMappingForDrone(droneIndex, veh) {
-        vehicleMapping[droneIndex] = veh || null
-        var sm = areaMapSettings.savedMap || {}
-        sm[droneIndex] = veh ? veh.id : null
-        areaMapSettings.savedMap = sm
-    }
+	/**
+	 * @brief Set the vehicle mapping for a specific drone index
+	 * 
+	 * @param droneIndex The drone index (0, 1, 2, ...) to map
+	 * @param veh The vehicle object to assign, or null to clear mapping
+	 * 
+	 * This function updates both the runtime vehicleMapping object and
+	 * the persisted settings. When a vehicle is assigned, it's automatically
+	 * saved for future sessions.
+	 */
+	function setMappingForDrone(droneIndex, veh) {
+		vehicleMapping[droneIndex] = veh || null
+		var sm = areaMapSettings.savedMap || {}
+		sm[droneIndex] = veh ? veh.id : null
+		areaMapSettings.savedMap = sm
+	}
 
-    // Rebind runtime mapping from persisted IDs (run on app start and when vehicles change)
-    function rebindMappingsFromSaved() {
-        var sm = areaMapSettings.savedMap
-        if (!sm) return
-        for (var k in sm) {
-            if (!sm.hasOwnProperty(k)) continue
-            var id = sm[k]
-            var obj = getVehicleById(id)
-            vehicleMapping[k] = obj
-        }
-    }
+	/**
+	 * @brief Rebuild vehicle mappings from persisted data
+	 * 
+	 * This function is called when the application starts or when
+	 * the vehicle list changes. It attempts to restore the previous
+	 * drone-to-vehicle mappings by looking up vehicle objects by
+	 * their persisted IDs.
+	 * 
+	 * @note This function handles cases where vehicles may have
+	 * disconnected and reconnected with different connection orders.
+	 */
+	function rebindMappingsFromSaved() {
+		var sm = areaMapSettings.savedMap
+		if (!sm) return
+		for (var k in sm) {
+			if (!sm.hasOwnProperty(k)) continue
+			var id = sm[k]
+			var obj = getVehicleById(id)
+			vehicleMapping[k] = obj
+		}
+	}
 
-    function refreshVehicleList() {
-        var labels = []
-        var objs = []
-        var mv = QGroundControl.multiVehicleManager
-        if (mv && mv.vehicles) {
-            var n = mv.vehicles.count
-            for (var i = 0; i < n; i++) {
-                var veh = mv.vehicles.get(i)
-                if (veh) {
-                    var label = veh.id !== undefined ? (qsTr("Vehicle %1").arg(veh.id)) : qsTr("Vehicle")
-                    labels.push(label)
-                    objs.push(veh)
-                }
-            }
-        }
-        vehicleLabels = labels
-        vehicleObjects = objs
-        // Attempt to rebind runtime mappings to current vehicle objects after list refresh
-        rebindMappingsFromSaved()
-    }
+	/**
+	 * @brief Refresh the list of available vehicles
+	 * 
+	 * This function queries the QGC multi-vehicle manager to get
+	 * the current list of connected vehicles and updates both
+	 * vehicleLabels and vehicleObjects arrays. After refreshing,
+	 * it attempts to rebind any saved mappings to the current
+	 * vehicle objects.
+	 * 
+	 * @note This function is called automatically when vehicles
+	 * connect/disconnect and can be called manually to refresh.
+	 */
+	function refreshVehicleList() {
+		var labels = []
+		var objs = []
+		var mv = QGroundControl.multiVehicleManager
+		if (mv && mv.vehicles) {
+			var n = mv.vehicles.count
+			for (var i = 0; i < n; i++) {
+				var veh = mv.vehicles.get(i)
+				if (veh) {
+					var label = veh.id !== undefined ? (qsTr("Vehicle %1").arg(veh.id)) : qsTr("Vehicle")
+					labels.push(label)
+					objs.push(veh)
+				}
+			}
+		}
+		vehicleLabels = labels
+		vehicleObjects = objs
+		// Attempt to rebind runtime mappings to current vehicle objects after list refresh
+		rebindMappingsFromSaved()
+	}
 
-    // Sizing helpers (no hardcoded sizes)
-    readonly property real _h: ScreenTools.defaultFontPixelHeight
-    readonly property real _w: ScreenTools.defaultFontPixelWidth
+	// ============================================================================
+	// SIZING & LAYOUT HELPERS
+	// ============================================================================
+	
+	/**
+	 * @brief Height multiplier based on default font size
+	 * 
+	 * This property provides consistent height sizing throughout the UI
+	 * by using ScreenTools.defaultFontPixelHeight as a base unit.
+	 * All heights should be multiples of this value for consistency.
+	 * 
+	 * @note Never use hardcoded pixel values - always use _h * multiplier
+	 */
+	readonly property real _h: ScreenTools.defaultFontPixelHeight
+	
+	/**
+	 * @brief Width multiplier based on default font size
+	 * 
+	 * This property provides consistent width sizing throughout the UI
+	 * by using ScreenTools.defaultFontPixelWidth as a base unit.
+	 * All widths should be multiples of this value for consistency.
+	 * 
+	 * @note Never use hardcoded pixel values - always use _w * multiplier
+	 */
+	readonly property real _w: ScreenTools.defaultFontPixelWidth
 
-
-    Component.onCompleted: {
+	// ============================================================================
+	// COMPONENT LIFECYCLE
+	// ============================================================================
+	
+	/**
+	 * @brief Component initialization handler
+	 * 
+	 * This function is called when the component is fully loaded and
+	 * ready for use. It performs essential setup tasks including:
+	 * - Refreshing the vehicle list
+	 * - Rebuilding vehicle mappings from persisted data
+	 * - Setting up initial UI state
+	 */
+	Component.onCompleted: {
 		console.log("AreaPlanEditor: Component completed")
 		areaPlanEditor = QGroundControl.areaPlanEditor
 		console.log("AreaPlanEditor backend:", !!areaPlanEditor)
@@ -155,29 +374,84 @@ Item {
         function onCountChanged() { refreshVehicleList() }
     }
 
-    QGCPalette {
-        id: qgcPal
-        colorGroupEnabled: enabled
-    }
+	// ============================================================================
+	// THEME & STYLING
+	// ============================================================================
+	
+	/**
+	 * @brief QGC color palette for consistent theming
+	 * 
+	 * This palette provides access to all QGC theme colors including
+	 * window backgrounds, text colors, button colors, and accent colors.
+	 * The palette automatically adapts to light/dark themes and ensures
+	 * consistent visual appearance across the application.
+	 */
+	QGCPalette {
+		id: qgcPal
+		colorGroupEnabled: enabled
+	}
 
-    Rectangle {
+	// ============================================================================
+	// MAIN UI LAYOUT
+	// ============================================================================
+	
+	/**
+	 * @brief Main background container
+	 * 
+	 * This Rectangle serves as the root container for all UI elements.
+	 * It provides the base background color and contains the scrollable
+	 * main content area. The background color automatically adapts to
+	 * the current QGC theme.
+	 */
+	Rectangle {
 		id: background
 		anchors.fill: parent
 		color: qgcPal.window
 		
+		/**
+		 * @brief Scrollable container for main content
+		 * 
+		 * This ScrollView provides vertical scrolling for the main content
+		 * while preventing horizontal scrolling. It automatically shows
+		 * scroll bars when content exceeds the available height.
+		 * 
+		 * @note Horizontal scrolling is disabled to maintain consistent
+		 * layout across different screen sizes and orientations.
+		 */
 		ScrollView {
 			id: scrollView
 			anchors.fill: parent
 			ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 			ScrollBar.vertical.policy: ScrollBar.AsNeeded
 			
+			/**
+			 * @brief Main content layout container
+			 * 
+			 * This Column arranges all UI sections vertically with consistent
+			 * spacing. Each section (header, configuration, controls, etc.)
+			 * is added as a child of this column. The spacing uses the
+			 * standardized _h multiplier for consistent visual rhythm.
+			 * 
+			 * @note The width is bound to the scroll view width to ensure
+			 * proper layout and scrolling behavior.
+			 */
 			Column {
 				id: mainColumn
 				width: scrollView.width
-                spacing: _h
-                anchors.margins: _h
+				spacing: _h
+				anchors.margins: _h
 				
-				// Header
+				// ============================================================================
+				// APPLICATION HEADER
+				// ============================================================================
+				
+				/**
+				 * @brief Main application title
+				 * 
+				 * This label displays the primary title for the Area Plan Editor.
+				 * It uses the QGC label component for consistent styling and
+				 * internationalization support.
+				 */
 				QGCLabel {
 					text: qsTr("Area Planning Mission Editor")
 					font.pointSize: ScreenTools.largeFontPointSize
@@ -189,130 +463,355 @@ Item {
 					verticalAlignment: Text.AlignVCenter
 				}
 
-				// Area Configuration Section
+				// ============================================================================
+				// AREA CONFIGURATION SECTION
+				// ============================================================================
+				
+				/**
+				 * @brief Area configuration parameters container
+				 * 
+				 * This section contains all the core parameters for defining
+				 * the operational area including dimensions, center coordinates,
+				 * and geometric properties. The container uses a subtle background
+				 * color and rounded corners to visually group related controls.
+				 * 
+				 * @note The height is dynamically calculated based on content
+				 * to ensure proper spacing and visual hierarchy.
+				 */
 				Rectangle {
 					width: parent.width
-                    height: areaConfigColumn.height + _h * 2
-                    color: qgcPal.windowShade
-                    radius: _w * 0.5
+					height: areaConfigColumn.height + _h * 2
+					color: qgcPal.windowShade
+					radius: _w * 0.5
 					
+					/**
+					 * @brief Vertical layout for area configuration controls
+					 * 
+					 * This column arranges the area configuration controls
+					 * vertically with consistent spacing. It contains the
+					 * section header and the parameter input grid.
+					 * 
+					 * @note The spacing uses _h * 0.8 for tighter grouping
+					 * of related configuration elements.
+					 */
 					Column {
 						id: areaConfigColumn
 						anchors.left: parent.left
 						anchors.right: parent.right
 						anchors.top: parent.top
-                        anchors.margins: _h
-                        spacing: _h * 0.8
+						anchors.margins: _h
+						spacing: _h * 0.8
 
+						/**
+						 * @brief Section header label
+						 * 
+						 * This label provides a clear title for the area
+						 * configuration section. It uses medium font size
+						 * and bold styling to establish visual hierarchy.
+						 */
 						QGCLabel {
 							text: qsTr("Area Configuration Parameters")
 							font.pointSize: ScreenTools.mediumFontPointSize
 							font.bold: true
 							width: parent.width
-                            height: _h * 1.2
+							height: _h * 1.2
 							verticalAlignment: Text.AlignVCenter
 						}
 
+						/**
+						 * @brief Parameter input grid layout
+						 * 
+						 * This grid arranges parameter labels and input fields
+						 * in a two-column layout for efficient space usage.
+						 * Each row contains a label and its corresponding input
+						 * control, with consistent spacing between elements.
+						 * 
+						 * @note The grid automatically handles alignment and
+						 * spacing for optimal visual presentation.
+						 */
 						Grid {
 							columns: 2
 							width: parent.width
-                            rowSpacing: _h * 0.6
-                            columnSpacing: _w
-                            property color _err: '#E53935'
+							rowSpacing: _h * 0.6
+							columnSpacing: _w
+							
+							/**
+							 * @brief Error color for validation feedback
+							 * 
+							 * This property defines the color used to highlight
+							 * input fields with validation errors. It provides
+							 * immediate visual feedback to users about invalid input.
+							 */
+							property color _err: '#E53935'
 
+							/**
+							 * @brief Area width parameter label
+							 * 
+							 * This label describes the area width input field.
+							 * It specifies that the value should be in meters
+							 * and uses consistent sizing with other parameter labels.
+							 */
 							QGCLabel { 
 								text: qsTr("Area Width (Meters):")
 								width: parent.width * 0.4
-                                height: _h * 1.6
+								height: _h * 1.6
 								verticalAlignment: Text.AlignVCenter
 							}
+							
+							/**
+							 * @brief Area width input field container
+							 * 
+							 * This column contains the width input field and
+							 * its associated error message. The layout ensures
+							 * proper spacing and alignment of the input control.
+							 */
 							Column {
-                                width: parent.width * 0.5
-                                spacing: _h * 0.2
-                                QGCTextField {
-                                    id: widthTextField
-                                    text: areaPlanEditor ? areaPlanEditor.areaWidth.toString() : "10"
-                                    height: _h * 1.6
-                                    validator: DoubleValidator { bottom: 1; top: 1000; decimals: 1 }
-                                    onEditingFinished: {
-                                        if (areaPlanEditor && text !== "") {
-var err = _safeValidate("areaWidth", parseFloat(text))
-                                            widthError.text = err
-                                            if (err === "") areaPlanEditor.areaWidth = parseFloat(text)
-                                        }
-                                    }
-                                }
-                                QGCLabel { id: widthError; color: parent.parent._err; visible: text.length>0; text: "" }
-                            }
+								width: parent.width * 0.5
+								spacing: _h * 0.2
+								
+								/**
+								 * @brief Area width input field
+								 * 
+								 * This text field allows users to specify the
+								 * width of the operational area in meters.
+								 * It includes validation to ensure the value
+								 * is within acceptable bounds (1-1000m).
+								 * 
+								 * @note The field automatically updates the
+								 * backend areaPlanEditor.areaWidth property
+								 * when editing is finished and validation passes.
+								 */
+								QGCTextField {
+									id: widthTextField
+									text: areaPlanEditor ? areaPlanEditor.areaWidth.toString() : "10"
+									height: _h * 1.6
+									validator: DoubleValidator { bottom: 1; top: 1000; decimals: 1 }
+									onEditingFinished: {
+										if (areaPlanEditor && text !== "") {
+											var err = _safeValidate("areaWidth", parseFloat(text))
+											widthError.text = err
+											if (err === "") areaPlanEditor.areaWidth = parseFloat(text)
+										}
+									}
+								}
+								
+								/**
+								 * @brief Width input validation error display
+								 * 
+								 * This label displays validation errors for the
+								 * width input field. It only appears when there
+								 * are validation errors and uses the error color
+								 * for immediate visual feedback.
+								 */
+								QGCLabel { 
+									id: widthError
+									color: parent.parent._err
+									visible: text.length > 0
+									text: ""
+								}
+							}
 
-                            // --- Multi-drone parameters ---
-                            QGCLabel {
-                                text: qsTr("Number of Drones:")
-                                width: parent.width * 0.4
-                                height: _h * 1.6
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                            Column {
-                                width: parent.width * 0.5
-                                spacing: _h * 0.2
-                                QGCTextField {
-                                    id: droneCountField
-                                    height: _h * 1.6
-                                    text: areaPlanEditor ? areaPlanEditor.droneCount.toString() : "2"
-                                    validator: IntValidator { bottom: 1; top: 50 }
-                                    onEditingFinished: {
-                                        if (areaPlanEditor && text !== "") {
-var err = _safeValidate("droneCount", parseInt(text))
-                                            droneCountError.text = err
-                                            if (err === "") areaPlanEditor.setDroneCount(parseInt(text))
-                                        }
-                                    }
-                                }
-                                QGCLabel { id: droneCountError; color: parent.parent._err; visible: text.length>0; text: "" }
-                            }
+							// ============================================================================
+							// MULTI-DRONE PARAMETERS
+							// ============================================================================
+							
+							/**
+							 * @brief Multi-drone parameters section header
+							 * 
+							 * This comment marks the beginning of the multi-drone
+							 * configuration section. All parameters below this point
+							 * control how multiple drones coordinate their missions.
+							 */
+							// --- Multi-drone parameters ---
+							
+							/**
+							 * @brief Drone count parameter label
+							 * 
+							 * This label describes the drone count input field.
+							 * It specifies the number of drones that will be
+							 * used for the area coverage mission.
+							 */
+							QGCLabel {
+								text: qsTr("Number of Drones:")
+								width: parent.width * 0.4
+								height: _h * 1.6
+								verticalAlignment: Text.AlignVCenter
+							}
+							/**
+							 * @brief Drone count input field container
+							 * 
+							 * This column contains the drone count input field and
+							 * its associated error message. The layout ensures
+							 * proper spacing and alignment of the input control.
+							 */
+							Column {
+								width: parent.width * 0.5
+								spacing: _h * 0.2
+								
+								/**
+								 * @brief Drone count input field
+								 * 
+								 * This text field allows users to specify the
+								 * number of drones for the mission. It includes
+								 * validation to ensure the value is within
+								 * acceptable bounds (1-50 drones).
+								 * 
+								 * @note The field automatically updates the
+								 * backend areaPlanEditor.droneCount property
+								 * when editing is finished and validation passes.
+								 */
+								QGCTextField {
+									id: droneCountField
+									height: _h * 1.6
+									text: areaPlanEditor ? areaPlanEditor.droneCount.toString() : "2"
+									validator: IntValidator { bottom: 1; top: 50 }
+									onEditingFinished: {
+										if (areaPlanEditor && text !== "") {
+											var err = _safeValidate("droneCount", parseInt(text))
+											droneCountError.text = err
+											if (err === "") areaPlanEditor.setDroneCount(parseInt(text))
+										}
+									}
+								}
+								
+								/**
+								 * @brief Drone count validation error display
+								 * 
+								 * This label displays validation errors for the
+								 * drone count input field. It only appears when
+								 * there are validation errors and uses the error
+								 * color for immediate visual feedback.
+								 */
+								QGCLabel { 
+									id: droneCountError
+									color: parent.parent._err
+									visible: text.length > 0
+									text: ""
+								}
+							}
 
-                            QGCLabel {
-                                text: qsTr("Altitude Band Start (m):")
-                                width: parent.width * 0.4
-                                height: _h * 1.6
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                            Column {
-                                width: parent.width * 0.5
-                                spacing: _h * 0.2
-                                QGCTextField {
-                                    id: bandStartField
-                                    height: _h * 1.6
-                                    text: areaPlanEditor ? areaPlanEditor.altitudeBandStart.toString() : "0"
-                                    validator: DoubleValidator { bottom: 0; top: 10000; decimals: 1 }
-                                    onEditingFinished: {
-                                        if (areaPlanEditor && text !== "") {
-var err = _safeValidate("missionAltitude", parseFloat(text))
-                                            // missionAltitude validator is generic numeric; accept >=0 here
-                                            bandStartError.text = ""  // no hard error at UI level
-                                            areaPlanEditor.setAltitudeBandStart(parseFloat(text))
-                                        }
-                                    }
-                                }
-                                QGCLabel { id: bandStartError; color: parent.parent._err; visible: text.length>0; text: "" }
-                            }
+							/**
+							 * @brief Altitude band start parameter label
+							 * 
+							 * This label describes the altitude band start input field.
+							 * It specifies the starting altitude for altitude banding
+							 * in meters, which determines the vertical separation
+							 * between drones.
+							 */
+							QGCLabel {
+								text: qsTr("Altitude Band Start (m):")
+								width: parent.width * 0.4
+								height: _h * 1.6
+								verticalAlignment: Text.AlignVCenter
+							}
+							/**
+							 * @brief Altitude band start input field container
+							 * 
+							 * This column contains the altitude band start input field
+							 * and its associated error message. The layout ensures
+							 * proper spacing and alignment of the input control.
+							 */
+							Column {
+								width: parent.width * 0.5
+								spacing: _h * 0.2
+								
+								/**
+								 * @brief Altitude band start input field
+								 * 
+								 * This text field allows users to specify the
+								 * starting altitude for altitude banding in meters.
+								 * It includes validation to ensure the value is
+								 * within acceptable bounds (0-10000m).
+								 * 
+								 * @note The field automatically updates the
+								 * backend areaPlanEditor.altitudeBandStart property
+								 * when editing is finished and validation passes.
+								 * 
+								 * @note This field uses the generic missionAltitude
+								 * validator but accepts any non-negative value.
+								 */
+								QGCTextField {
+									id: bandStartField
+									height: _h * 1.6
+									text: areaPlanEditor ? areaPlanEditor.altitudeBandStart.toString() : "0"
+									validator: DoubleValidator { bottom: 0; top: 10000; decimals: 1 }
+									onEditingFinished: {
+										if (areaPlanEditor && text !== "") {
+											var err = _safeValidate("missionAltitude", parseFloat(text))
+											// missionAltitude validator is generic numeric; accept >=0 here
+											bandStartError.text = ""  // no hard error at UI level
+											areaPlanEditor.setAltitudeBandStart(parseFloat(text))
+										}
+									}
+								}
+								
+								/**
+								 * @brief Altitude band start validation error display
+								 * 
+								 * This label displays validation errors for the
+								 * altitude band start input field. It only appears
+								 * when there are validation errors and uses the
+								 * error color for immediate visual feedback.
+								 * 
+								 * @note Currently this field doesn't show hard
+								 * errors at the UI level, only soft validation.
+								 */
+								QGCLabel { 
+									id: bandStartError
+									color: parent.parent._err
+									visible: text.length > 0
+									text: ""
+								}
+							}
 
-                            QGCLabel {
-                                text: qsTr("Altitude Band Step (m):")
-                                width: parent.width * 0.4
-                                height: _h * 1.6
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                            Column {
-                                width: parent.width * 0.5
-                                spacing: _h * 0.2
-                                QGCTextField {
-                                    id: bandStepField
-                                    height: _h * 1.6
-                                    text: areaPlanEditor ? areaPlanEditor.altitudeBandStep.toString() : "10"
-                                    validator: DoubleValidator { bottom: 0.1; top: 10000; decimals: 1 }
-                                    onEditingFinished: {
-                                        if (areaPlanEditor && text !== "") {
+							/**
+							 * @brief Altitude band step parameter label
+							 * 
+							 * This label describes the altitude band step input field.
+							 * It specifies the vertical separation between drones
+							 * in meters, which determines how much altitude difference
+							 * exists between adjacent drones in the formation.
+							 */
+							QGCLabel {
+								text: qsTr("Altitude Band Step (m):")
+								width: parent.width * 0.4
+								height: _h * 1.6
+								verticalAlignment: Text.AlignVCenter
+							}
+							/**
+							 * @brief Altitude band step input field container
+							 * 
+							 * This column contains the altitude band step input field
+							 * and its associated error message. The layout ensures
+							 * proper spacing and alignment of the input control.
+							 */
+							Column {
+								width: parent.width * 0.5
+								spacing: _h * 0.2
+								
+								/**
+								 * @brief Altitude band step input field
+								 * 
+								 * This text field allows users to specify the
+								 * vertical separation between drones in meters.
+								 * It includes validation to ensure the value is
+								 * within acceptable bounds (0.1-10000m).
+								 * 
+								 * @note The field automatically updates the
+								 * backend areaPlanEditor.altitudeBandStep property
+								 * when editing is finished and validation passes.
+								 * 
+								 * @note The minimum value of 0.1m ensures that
+								 * drones have sufficient vertical separation
+								 * for safe operation.
+								 */
+								QGCTextField {
+									id: bandStepField
+									height: _h * 1.6
+									text: areaPlanEditor ? areaPlanEditor.altitudeBandStep.toString() : "10"
+									validator: DoubleValidator { bottom: 0.1; top: 10000; decimals: 1 }
+									onEditingFinished: {
+										if (areaPlanEditor && text !== "") {
 var err = _safeValidate("altitudeBandStep", parseFloat(text))
                                             bandStepError.text = err
                                             if (err === "") areaPlanEditor.setAltitudeBandStep(parseFloat(text))
