@@ -3059,7 +3059,7 @@ QList<QVariant> AreaPlanEditor::generateWaypoints()
     // Local helpers for geometry
     const qreal halfW = _areaWidth * 0.5;
     const qreal halfH = _areaHeight * 0.5;
-    const qreal theta = qDegreesToRadians(_areaRotation); // rotation: 0 = North
+    const qreal theta = qDegreesToRadians(-_areaRotation); // rotation: positive = clockwise
     const qreal cosT = qCos(theta);
     const qreal sinT = qSin(theta);
 
@@ -3476,7 +3476,7 @@ QList<QVariant> AreaPlanEditor::computePerDroneWaypointPreview() const
     // Precompute rotated coordinates for each line index and point index similar to generateWaypoints
     const qreal halfW = _areaWidth * 0.5;
     const qreal halfH = _areaHeight * 0.5;
-    const qreal theta = qDegreesToRadians(_areaRotation);
+    const qreal theta = qDegreesToRadians(-_areaRotation);
     const qreal cosT = qCos(theta);
     const qreal sinT = qSin(theta);
     auto rotateXY = [&](qreal x, qreal y) { return QPointF(x * cosT - y * sinT, x * sinT + y * cosT); };
@@ -3582,7 +3582,7 @@ QList<QVariant> AreaPlanEditor::generatePerDroneWaypoints(int droneIndex) const
 
     const qreal halfW = _areaWidth * 0.5;
     const qreal halfH = _areaHeight * 0.5;
-    const qreal theta = qDegreesToRadians(_areaRotation);
+    const qreal theta = qDegreesToRadians(-_areaRotation);
     const qreal cosT = qCos(theta);
     const qreal sinT = qSin(theta);
     auto rotateXY = [&](qreal x, qreal y) { return QPointF(x * cosT - y * sinT, x * sinT + y * cosT); };
@@ -5279,9 +5279,9 @@ bool AreaPlanEditor::validateWaypointGeneration()
     };
 
     auto unrotate = [&](const QPointF& p) {
-        // Apply inverse rotation by -theta to map back to local rectangle axes
-        return QPointF(p.x() *  cosT + p.y() * sinT,
-                       -p.x() * sinT + p.y() * cosT);
+        // Map world displacement back to local rectangle axes using clockwise-positive convention
+        return QPointF(p.x() * cosT - p.y() * sinT,
+                       p.x() * sinT + p.y() * cosT);
     };
 
     const qreal eps = 0.25; // meters tolerance
