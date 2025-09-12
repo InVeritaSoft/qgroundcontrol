@@ -348,14 +348,14 @@ private:
     // Default values
     static constexpr qreal _defaultAreaWidth = 10.0;   // Changed from 100.0 to 10.0
     static constexpr qreal _defaultAreaHeight = 10.0;  // Changed from 100.0 to 10.0
-    static constexpr qreal _defaultLineSpacing = 10.0; // Increased from 3.0
+    static constexpr qreal _defaultLineSpacing = 1.0; // per defaults UI
     static constexpr int _defaultNumPoints = 1;
-    static constexpr qreal _defaultAltitude = 10.0;
-    static constexpr int   _defaultDroneCount = 2;
-    static constexpr qreal _defaultAltitudeBandStart = 0.0;
-    static constexpr qreal _defaultAltitudeBandStep  = 10.0;
-    static constexpr qreal _defaultTimeOffsetPerDrone = 0.0; // seconds
-    static constexpr qreal _defaultPerTargetSeparationS = 5.0; // seconds
+    static constexpr qreal _defaultAltitude = 5.0;
+    static constexpr int   _defaultDroneCount = 3;
+    static constexpr qreal _defaultAltitudeBandStart = 2.0;
+    static constexpr qreal _defaultAltitudeBandStep  = 2.0;
+    static constexpr qreal _defaultTimeOffsetPerDrone = 2.0; // seconds
+    static constexpr qreal _defaultPerTargetSeparationS = 60.0; // seconds
 
     // Properties
     qreal _areaWidth = _defaultAreaWidth;
@@ -381,7 +381,7 @@ private:
     };
     QMap<int, DroneStats> _droneStats;
     qreal _areaRotation = 0.0;  // Rotation in degrees, 0 = North
-    qreal _loiterTime = 10.0;   // Loiter time in seconds at each waypoint
+    qreal _loiterTime = 2.0;    // Loiter time in seconds at each waypoint
     bool _isProcessing = false;
     int _progressValue = 0;
     QString _progressMessage;
@@ -412,5 +412,5 @@ private:
     qreal _targetHoldTimeS = 10.0;         // default 10s hold at target
     qreal _homeTurnaroundWaitS = 30.0;     // default 30s wait at home between trips
     bool  _payloadReleaseEnabled = false;  // default disabled
-    qreal _takeoffHeight = 3.0;            // default takeoff height in meters
+    qreal _takeoffHeight = 5.0;            // default takeoff height in meters
 };
