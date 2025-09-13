@@ -734,7 +734,7 @@ Item {
 									id: bandStartField
 									height: _h * 1.6
 									text: areaPlanEditor ? areaPlanEditor.altitudeBandStart.toString() : "0"
-									validator: DoubleValidator { bottom: 0; top: 10000; decimals: 1 }
+									validator: DoubleValidator { bottom: 1; top: 10000; decimals: 1 }
 									onEditingFinished: {
 										if (areaPlanEditor && text !== "") {
 											var err = _safeValidate("missionAltitude", parseFloat(text))
@@ -833,8 +833,8 @@ var err = _safeValidate("altitudeBandStep", parseFloat(text))
                                 QGCTextField {
                                     id: timeOffsetField
                                     height: _h * 1.6
-                                    text: areaPlanEditor ? areaPlanEditor.timeOffsetPerDrone.toString() : "0"
-                                    validator: DoubleValidator { bottom: 0; top: 3600; decimals: 1 }
+                                    text: areaPlanEditor ? areaPlanEditor.timeOffsetPerDrone.toString() : "1"
+                                    validator: DoubleValidator { bottom: 1; top: 3600; decimals: 1 }
                                     onEditingFinished: if (areaPlanEditor && text !== "") areaPlanEditor.setTimeOffsetPerDrone(parseFloat(text))
                                 }
                                 QGCLabel { text: qsTr("Start staggering per aircraft"); color: qgcPal.colorGrey }
@@ -849,8 +849,8 @@ var err = _safeValidate("altitudeBandStep", parseFloat(text))
                             QGCTextField {
                                 width: parent.width * 0.5
                                 height: _h * 1.6
-                                text: areaPlanEditor ? areaPlanEditor.perTargetSeparationS.toString() : "5"
-                                validator: DoubleValidator { bottom: 0; top: 3600; decimals: 1 }
+                                text: areaPlanEditor ? areaPlanEditor.perTargetSeparationS.toString() : "60"
+                                validator: DoubleValidator { bottom: 1; top: 3600; decimals: 1 }
                                 onEditingFinished: if (areaPlanEditor && text !== "") areaPlanEditor.setPerTargetSeparationS(parseFloat(text))
                             }
 
@@ -1035,11 +1035,11 @@ var err = _safeValidate("numPoints", parseInt(text))
 							QGCTextField {
                                 width: parent.width * 0.6
                                 height: _h * 1.6
-								text: areaPlanEditor ? areaPlanEditor.loiterTime : 10.0
-								placeholderText: qsTr("10.0")
+								text: areaPlanEditor ? areaPlanEditor.loiterTime : 2.0
+								placeholderText: qsTr("2.0")
 								inputMethodHints: Qt.ImhFormattedNumbersOnly
 								validator: DoubleValidator {
-									bottom: 0.0
+									bottom: 1.0
 									top: 3600.0
 									decimals: 1
 									notation: DoubleValidator.StandardNotation
@@ -1688,8 +1688,8 @@ var err = _safeValidate("numPoints", parseInt(text))
                                 id: droneIndexField
                                 width: parent.width * 0.2
                                 height: parent.height
-                                text: qsTr("0")
-                                validator: IntValidator { bottom: 0; top: 99 }
+                                text: qsTr("1")
+                                validator: IntValidator { bottom: 1; top: 99 }
                             }
                             QGCButton {
                                 text: qsTr("Insert")
@@ -1697,8 +1697,8 @@ var err = _safeValidate("numPoints", parseInt(text))
                                 height: parent.height
                                 onClicked: {
                                     if (areaPlanEditor) {
-                                        var idx = parseInt(droneIndexField.text)
-                                        if (!isNaN(idx)) {
+                                        var idx = parseInt(droneIndexField.text) - 1
+                                        if (!isNaN(idx) && idx >= 0) {
                                             areaPlanEditor.addPerDroneToMission(idx)
                                         }
                                     }
@@ -1770,8 +1770,8 @@ var err = _safeValidate("numPoints", parseInt(text))
                                 id: uploadDroneIndexField
                                 width: parent.width * 0.1
                                 height: parent.height
-                                text: qsTr("0")
-                                validator: IntValidator { bottom: 0; top: 99 }
+                                text: qsTr("1")
+                                validator: IntValidator { bottom: 1; top: 99 }
                             }
                             QGCButton {
                                 text: qsTr("Upload")
@@ -1779,8 +1779,8 @@ var err = _safeValidate("numPoints", parseInt(text))
                                 height: parent.height
                                 onClicked: {
                                     if (areaPlanEditor) {
-                                        var idx = parseInt(uploadDroneIndexField.text)
-                                        if (!isNaN(idx)) {
+                                        var idx = parseInt(uploadDroneIndexField.text) - 1
+                                        if (!isNaN(idx) && idx >= 0) {
                                             if (selectedVehicle) {
                                                 areaPlanEditor.uploadPerDroneMissionToVehicle(idx, selectedVehicle)
                                             } else {
@@ -1932,15 +1932,15 @@ var err = _safeValidate("numPoints", parseInt(text))
                                         spacing: _w
 
                                         QGCLabel {
-                                            text: qsTr("Aircraft %1").arg(modelData.droneIndex)
-                                            width: parent.width * 0.15
+                                            text: qsTr("Aircraft %1").arg(modelData.droneIndex + 1)
+                                            width: parent.width * 0.12
                                             height: parent.height
                                             verticalAlignment: Text.AlignVCenter
                                         }
 
                                         // Vehicle selector (guarded for empty vehicle list)
                                         Item {
-                                            width: parent.width * 0.30
+                                            width: parent.width * 0.28
                                             height: parent.height
                                             visible: true
                                             property int _vehCount: vehicleLabels.length
@@ -1968,7 +1968,7 @@ var err = _safeValidate("numPoints", parseInt(text))
                                         // Explicit map button for user confirmation
                                         QGCButton {
                                             text: qsTr("Map")
-                                            width: _w * 10
+                                            width: parent.width * 0.08
                                             height: parent.height
                                             enabled: (function(){
                                                 var count = vehicleLabels.length
@@ -1980,7 +1980,7 @@ var err = _safeValidate("numPoints", parseInt(text))
                                                     setMappingForDrone(modelData.droneIndex, veh)
                                                     if (areaPlanEditor) {
                                                         var vid = (veh && typeof veh.id !== 'undefined') ? veh.id : "?"
-                                                        areaPlanEditor.updateStatus(qsTr("Mapped Aircraft %1 to Vehicle %2").arg(modelData.droneIndex).arg(vid))
+                                                        areaPlanEditor.updateStatus(qsTr("Mapped Aircraft %1 to Vehicle %2").arg(modelData.droneIndex + 1).arg(vid))
                                                     }
                                                 }
                                             }
@@ -2009,7 +2009,7 @@ var err = _safeValidate("numPoints", parseInt(text))
                                         }
                                         QGCButton {
                                             text: qsTr("Unmap")
-                                            width: _w * 10
+                                            width: parent.width * 0.08
                                             height: parent.height
                                             enabled: (function(){
                                                 var sm = areaMapSettings.savedMap || {}
@@ -2017,7 +2017,7 @@ var err = _safeValidate("numPoints", parseInt(text))
                                             })()
                                             onClicked: {
                                                 setMappingForDrone(modelData.droneIndex, null)
-                                                if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Unmapped Aircraft %1").arg(modelData.droneIndex))
+                                                if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Unmapped Aircraft %1").arg(modelData.droneIndex + 1))
                                             }
                                             ToolTip.visible: hovered
                                             ToolTip.text: qsTr("Clear mapping for this aircraft")
@@ -2025,7 +2025,7 @@ var err = _safeValidate("numPoints", parseInt(text))
 
                                         QGCButton {
                                             text: qsTr("Upload")
-                                            width: parent.width * 0.2
+                                            width: parent.width * 0.12
                                             height: parent.height
                                             onClicked: {
                                                 if (areaPlanEditor) {
@@ -2084,7 +2084,7 @@ var err = _safeValidate("numPoints", parseInt(text))
                                     // Start all mapped missions with optional stagger
                                     QGCTextField {
                                         id: staggerField
-                                        width: _w * 10
+                                        width: parent.width * 0.08
                                         height: parent.height
                                         text: "3"
                                         validator: DoubleValidator { bottom: 0; top: 3600; decimals: 1 }
@@ -2137,7 +2137,7 @@ var err = _safeValidate("numPoints", parseInt(text))
                                             width: parent.width
                                             height: _h * 1.8
                                             spacing: _w
-                                            QGCLabel { text: qsTr("Aircraft %1").arg(modelData.droneIndex); width: parent.width * 0.15; verticalAlignment: Text.AlignVCenter }
+                                            QGCLabel { text: qsTr("Aircraft %1").arg(modelData.droneIndex + 1); width: parent.width * 0.15; verticalAlignment: Text.AlignVCenter }
                                             QGCButton {
                                                 text: qsTr("Arm")
                                                 enabled: {

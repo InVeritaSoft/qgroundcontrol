@@ -283,10 +283,12 @@ void AreaPlanEditor::setLineSpacing(qreal spacing)
  */
 void AreaPlanEditor::setNumPoints(int points)
 {
-    if (_numPoints == points) {
+    // Clamp to minimum of 1 to ensure at least one waypoint per line
+    int clamped = points < 1 ? 1 : points;
+    if (_numPoints == clamped) {
         return;
     }
-    _numPoints = points;
+    _numPoints = clamped;
     emit numPointsChanged();
 }
 
