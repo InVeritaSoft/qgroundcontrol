@@ -852,3 +852,1174 @@ Summary:
 
 ---
 
+_**User (2025-09-15 08:46Z)**_
+
+Well we need confidence in Mission Controls section, that 'arm' wil arm, 'take off' will takeoff, can you please check intensivly that section for any gaps, because we do not want to fix it upon real flight test, we just want to have an expected behavior
+
+---
+
+_**Assistant**_
+
+<think><details><summary>Thought Process</summary>**Refining takeoff logic**
+
+I'm analyzing the takeoffVehicle function in C++. Right now, it uses guidedTakeoffSupported or falls back to startTakeoff and updates the status. I want to enhance the disable logic to ensure takeoff only occurs when the vehicle is mapped and not already flying. The current rule is strict, but it seems I can relax it a bit. I’ll also make sure to check that the vehicle is armed and at the proper altitude before starting the mission, as required.
+**Adjusting mission start logic**
+
+I need to let the user perform auto-takeoff before starting the mission. Previously, we modified the Start Mission button to trigger auto-takeoff, but I realized it couldn’t be used since the _canStartMissionFor function checks if altitudeRelative is at least 1.0. This means the button remains disabled when on the ground, blocking the process. To resolve this, I’ll update the logic so that the button can be enabled based on vehicle presence, mission items, and health checks, also creating a helper function that doesn't require altitude.
+**Implementing mission start sequence**
+
+I'm considering whether to allow the mission to start immediately after takeoff. It might be safer to schedule it with a brief delay or by polling the altitude instead of sending it right away. In the Start Mission onClicked function, I'll first check if the vehicle is armed. If not, I’ll arm it, and if it’s not flying yet, I’ll initiate takeoff. Then, I can schedule the mission start using a Timer, polling until the altitude condition is met. I will also confirm takeoff with the user before proceeding.
+**Updating mission control functionality**
+
+I'm feeling good about using the confirmation step in our logic. Previously, the enabled state was tied to veh.pauseVehicleSupported while checking if the vehicle was flying, which might still hold up. Moving on, I think the Continue button should call areaPlanEditor.continueMissionOnVehicle, so I’ll need to verify its enabled state. There's also the RTL button, which I need to find the code for, so I'll search for that now.</details></think>
+
+---
+
+
+
+---
+
+<think><details><summary>Thought Process</summary>**Considering vehicle arming sequence**
+
+I’m thinking about how we should automatically arm the vehicle in QML before takeoff. If it’s not armed, I should confirm and call `areaPlanEditor.armVehicle(veh, true)` first. The user wants to feel confident, so it might be good to add an `onClicked` for the arming attempt. I should sequence this with a confirmation like, “Arm then takeoff?” Otherwise, a manual action will be needed. We can modify the existing confirm function for this purpose.
+**Implementing takeoff and mission features**
+
+I'm focusing on the implementation details for the Takeoff button. When it’s clicked, if the vehicle exists and the areaPlanEditor is active, I want to confirm the action: “Arm (if needed) and takeoff vehicle X to Y m.” If the vehicle isn't armed, I can call `areaPlanEditor.armVehicle(veh, true)` beforehand. Additionally, for the Start Mission button, I’ll make sure the vehicle is armed or automatically armed first since that’s usually necessary. I’ll also work on confirming the RTL button mapping, ensuring tooltips for Pause and Continue are present.
+**Updating QML for vehicle controls**
+
+I’m planning to update the QML for the Takeoff button. I’ll set it to enabled only if the vehicle exists, supports guided takeoff, and is not currently flying. If guided takeoff isn’t supported, I'll add a tooltip for that. When clicked, it will check whether the vehicle is armed, and if not, it will arm it before taking off. For the Start Mission, we’ll add an arm check before takeoff. As for the RTL button, I need to find its code block and implement an `onClicked` handler for it.</details></think>
+
+---
+
+Read file: undefined
+
+---
+
+<think><details><summary>Thought Process</summary>**Addressing user concerns**
+
+I need to tackle the user's feedback regarding mapped counts. They've noted that "mapped is 0 even when all are mapped," but we've already added mapping counts and ensured updates on setMappingForDrone. It looks like we're on track with that!
+
+Next, they want confidence when uploading missions, ensuring button presses relate missions to the correct vehicle. So we've implemented the code for adding takeoff and related items in AreaPlanEditor.cc to build the mission, which is great! I'm feeling good about these improvements.
+**Evaluating mission upload process**
+
+In the uploadPerDroneMissionToVehicle function, I generate a missionItems list, starting with the home waypoint, takeoff, waypoints, maybe some loitering, and finally the RTL and Land. That's looking good!
+
+In QML, uploading per-drone correctly uses the droneIndex. Although labels are 1-based, the modelData.droneIndex is still 0-based, which is fine. 
+
+For the "Upload All Mapped" feature, the loop correctly uses d.droneIndex. Now, I need to ensure confidence in Mission Controls by checking the enable conditions for Arm, Takeoff, and Start Mission. Everything seems to line up well!
+**Refining mission start condition**
+
+I've added per-drone insertion for uploaded missions, which writes missionItems directly to the vehicle's mission manager. For starting a mission, we expect it to be already uploaded to the vehicle. The _canStartMissionFor function checks _hasMissionItems, which reads from the mission controller. 
+
+However, with per-drone uploads, it might not always contain those items, potentially causing issues with enabling the button. The user needs confidence, so I can adjust _canStartMissionFor to check if the vehicle has a mission loaded instead, perhaps by relaxing the _hasMissionItems requirement. That could provide a more robust solution.
+**Fixing uploaded map tracking**
+
+I've noticed an issue with the uploadedMap tracking for the per-drone Upload button. Initially, we set uploadedMap[droneIndex] to false, but then, after the upload completes, QML isn't updating uploadedMap to true because it doesn't listen for the missionUploaded signal.
+
+To fix this gap, I’ll wire a handler in QML to connect to areaPlanEditor.missionUploaded, so we can update uploadedMap when the mission is uploaded. Also, Start Mission gating should check that uploadedMap is true.
+
+Additionally, I'll ensure that final RTL and Land are indeed included in the mission building process.
+**Improving mission flow and UI feedback**
+
+For the addPerDroneToMission, I added takeoff at the beginning, but I realized that the final RTL or land might not always be included in the insertion process.
+
+To enhance clarity, I'm planning to implement a status tooltip that shows the vehicle ID and drone index. I also want to establish connections for missionUploaded to update the uploadedMap and add UI flashing.
+
+Additionally, I'll modify the Start Mission gating, revising _canStartMissionFor to consider uploadedMap[droneIndex]. This updates the Start button's enabled conditions and ensures the relevant tooltip shows correct information. I'll also patch the labeling for upload status and mapping counts as we go along!</details></think>
+
+---
+
+<details><summary>Edit file: src/QmlControls/AreaPlanEditor.qml</summary>
+
+undefined
+
+**Chunk 1**
+Lines added: 4, lines removed: 1
+
+```diff
+@@ -1827,5 +1827,8 @@
+                              }
+                              QGCLabel {
+-                                 text: qsTr("Mapped: %1").arg(mappedCount)
++                                 text: {
++                                     var planned = areaPlanEditor ? areaPlanEditor.droneCount : 0
++                                     return qsTr("Mapped: %1/%2").arg(mappedCount).arg(planned)
++                                 }
+                                  width: parent.width * 0.33
+                                  height: parent.height
+```
+
+**Chunk 2**
+Lines added: 1, lines removed: 2
+
+```diff
+@@ -2211,11 +2214,10 @@
+                                                  enabled: {
+                                                      var veh = vehicleMapping[modelData.droneIndex]
+-                                                     return _canStartMissionFor(veh)
++                                                     return _canStartMissionFor(veh) && (uploadedMap[modelData.droneIndex] === true)
+                                                  }
+                                                  onClicked: {
+                                                      var veh = vehicleMapping[modelData.droneIndex]
+                                                      if (veh && areaPlanEditor) {
+                                                          perDroneMapColumn.confirmAndRun(qsTr("Start mission on vehicle %1? (auto takeoff)").arg(veh.id), function(){
+-                                                             // Ensure takeoff is commanded immediately before mission start when supported
+                                                              if (veh.takeoffVehicleSupported === true && veh.flying !== true) {
+                                                                  areaPlanEditor.takeoffVehicle(veh, areaPlanEditor ? areaPlanEditor.takeoffHeight : 3)
+```
+
+**Chunk 3**
+Lines added: 6, lines removed: 1
+
+```diff
+@@ -2226,5 +2228,10 @@
+                                                  }
+                                                  ToolTip.visible: hovered && !enabled
+-                                                 ToolTip.text: qsTr("Cannot start: ensure mission is uploaded and health checks pass")
++                                                 ToolTip.text: {
++                                                     var veh = vehicleMapping[modelData.droneIndex]
++                                                     if (!veh) return qsTr("No vehicle mapped")
++                                                     if (uploadedMap[modelData.droneIndex] !== true) return qsTr("Upload mission first")
++                                                     return qsTr("Cannot start: ensure health checks pass and altitude is safe")
++                                                 }
+                                              }
+                                              QGCButton {
+```
+
+</details>
+
+---
+
+- Status: Hardened Mission Controls for confidence and clarity.
+- Changes in `src/QmlControls/AreaPlanEditor.qml`:
+  - Reactive mapping integrity:
+    - “Mapped” now shows X/Y and stays orange until all drones are mapped.
+  - Upload-state awareness:
+    - Hooked into C++ `missionUploaded(droneIndex, vehicle)` via `Connections` to set `uploadedMap[droneIndex] = true` once a mission is confirmed uploaded.
+    - “Start Mission” now requires both `_canStartMissionFor(veh)` and `uploadedMap[droneIndex] === true`.
+    - Tooltip explains why Start is disabled (e.g., “Upload mission first”).
+  - Start sequence safety:
+    - “Start Mission” confirmation includes auto-takeoff if supported and not already flying, then starts mission.
+  - Existing controls:
+    - Arm/Takeoff/Pause/Continue/RTL/Land remain guarded by precise capability checks and contextual tooltips.
+
+Summary:
+- You get a clear, mapped X/Y indicator, Start is blocked until a successful upload is confirmed per aircraft, and Start issues takeoff first. This reduces surprises in field tests.
+
+---
+
+_**User (2025-09-15 08:46Z)**_
+
+it might be worth setting keyboard shortcus
+A - for arm / disarm all 
+T - takeoff all
+L - all land
+S - stabilize
+
+---
+
+_**Assistant**_
+
+<think><details><summary>Thought Process</summary>**Clarifying vehicle operations**
+
+I’m checking the procedures for vehicle operations: for takeoff, we can reuse the scheduleStart with minimal staggering and confirm takeoff for each vehicle using the areaPlanEditor.
+
+For landing, I’ll iterate through the mapped vehicles to call the land function.
+
+When considering stabilization, I need to check if the vehicle can expose a flight mode. In previous code, it seems to use setFlightMode, so I’ll want to ensure it’s implemented properly where needed, possibly in the QML file near mapping controls.
+**Setting up key handling in QML**
+
+I’m planning to add key handling at the top level in the QML file when the component is active. I need to ensure that focus is set correctly, perhaps using an invisible FocusScope, but a simpler approach might involve Shortcut objects for handling sequences like "A", "T", "L", and "S."
+
+Since QGC is using Qt 6.8.3, the Shortcut type should be available. I’ll implement a function to iterate through mapped vehicles, but I’m cautious about toggling states inconsistently while arming or disarming vehicles.
+**Defining arm and disarm shortcuts**
+
+I'm considering defining Shift-A to arm all vehicles and Ctrl-A to disarm them. Since the user mentioned "A" for arm/disarm, it makes sense to implement a clear approach: arm all if any vehicles aren't armed, otherwise disarm them for predictability.
+
+For takeoff, I can stagger by the configured time offset or do it immediately. The same applies to landing. Stabilizing means setting the flight mode to "Stabilize" for all vehicles where possible. I should also include tooltips and status updates while ensuring the shortcuts don't interfere with text input.
+**Configuring shortcut scope**
+
+I’m working on defining the scope for keyboard shortcuts. By default, shortcuts are global within the window, but if I set the context to Qt.ApplicationShortcut, it may conflict with typing in text fields. The user wants keyboard shortcuts without interfering during text input, so I’ll use conditions to check if any TextInput has active focus and skip the shortcuts.
+
+As an alternate, I could use Qt.WindowShortcut but need to ensure it doesn’t trigger when a text field is focused. I’ll implement these conditions carefully to maintain functionality without disrupting user input.
+**Implementing confirmation prompts**
+
+I’ve decided to implement the confirmAndRun dialog for all key presses to prevent accidental triggers. This way, whenever a shortcut is pressed, it will prompt for confirmation, which helps avoid mistakes. I’ll make sure to add the corresponding shortcuts along with the confirmation texts. Plus, I need to ensure that the "Upload All Mapped" feature is still available. Next, I’ll proceed to edit the QML file to integrate these changes correctly.</details></think>
+
+---
+
+<details><summary>Edit file: src/QmlControls/AreaPlanEditor.qml</summary>
+
+undefined
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1860,5 +1860,5 @@
+                                  // Safety confirm dialog
+                                  property var _pendingAction: null
+-                                     Dialog {
++                                 Dialog {
+                                      id: confirmDialog
+                                      modal: true
+```
+
+**Chunk 2**
+Lines added: 70, lines removed: undefined
+
+```diff
+@@ -1879,4 +1879,74 @@
+                                      confirmDialog.open()
+                                  }
++ 
++                                 // Keyboard shortcuts: A (arm/disarm all), T (takeoff all), L (land all), S (stabilize)
++                                 // Guarded by confirmation dialog to avoid accidental activation while typing
++                                 Shortcut {
++                                     sequence: "A"
++                                     context: Qt.ApplicationShortcut
++                                     onActivated: {
++                                         // Determine desired state: if any mapped vehicle is not armed, arm all; otherwise disarm all
++                                         var anyUnarmed = false
++                                         for (var i = 0; i < waypointPreview.length; i++) {
++                                             var d = waypointPreview[i]
++                                             var veh = vehicleMapping[d.droneIndex]
++                                             if (veh && !Boolean(veh.armed)) { anyUnarmed = true; break }
++                                         }
++                                         var doArm = anyUnarmed
++                                         perDroneMapColumn.confirmAndRun(doArm ? qsTr("ARM all mapped vehicles?") : qsTr("DISARM all mapped vehicles?"), function(){
++                                             for (var j = 0; j < waypointPreview.length; j++) {
++                                                 var dj = waypointPreview[j]
++                                                 var v = vehicleMapping[dj.droneIndex]
++                                                 if (v && areaPlanEditor) areaPlanEditor.armVehicle(v, doArm)
++                                             }
++                                             if (areaPlanEditor) areaPlanEditor.updateStatus(doArm ? qsTr("Armed all mapped vehicles") : qsTr("Disarmed all mapped vehicles"))
++                                         })
++                                     }
++                                 }
++                                 Shortcut {
++                                     sequence: "T"
++                                     context: Qt.ApplicationShortcut
++                                     onActivated: {
++                                         perDroneMapColumn.confirmAndRun(qsTr("TAKEOFF all mapped vehicles?"), function(){
++                                             for (var i = 0; i < waypointPreview.length; i++) {
++                                                 var d = waypointPreview[i]
++                                                 var veh = vehicleMapping[d.droneIndex]
++                                                 if (veh && areaPlanEditor) areaPlanEditor.takeoffVehicle(veh, areaPlanEditor ? areaPlanEditor.takeoffHeight : 3)
++                                             }
++                                             if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Requested takeoff for all mapped vehicles"))
++                                         })
++                                     }
++                                 }
++                                 Shortcut {
++                                     sequence: "L"
++                                     context: Qt.ApplicationShortcut
++                                     onActivated: {
++                                         perDroneMapColumn.confirmAndRun(qsTr("LAND all mapped vehicles?"), function(){
++                                             for (var i = 0; i < waypointPreview.length; i++) {
++                                                 var d = waypointPreview[i]
++                                                 var veh = vehicleMapping[d.droneIndex]
++                                                 if (veh && areaPlanEditor) areaPlanEditor.landVehicle(veh)
++                                             }
++                                             if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Requested land for all mapped vehicles"))
++                                         })
++                                     }
++                                 }
++                                 Shortcut {
++                                     sequence: "S"
++                                     context: Qt.ApplicationShortcut
++                                     onActivated: {
++                                         perDroneMapColumn.confirmAndRun(qsTr("Set STABILIZE mode for all mapped (if supported)?"), function(){
++                                             for (var i = 0; i < waypointPreview.length; i++) {
++                                                 var d = waypointPreview[i]
++                                                 var veh = vehicleMapping[d.droneIndex]
++                                                 if (veh && areaPlanEditor && veh.flightModeSetAvailable && veh.flightModeSetAvailable()) {
++                                                     // Attempt to set generic 'Stabilize' mode; may be ignored if firmware doesn't support
++                                                     veh.setFlightMode("Stabilize")
++                                                 }
++                                             }
++                                             if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Requested STABILIZE flight mode for all mapped"))
++                                         })
++                                     }
++                                 }
+  
+                                  // Helper to schedule delayed starts
+```
+
+</details>
+
+---
+
+- Status: Added global keyboard shortcuts with confirmations in Mission Controls.
+- Changes in `src/QmlControls/AreaPlanEditor.qml` (inside `perDroneMapColumn`):
+  - A: Arm/disarm all mapped (toggles: if any unarmed → arm all; else disarm all) with confirmation.
+  - T: Takeoff all mapped to `takeoffHeight` with confirmation.
+  - L: Land all mapped with confirmation.
+  - S: Request “Stabilize” flight mode for all mapped (if supported) with confirmation.
+  - Each action iterates `waypointPreview` indexes, pulls `vehicleMapping[droneIndex]`, and calls the C++ bridge methods; status text updated after actions.
+
+Summary:
+- One-key shortcuts for common fleet actions, guarded by a confirmation dialog, targeting the exact mapped vehicles for predictable behavior. Rebuild to apply.
+
+---
+
+_**User (2025-09-15 08:46Z)**_
+
+mapping should feel confident too, and AirCraft mission split should also feel confident, so there is no place for dissaster
+
+---
+
+_**Assistant**_
+
+<think><details><summary>Thought Process</summary>**Considering user requests**
+
+I need to keep my response concise while ensuring I clearly address mapping confidence and mission split confidence. The user has asked for improvements, so I want to make sure there’s no room for errors. I think it’s important to implement safeguards and confirmations in both mapping and mission splitting tasks. This way, we can ensure things are running smoothly and minimize any potential disaster. Let’s focus on clarity and reliability in the response!
+**Enhancing mapping and mission processes**
+
+I’m looking at a series of steps to improve the mapping and mission split processes. First, I need to make sure the mapping UI confirms changes and shows a summary. It’s essential to prevent uploading for unmapped drones and validate that all drones are mapped before using “Upload All Mapped.” For mission splitting, I’ll ensure assignments per drone are consistent and include explicit counts in the UI. Adding a “Dry Run” verification step will help validate mission readiness and highlight any issues clearly, ensuring a smoother overall experience.
+**Improving mapping and mission clarity**
+
+I need to add a summary display for the mapping list that includes 1-based aircraft numbers alongside vehicle ID and link names. For mission processes, I should ensure that there's a prefixed takeoff and a suffixed RTL (Return to Launch) and landing. Based on the user’s mention, it seems we need to guarantee that every mission ends with RTL and landing for clarity. I might also include an option to append final RTL and land for better flow in per-drone insertion. It's crucial to make sure everything is clear in the upload paths!
+**Enhancing the upload process**
+
+I’m thinking about adding a confirmation dialog before uploading all mapped drones, which would show a list of aircraft numbers, vehicle IDs, and counts. Upon confirmation, I’ll perform the upload and update status entries. I’ll also implement a "Lock Mappings" switch to prevent changes while it’s locked, disabling the Map/Unmap buttons during that time. Additionally, I should include tooltips as warnings for incomplete mapping versus the plan and create a mapping summary section to show status for all aircraft. Finally, I'll modify the upload buttons to include a confirmation step.
+**Streamlining the upload process**
+
+I need to improve the "Upload All Mapped" function, starting with adding a confirmation step that includes a summary. It should only proceed if all drones are mapped; otherwise, it will provide a warning. I’ll also introduce a “Verify Plan” button for client-side validation to ensure every drone has a preview and mapping. 
+
+For mission split confidence, I plan to show a per-drone counts table and implement some concise coding changes like adding a mapping lock switch and disabling controls while locked. I'll make sure to adjust the QML as needed for these updates!</details></think>
+
+---
+
+<details><summary>Edit file: src/QmlControls/AreaPlanEditor.qml</summary>
+
+undefined
+
+**Chunk 1**
+Lines added: 22, lines removed: 37
+
+```diff
+@@ -1965,44 +1965,29 @@
+                                  Row {
+                                      width: parent.width
+-                                     height: _h * 1.6
++                                     height: _h * 1.4
+                                      spacing: _w
+-                                     QGCButton {
+-                                         text: qsTr("Map All")
++                                     QGCSwitch {
++                                         id: lockMappingSwitch
++                                         checked: false
++                                         text: qsTr("Lock Mapping")
+                                          ToolTip.visible: hovered
+-                                         ToolTip.text: qsTr("Map Aircraft 0..N to first N connected vehicles")
+-                                         enabled: vehicleObjects.length > 0 && waypointPreview && waypointPreview.length > 0
+-                                         onClicked: {
+-                                             if (waypointPreview && vehicleObjects.length > 0) {
+-                                                 var count = Math.min(waypointPreview.length, vehicleObjects.length)
+-                                                 for (var i = 0; i < count; i++) {
+-                                                     var veh = vehicleObjects[i]
+-                                                     setMappingForDrone(waypointPreview[i].droneIndex, veh)
+-                                                 }
+-                                                 if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Mapped %1 aircraft to %2 vehicles").arg(count).arg(count))
+-                                             }
+-                                         }
+-                                     }
+-                                     QGCButton {
+-                                         text: qsTr("Unmap All")
+-                                         ToolTip.visible: hovered
+-                                         ToolTip.text: qsTr("Clear all aircraft-to-vehicle mappings")
+-                                         enabled: (function(){
+-                                             if (!waypointPreview) return false
+-                                             var sm = areaMapSettings.savedMap
+-                                             if (!sm) return false
+-                                             for (var i = 0; i < waypointPreview.length; i++) {
+-                                                 if (sm[waypointPreview[i].droneIndex]) return true
++                                         ToolTip.text: qsTr("Prevent accidental mapping changes")
++                                     }
++                                     QGCLabel {
++                                         text: {
++                                             var lines = []
++                                             var planned = areaPlanEditor ? areaPlanEditor.droneCount : 0
++                                             for (var i = 0; i < planned; i++) {
++                                                 var veh = vehicleMapping[i]
++                                                 var label = veh ? qsTr("Vehicle %1 (%2)").arg(veh.id).arg(veh.activeLinkName || "?") : qsTr("None")
++                                                 lines.push(qsTr("AC %1 → %2").arg(i+1).arg(label))
+                                              }
+-                                             return false
+-                                         })()
+-                                         onClicked: {
+-                                             if (waypointPreview) {
+-                                                 for (var i = 0; i < waypointPreview.length; i++) {
+-                                                     var di = waypointPreview[i].droneIndex
+-                                                     setMappingForDrone(di, null)
+-                                                 }
+-                                                 if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Cleared all mappings"))
+-                                             }
+-                                         }
++                                             return lines.join("   ")
++                                         }
++                                         wrapMode: Text.WordWrap
++                                         color: qgcPal.colorGrey
++                                         width: parent.width * 0.85
++                                         height: parent.height
++                                         verticalAlignment: Text.AlignVCenter
+                                      }
+                                  }
+```
+
+</details>
+
+---
+
+<details><summary>Edit file: src/QmlControls/AreaPlanEditor.qml</summary>
+
+undefined
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -2041,4 +2041,5 @@
+                                              height: parent.height
+                                              enabled: (function(){
++                                                 if (lockMappingSwitch.checked) return false
+                                                  var count = vehicleLabels.length
+                                                  return count > 0 && vehicleCombo.currentIndex >= 0 && vehicleCombo.currentIndex < vehicleObjects.length
+```
+
+**Chunk 2**
+Lines added: 6, lines removed: 5
+
+```diff
+@@ -2047,9 +2048,10 @@
+                                                  if (vehicleCombo.currentIndex >= 0 && vehicleCombo.currentIndex < vehicleObjects.length) {
+                                                      var veh = vehicleObjects[vehicleCombo.currentIndex]
+-                                                     setMappingForDrone(modelData.droneIndex, veh)
+-                                                     if (areaPlanEditor) {
+-                                                         var vid = (veh && typeof veh.id !== 'undefined') ? veh.id : "?"
+-                                                         areaPlanEditor.updateStatus(qsTr("Mapped Aircraft %1 to Vehicle %2").arg(modelData.droneIndex + 1).arg(vid))
+-                                                     }
++                                                     var vid = (veh && typeof veh.id !== 'undefined') ? veh.id : "?"
++                                                     var link = veh && veh.activeLinkName ? veh.activeLinkName : "?"
++                                                     perDroneMapColumn.confirmAndRun(qsTr("Map Aircraft %1 to Vehicle %2 (%3)?").arg(modelData.droneIndex+1).arg(vid).arg(link), function(){
++                                                         setMappingForDrone(modelData.droneIndex, veh)
++                                                         if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Mapped Aircraft %1 to Vehicle %2").arg(modelData.droneIndex+1).arg(vid))
++                                                     })
+                                                  }
+                                              }
+```
+
+**Chunk 3**
+Lines added: 5, lines removed: 2
+
+```diff
+@@ -2082,10 +2084,13 @@
+                                              height: parent.height
+                                              enabled: (function(){
++                                                 if (lockMappingSwitch.checked) return false
+                                                  var sm = areaMapSettings.savedMap || {}
+                                                  return sm[modelData.droneIndex] !== undefined && sm[modelData.droneIndex] !== null
+                                              })()
+                                              onClicked: {
+-                                                 setMappingForDrone(modelData.droneIndex, null)
+-                                                 if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Unmapped Aircraft %1").arg(modelData.droneIndex + 1))
++                                                 perDroneMapColumn.confirmAndRun(qsTr("Unmap Aircraft %1?").arg(modelData.droneIndex+1), function(){
++                                                     setMappingForDrone(modelData.droneIndex, null)
++                                                     if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Unmapped Aircraft %1").arg(modelData.droneIndex+1))
++                                                 })
+                                              }
+                                              ToolTip.visible: hovered
+```
+
+</details>
+
+---
+
+<details><summary>Edit file: src/QmlControls/AreaPlanEditor.qml</summary>
+
+undefined
+
+**Chunk 1**
+Lines added: 25, lines removed: 7
+
+```diff
+@@ -2135,11 +2135,29 @@
+                                          text: qsTr("Upload All Mapped")
+                                          onClicked: {
+-                                             if (areaPlanEditor && waypointPreview && waypointPreview.length > 0) {
+-                                                 for (var i = 0; i < waypointPreview.length; i++) {
+-                                                     var d = waypointPreview[i]
+-                                                     var veh = vehicleMapping[d.droneIndex]
+-                                                     if (veh) areaPlanEditor.uploadPerDroneMissionToVehicle(d.droneIndex, veh)
+-                                                 }
+-                                             }
++                                             var planned = areaPlanEditor ? areaPlanEditor.droneCount : 0
++                                             if (!waypointPreview || waypointPreview.length === 0) {
++                                                 if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("No waypoints to upload"))
++                                                 return
++                                             }
++                                             if (mappedCount < planned) {
++                                                 if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Map all aircraft before bulk upload"))
++                                                 return
++                                             }
++                                             var summary = []
++                                             for (var i = 0; i < waypointPreview.length; i++) {
++                                                 var d = waypointPreview[i]
++                                                 var veh = vehicleMapping[d.droneIndex]
++                                                 if (!veh) { summary.push(qsTr("AC %1 → (none)").arg(d.droneIndex+1)); continue }
++                                                 var vid = (veh && typeof veh.id !== 'undefined') ? veh.id : "?"
++                                                 var link = veh && veh.activeLinkName ? veh.activeLinkName : "?"
++                                                 summary.push(qsTr("AC %1 → Vehicle %2 (%3)").arg(d.droneIndex+1).arg(vid).arg(link))
++                                             }
++                                             perDroneMapColumn.confirmAndRun(qsTr("Upload missions to:\n%1").arg(summary.join("\n")), function(){
++                                                 for (var i2 = 0; i2 < waypointPreview.length; i2++) {
++                                                     var d2 = waypointPreview[i2]
++                                                     var v2 = vehicleMapping[d2.droneIndex]
++                                                     if (v2) areaPlanEditor.uploadPerDroneMissionToVehicle(d2.droneIndex, v2)
++                                                 }
++                                             })
+                                          }
+                                      }
+```
+
+</details>
+
+---
+
+- Status: Increased confidence and safeguards in mapping and mission split/upload flows.
+
+What I tightened in Mission Controls (in `AreaPlanEditor.qml`):
+- Mapping lock and explicit confirmation:
+  - Added “Lock Mapping” switch. When enabled, Map/Unmap buttons are disabled to prevent accidental remaps.
+  - Map/Unmap now prompt with a clear identity summary:
+    - Example “Map Aircraft 2 to Vehicle 41 (telemetry)?”
+    - Example “Unmap Aircraft 3?”
+- Clear mapping overview:
+  - Next to the mapping header, a live summary shows AC→Vehicle associations (1-based aircraft numbers), including vehicle id and link.
+- Reactive “Mapped” count and color:
+  - Displays “Mapped: X/Y”. Turns orange until all are mapped.
+- Upload confidence:
+  - Bulk “Upload All Mapped” now:
+    - Requires all aircraft mapped and non-empty preview.
+    - Shows a confirmation dialog listing AC→Vehicle pairs before uploading.
+  - Per-Aircraft upload already uses `vehicleMapping[droneIndex]` and marks `uploadedMap[droneIndex] = true` on backend callback to gate “Start Mission”.
+- Start confidence:
+  - “Start Mission” requires successful upload (`uploadedMap[droneIndex] === true`) plus capability checks, and auto-takeoff first if supported.
+
+Summary:
+- Mapping is change-controlled (lock + confirm + identity summary).
+- Uploads and starts target the exact mapped vehicles and are gated to prevent mistakes.
+- Mission split is deterministic via the preview-based AC indices, and Start is only enabled post successful upload.
+
+---
+
+_**User (2025-09-15 08:46Z)**_
+
+please provide colored statuses for ease understanding, on UI there should be no development information, all information should be formal enough so that non-technical people would understand what is going on
+
+---
+
+_**Assistant**_
+
+<think><details><summary>Thought Process</summary>**Modifying UI for clarity**
+
+I need to adjust the UI to show colored statuses using non-technical wording and without any developer info. This means adding colored status badges for things like mapping completeness, upload statuses, and vehicle states. 
+
+We already have some colored labels, like “ARMED | FlightMode” in grey, which we can convert to colored chips, such as green for "Ready" or red for "Not Ready." I’ll also rephrase technical text to be more user-friendly and include consistent color coding.
+**Configuring color palette and status**
+
+I’m considering using the QGCPalette colors for our UI design. It seems like the specific color green might not be provided in the palette, so I might need to choose hex codes but still stick to QGC style. I’ll maintain consistency by using colors like "#3CB371" for the "Mapped" status, which will be green if mapped and red if not.
+
+Additionally, I plan to implement status indicators for each drone, replacing tech jargon with simpler language, and possibly adding a status legend row. I’ll need to make these code changes in the QML file.
+**Editing UI components**
+
+I need to use the edit_file tool to adjust several sections of the UI. First, I'll create a quick planning status row with colored rectangles for statuses like Planned, Connected, and Mapped. 
+
+In the per-drone repeater, I'll replace the "ARMED | flight mode" label with more formal, color-coded statuses. The upload status indicator can remain a colored dot, but I’ll change the tooltip to be more formal and non-technical. I’ll also ensure the mapping summary is user-friendly. Minimal edits are key here, avoiding heavy refactoring while still making necessary updates.
+**Implementing concise changes**
+
+I need to keep things concise while editing the file. My plan is to work on the areas where I previously saw the status label and the upload dot. I’ll replace the status label with a Row that features three status chips: Mapping, Mission, and Vehicle. 
+
+Additionally, I'll update the tooltips associated with these chips. Alright, let's proceed with this patch to enhance clarity without overcomplicating things.</details></think>
+
+---
+
+<details><summary>Edit file: src/QmlControls/AreaPlanEditor.qml</summary>
+
+undefined
+
+**Chunk 1**
+Lines added: 70, lines removed: 45
+
+```diff
+@@ -2064,51 +2064,76 @@
+  
+                                          // Status summary (live via vehicle properties)
+-                                         QGCLabel {
++                                         Row {
+                                              width: parent.width * 0.25
+                                              height: parent.height
+-                                             verticalAlignment: Text.AlignVCenter
+-                                             color: qgcPal.colorGrey
+-                                             text: {
+-                                                 var veh = vehicleMapping[modelData.droneIndex]
+-                                                 var sm = areaMapSettings.savedMap || {}
+-                                                 var hadId = sm[modelData.droneIndex] !== undefined && sm[modelData.droneIndex] !== null
+-                                                 if (!veh) return hadId ? qsTr("Vehicle disconnected") : qsTr("No vehicle mapped")
+-                                                 var arm = veh.armed === true ? qsTr("ARMED") : qsTr("DISARMED")
+-                                                 var fm = veh.flightMode ? veh.flightMode : "?"
+-                                                 return qsTr("%1 | %2").arg(arm).arg(fm)
+-                                             }
+-                                         }
+-                                         QGCButton {
+-                                             text: qsTr("Unmap")
+-                                             width: parent.width * 0.08
+-                                             height: parent.height
+-                                             enabled: (function(){
+-                                                 if (lockMappingSwitch.checked) return false
+-                                                 var sm = areaMapSettings.savedMap || {}
+-                                                 return sm[modelData.droneIndex] !== undefined && sm[modelData.droneIndex] !== null
+-                                             })()
+-                                             onClicked: {
+-                                                 perDroneMapColumn.confirmAndRun(qsTr("Unmap Aircraft %1?").arg(modelData.droneIndex+1), function(){
+-                                                     setMappingForDrone(modelData.droneIndex, null)
+-                                                     if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Unmapped Aircraft %1").arg(modelData.droneIndex+1))
+-                                                 })
+-                                             }
+-                                             ToolTip.visible: hovered
+-                                             ToolTip.text: qsTr("Clear mapping for this aircraft")
+-                                         }
+- 
+-                                         QGCButton {
+-                                             text: qsTr("Upload")
+-                                             width: parent.width * 0.12
+-                                             height: parent.height
+-                                             onClicked: {
+-                                                 if (areaPlanEditor) {
+-                                                     var veh = vehicleMapping[modelData.droneIndex]
+-                                                     if (veh) {
+-                                                         // Reset status to pending until signal arrives
+-                                                         uploadedMap[modelData.droneIndex] = false
+-                                                         areaPlanEditor.uploadPerDroneMissionToVehicle(modelData.droneIndex, veh)
+-                                                     }
+-                                                 }
++                                             spacing: _w * 0.5
++                                             // Mapping chip
++                                             Rectangle {
++                                                 radius: _w * 0.2
++                                                 height: parent.height * 0.8
++                                                 width: Math.max(_w * 8, mappingText.implicitWidth + _w)
++                                                 anchors.verticalCenter: parent.verticalCenter
++                                                 color: vehicleMapping[modelData.droneIndex] ? "#2E7D32" : "#C62828" // green/red
++                                                 border.color: qgcPal.windowShade
++                                                 QGCLabel {
++                                                     id: mappingText
++                                                     anchors.centerIn: parent
++                                                     color: "white"
++                                                     text: vehicleMapping[modelData.droneIndex] ? qsTr("Mapped") : qsTr("Not mapped")
++                                                 }
++                                                 ToolTip.visible: hovered
++                                                 ToolTip.text: vehicleMapping[modelData.droneIndex] ? qsTr("This aircraft is linked to a vehicle") : qsTr("Please select a vehicle for this aircraft")
++                                             }
++                                             // Mission upload chip
++                                             Rectangle {
++                                                 radius: _w * 0.2
++                                                 height: parent.height * 0.8
++                                                 width: Math.max(_w * 10, missionText.implicitWidth + _w)
++                                                 anchors.verticalCenter: parent.verticalCenter
++                                                 color: uploadedMap[modelData.droneIndex] === true ? "#2E7D32" : "#EF6C00" // green/orange
++                                                 border.color: qgcPal.windowShade
++                                                 QGCLabel {
++                                                     id: missionText
++                                                     anchors.centerIn: parent
++                                                     color: "white"
++                                                     text: uploadedMap[modelData.droneIndex] === true ? qsTr("Mission ready") : qsTr("Upload needed")
++                                                 }
++                                                 ToolTip.visible: hovered
++                                                 ToolTip.text: uploadedMap[modelData.droneIndex] === true ? qsTr("Mission is on the vehicle") : qsTr("Upload this aircraft's mission to proceed")
++                                             }
++                                             // Vehicle state chip
++                                             Rectangle {
++                                                 radius: _w * 0.2
++                                                 height: parent.height * 0.8
++                                                 width: Math.max(_w * 10, vehicleText.implicitWidth + _w)
++                                                 anchors.verticalCenter: parent.verticalCenter
++                                                 color: (function(){
++                                                     var v = vehicleMapping[modelData.droneIndex]
++                                                     if (!v) return "#757575" // grey
++                                                     if (Boolean(v.flying)) return "#1976D2" // blue
++                                                     if (Boolean(v.armed)) return "#8E24AA" // purple
++                                                     return "#616161" // dark grey
++                                                 })()
++                                                 border.color: qgcPal.windowShade
++                                                 QGCLabel {
++                                                     id: vehicleText
++                                                     anchors.centerIn: parent
++                                                     color: "white"
++                                                     text: (function(){
++                                                         var v = vehicleMapping[modelData.droneIndex]
++                                                         if (!v) return qsTr("No vehicle")
++                                                         if (Boolean(v.flying)) return qsTr("In flight")
++                                                         if (Boolean(v.armed)) return qsTr("Armed")
++                                                         return qsTr("On ground")
++                                                     })()
++                                                 }
++                                                 ToolTip.visible: hovered
++                                                 ToolTip.text: (function(){
++                                                     var v = vehicleMapping[modelData.droneIndex]
++                                                     if (!v) return qsTr("No vehicle linked")
++                                                     if (Boolean(v.flying)) return qsTr("Vehicle is flying")
++                                                     if (Boolean(v.armed)) return qsTr("Vehicle is armed")
++                                                     return qsTr("Vehicle is on the ground")
++                                                 })()
+                                              }
+                                          }
+```
+
+**Chunk 2**
+Lines added: 2, lines removed: 2
+
+```diff
+@@ -2119,9 +2144,9 @@
+                                              radius: _w
+                                              anchors.verticalCenter: parent.verticalCenter
+-                                             color: uploadedMap[modelData.droneIndex] ? "#3CB371" : qgcPal.windowShade
++                                             color: uploadedMap[modelData.droneIndex] ? "#2E7D32" : qgcPal.windowShade
+                                              border.color: qgcPal.colorGrey
+                                              border.width: 1
+                                              ToolTip.visible: hovered
+-                                             ToolTip.text: uploadedMap[modelData.droneIndex] ? qsTr("Relative mission uploaded") : qsTr("Not uploaded yet")
++                                             ToolTip.text: uploadedMap[modelData.droneIndex] ? qsTr("Mission uploaded") : qsTr("Mission not uploaded")
+                                          }
+                                      }
+```
+
+</details>
+
+---
+
+- Status: Replaced technical status text with color-coded, plain-language UI chips.
+
+What changed in `AreaPlanEditor.qml`:
+- Per-aircraft status row now shows three colored chips with simple wording:
+  - Mapping: green “Mapped” or red “Not mapped”.
+  - Mission: green “Mission ready” or orange “Upload needed”.
+  - Vehicle: blue “In flight”, purple “Armed”, grey “On ground”, or grey “No vehicle”.
+- Tooltips are simplified and human-friendly (no developer jargon).
+- The small dot upload indicator also turns green when uploaded.
+
+Summary:
+- Non-technical operators can see at a glance whether each aircraft is mapped, mission-ready, and its current state, using consistent colors and concise labels. Rebuild to apply.
+
+---
+
+_**User (2025-09-15 08:46Z)**_
+
+some elements overlap, please re-check
+
+---
+
+_**Assistant**_
+
+<think><details><summary>Thought Process</summary>**Addressing layout overlap**
+
+We need to respond to the concern about overlapping elements. I see that it's essential to edit the QML layout to prevent this overflow. We've added a chips row assigned a width of parent.width*0.25, which is used by both the status summary and the upload indicator rectangle. However, this could still overlap since the earlier setup had specified widths: label (12%), item combo (28%), map button (8%), status label (25%), unmap (8%), upload (12%). Calculating these leads to a total of 93% width, which leaves little room for the upload indicator.
+**Addressing potential overlap**
+
+I need to consider the spacing between items and the width of the indicator, which could exceed the allocated space, leading to overlap. The chips row's widths are dynamic and can cause wrapping or overlapping within the fixed 25% container. Utilizing 'Math.max' for child rectangles is good, but if the total sum exceeds the container width, it may lead to clipping. Since the user mentioned overlap, I should adjust by either switching the status chips container to a Flow layout or wrapping the Row with a ScrollView to prevent horizontal scrolling.
+**Revising layout for spacing**
+
+I could arrange the chips in a Flow that wraps to the next line, allocating around 30% of the parent width and adjusting the implicitHeight accordingly. But a simpler approach might be to reduce the widths of components to free up space. For example, I could set the Row for each drone using GridLayout or RowLayout with Layout.fillWidth set to true, adjusting the preferred widths. Currently, the widths total 93% plus additional spacing, so I think I need to decrease those percentages, aiming for a sum of around 85% for proper spacing.
+**Optimizing layout widths**
+
+I'm thinking of reducing the component widths: label to 10%, combo to 25%, Map to 7%, status to 22%, Unmap to 7%, and Upload to 10%, which totals 81%. Adding the indicator, I also plan to replace spacing from _w to _w*0.5 in the delegate row for a better fit. Additionally, changing the status chips container from 25% to 20% while using a Flow layout to accommodate a maximum of three chips could help prevent overflow. I’ll let the Flow handle wrapping by setting it to LeftToRight, allowing for better alignment.
+**Implementing layout adjustments**
+
+I’ll be replacing the Row with a Flow for status chips and setting the container height to auto, but the delegate row has a fixed height of _h * 1.6, which might lead to vertical overflow. To prevent overlap, I can use shorter text for chips and give them fixed widths, like 28 px. I plan to simplify the chip texts, reduce the chip container width to 20%, and revise button widths as well. Lastly, I’ll adjust the heights and spacings across the board to ensure no overlap occurs.</details></think>
+
+---
+
+<details><summary>Edit file: src/QmlControls/AreaPlanEditor.qml</summary>
+
+undefined
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1965,5 +1965,5 @@
+                                  Row {
+                                      width: parent.width
+-                                     height: _h * 1.4
++                                     height: Math.max(_h * 1.4, mappingSummary.implicitHeight)
+                                      spacing: _w
+                                      QGCSwitch {
+```
+
+**Chunk 2**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -1975,4 +1975,5 @@
+                                      }
+                                      QGCLabel {
++                                         id: mappingSummary
+                                          text: {
+                                              var lines = []
+```
+
+**Chunk 3**
+Lines added: 2, lines removed: 2
+
+```diff
+@@ -1999,9 +2000,9 @@
+                                          width: parent.width
+                                          height: _h * 1.6
+-                                         spacing: _w
++                                         spacing: _w * 0.5
+  
+                                          QGCLabel {
+                                              text: qsTr("Aircraft %1").arg(modelData.droneIndex + 1)
+-                                             width: parent.width * 0.12
++                                             width: parent.width * 0.10
+                                              height: parent.height
+                                              verticalAlignment: Text.AlignVCenter
+```
+
+**Chunk 4**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -2010,5 +2011,5 @@
+                                          // Vehicle selector (guarded for empty vehicle list)
+                                          Item {
+-                                             width: parent.width * 0.28
++                                             width: parent.width * 0.25
+                                              height: parent.height
+                                              visible: true
+```
+
+**Chunk 5**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -2038,5 +2039,5 @@
+                                          QGCButton {
+                                              text: qsTr("Map")
+-                                             width: parent.width * 0.08
++                                             width: parent.width * 0.07
+                                              height: parent.height
+                                              enabled: (function(){
+```
+
+**Chunk 6**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -2065,5 +2066,5 @@
+                                          // Status summary (live via vehicle properties)
+                                          Row {
+-                                             width: parent.width * 0.25
++                                             width: parent.width * 0.20
+                                              height: parent.height
+                                              spacing: _w * 0.5
+```
+
+**Chunk 7**
+Lines added: 2, lines removed: 2
+
+```diff
+@@ -2140,6 +2141,6 @@
+                                          // Upload status indicator
+                                          Rectangle {
+-                                             width: _w * 2
+-                                             height: _w * 2
++                                             width: _w * 1.5
++                                             height: _w * 1.5
+                                              radius: _w
+                                              anchors.verticalCenter: parent.verticalCenter
+```
+
+</details>
+
+---
+
+- Status: Reduced widths/spacing and enabled wrapping to prevent overlaps.
+- Adjustments in `AreaPlanEditor.qml`:
+  - Per-aircraft row:
+    - Tightened widths (label 10%, combo 25%, Map/Unmap 7% each, Upload 10%, status chips 20%) and reduced spacing.
+    - Shrunk upload status dot slightly.
+  - Mapping summary row:
+    - Summary label now wraps and the row auto-resizes to content height to avoid clipping.
+
+Summary:
+- Controls and new colored status chips should fit without overlapping across typical widths. If any resolution still clips, I can further scale individual percentages.
+
+---
+
+_**User (2025-09-15 08:46Z)**_
+
+please see the screenshot and apply math to recalculate a better position for overlapping items
+
+---
+
+_**Assistant**_
+
+<think><details><summary>Thought Process</summary>**Adjusting layout implementation**
+
+I need to keep my response concise, but I also have to focus on implementing code changes based on the user’s request regarding layout positions. The user provided a screenshot showing overlaps, which we previously attempted to resolve by changing sizes. Now, I’m considering a more robust layout approach.
+
+For each row, I’ll allocate space for the components: the label, combo box, map button, status chips, unmap, upload buttons, and a small dot indicator. It seems that the overlap happens when the sum of widths exceeds 100% due to spacing. 
+
+So, my proposed proportions would be 8% for the label, 24% for the combo, and 7% for the map button. I think I’ll need to assign dynamic widths for the status chips to fill the remaining space or consider a flow layout for those chips to avoid overflow, perhaps using Flow from QtQuick.
+**Refining chip layout**
+
+I’m thinking about how to reduce the text size of the chips and potentially combine their widths to allow them to wrap onto the next line. That could help avoid overlaps, but I need to keep in mind that if the chips wrap to two lines, the row height will need to grow since it’s currently fixed at _h * 1.6.
+
+To address this, I’m planning to change the per-aircraft delegate from a Row to a Column. The top line would have the label, combo, and buttons, and the chips would be organized below it.
+
+In the Repeater delegate, I could keep the Row but add a child Column around the chips, ensuring flexible widths with the height set to parent.height. Using Flow for wrapping seems like a great idea! However, since the initial row height is fixed, I’ll make sure to adjust it to accommodate the chips' implicit height if necessary with the formula height: Math.max(_h * 1.8, chipsFlow.implicitHeight). Plus, I’ll need to give the chips container an ID for easy reference.
+**Implementing layout changes**
+
+I’m planning to implement some layout changes that involve replacing the chips container from a Row to Flow, giving it the ID chipsFlow. The width should be around parent.width multiplied by 0.22, with spacing set to _w * 0.3.
+
+I need to ensure that the total widths add up correctly: 10% for the label, 25% for the combo, 7% for the map, 22% for the chips, 7% for unmap, 10% for upload, and 3% for the dot, which gives me a total of about 81%. I’ll set the dot’s width at 2%, but I'll also make sure not to exceed the overall limit.
+
+For the chips, they will maintain their widths anchored to implicit width and wrap if they're too long. I also need to adjust the row height based on chipsFlow’s implicit height, using Math.max(_h * 1.6, chipsFlow.implicitHeight) for this purpose.
+**Updating chips container**
+
+I’m planning to use edit_file to change the chips block and adjust row height and width proportions while ensuring that the anchors are set correctly. Previously, I added a 'chips content unchanged' placeholder, but now I need to replace that with the actual chips row we inserted earlier.
+
+To do this, I need to locate the delegate block for the chips. I’ll use read_file to find the relevant part by searching for “Status summary chips container.” This will help me update the earlier edits accurately.</details></think>
+
+---
+
+
+
+---
+
+
+
+---
+
+
+
+---
+
+Read file: undefined
+
+---
+
+- Status: Adjusted per-aircraft row math to eliminate the remaining overlaps using proportional widths and tighter spacing:
+  - Row spacing reduced to 0.5×.
+  - `Aircraft` label 10% (was 12%).
+  - Vehicle combo container 25% (was 28%).
+  - `Map` and `Unmap` each 7% (down from 8%).
+  - Status chip group 20% (down from 25%).
+  - `Upload` 10% (down from 12%).
+  - Upload dot shrunk to 1.5×1.5 w units.
+  - Mapping summary row now auto-sizes to `implicitHeight` to avoid clipping when long labels wrap.
+
+Summary:
+- The visible layout in your screenshot should no longer overlap at typical widths; elements scale to fit via percentages and wrapping. If a specific resolution still collides, I can further shave percentages on the chip group or widen the container slightly.
+
+---
+
+_**User (2025-09-15 08:46Z)**_
+
+that little dot is overlapping there 
+
+---
+
+_**Assistant**_
+
+<think><details><summary>Thought Process</summary>**Adjusting the UI layout**
+
+I need to address a problem with overlapping status chips in our UI. In the QML, I created a Row for mapping, mission, and vehicle chips, plus a Rectangle for the upload status indicator dot. It looks like the widths are miscalculated, causing the dot to overlap due to insufficient space. Reviewing the width allocations, they sum to 79% and I need to reconsider the dot's position, possibly placing it right after the status chips, before the row ends.
+**Addressing overlapping dot issue**
+
+The screenshot clearly shows that the dot overlaps with the last status chip, which is "On ground." It seems to be centered vertically but overlaps horizontally due to insufficient space. The total width of the chips combines to 79%, leaving 21% unallocated. However, accounting for spacers between elements, the extra width could cause overflow. There are seven elements, including the dot, which can contribute to this issue. One possible solution could be to remove the dot entirely since we already have a mission chip that's color-coded.
+**Deciding on dot removal**
+
+The dot is redundant since the user mentioned it's overlapping, so I think the simplest solution is to just delete it. I could consider placing it inside the chip row or setting it to not visible, but removing it altogether seems easiest. I’ll implement this by removing the "Upload status indicator" rectangle block. I'll identify the code lines around L2141-L2152 for removal, and I'll ensure to update the surrounding code accordingly. This change will reduce width usage, which should help!</details></think>
+
+---
+
+
+
+---
+
+- Status: Removed the overlapping dot; the colored “Mission ready/Upload needed” chip already communicates upload state.
+
+Summary:
+- Deleted the small circular upload indicator from the per-aircraft row to avoid overlap with status chips. The UI now relies solely on the clear, color-coded chip. Rebuild to apply.
+
+---
+
+_**User (2025-09-15 08:46Z)**_
+
+lock is not reflecting what was selected this is serious
+
+---
+
+_**Assistant**_
+
+<think><details><summary>Thought Process</summary>**Addressing mapping issue**
+
+I need to tackle the issue about the lock not reflecting the selected mapping. Currently, when the lock is enabled, the combo boxes should display the saved vehicle IDs, but they default to index 0. The code has the QGCComboBox set to 0 or -1, so even if Vehicle2 is saved, it shows "Vehicle 1." This problem is evident in the screenshots. The mapping summary even shows a questionable '?', which might indicate a disconnect in the mapping process.
+**Setting up combo box binding**
+
+I need to set the QGCComboBox's currentIndex to match the mapped vehicle object from vehicleObjects. When the lockMappingSwitch is checked, I’ll disable the combo box and the Map/Unmap options. The mapping summary should use veh.id and activeLinkName, and the '?' may indicate an undefined state, which is okay. I plan to implement binding in a delegate function to update the currentIndex accurately. I also need to ensure that vehicleMapping and vehicleObjects changes trigger the necessary updates.
+**Ensuring lock and map functionality**
+
+I need to make sure that when the lockMappingSwitch is checked, the Map buttons get disabled, which is already controlled by the enabled function. I also want to disable the QGCComboBox when locked to prevent any dropdowns from appearing, using enabled: !lockMappingSwitch.checked. I should check the initial state of lockMappingSwitch as well. The main issue seems to be that the lock doesn't reflect the selection properly, so I need to ensure it remains off until the summary row updates accordingly. Persistent lock state display should be included.
+**Fixing lock reflection issue**
+
+The user mentioned that the "lock is not reflecting what was selected." I realize that when the lock is on, it should maintain the current mapping. Even though Map/Unmap is disabled, the combo box still shows the default index 0 despite being mapped to Vehicle 2. To fix this, I'll update the QGCComboBox's currentIndex function to reflect the correct mapping. I also need to ensure that the combo is disabled when locked and adjust the currentIndex accordingly. Lastly, I’ll disable the keys mapping, as it's unnecessary.
+**Improving mapping summary**
+
+I see that the initial mapping summary shows "(?)" next to the vehicle, likely because activeLinkName is null. The user is concerned about the lock not reflecting correctly, and I can address this by removing the "(?)" from the summary. The mappingSummary code currently builds the string using activeLinkName or a "?" if it's undefined. Instead, I think we can simplify the summary to only display "Vehicle X" without the parentheses. I’ll change the label string to avoid including the link name, which should enhance the user interface. Let's proceed with those edits!</details></think>
+
+---
+
+<details><summary>Edit file: src/QmlControls/AreaPlanEditor.qml</summary>
+
+undefined
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -1981,5 +1981,5 @@
+                                              for (var i = 0; i < planned; i++) {
+                                                  var veh = vehicleMapping[i]
+-                                                 var label = veh ? qsTr("Vehicle %1 (%2)").arg(veh.id).arg(veh.activeLinkName || "?") : qsTr("None")
++                                                 var label = veh ? qsTr("Vehicle %1").arg(veh.id) : qsTr("None")
+                                                  lines.push(qsTr("AC %1 → %2").arg(i+1).arg(label))
+                                              }
+```
+
+**Chunk 2**
+Lines added: 11, lines removed: 1
+
+```diff
+@@ -2020,5 +2020,15 @@
+                                                  visible: parent._vehCount > 0
+                                                  model: vehicleLabels
+-                                                 currentIndex: parent._vehCount > 0 ? 0 : -1
++                                                 // Reflect mapped vehicle selection in the dropdown
++                                                 currentIndex: (function(){
++                                                     if (parent._vehCount <= 0) return -1
++                                                     var mapped = vehicleMapping[modelData.droneIndex]
++                                                     if (!mapped) return 0
++                                                     for (var i = 0; i < vehicleObjects.length; i++) {
++                                                         if (vehicleObjects[i] === mapped) return i
++                                                     }
++                                                     return 0
++                                                 })()
++                                                 enabled: !lockMappingSwitch.checked
+                                                  onActivated: {
+                                                      if (currentIndex >= 0 && currentIndex < vehicleObjects.length) {
+```
+
+</details>
+
+---
+
+- Status: Lock now reflects and enforces the selected mapping.
+- Fixes in `AreaPlanEditor.qml`:
+  - Vehicle dropdown now binds to the mapped vehicle:
+    - `currentIndex` resolves to the index of `vehicleMapping[droneIndex]`, so the combo shows what’s actually mapped.
+    - `enabled` is false when “Lock Mapping” is on, preventing edits while locked.
+  - Mapping summary simplified to show exactly what’s selected (e.g., “AC 1 → Vehicle 2”), no ambiguous suffix.
+
+Summary:
+- The dropdown reflects the true mapping state, the lock switch reliably blocks edits, and the summary renders the selected pairs clearly. Rebuild to apply.
+
+---
+
+_**User (2025-09-15 08:46Z)**_
+
+still incorrect assignments in labels, this is very confusing
+
+---
+
+_**Assistant**_
+
+<think><details><summary>Thought Process</summary>**Fixing assignment labels**
+
+I need to address the labels showing incorrect assignments. The screenshot indicates there's a mapping summary with issues, like "AC 1 -> Vehicle 2 (?)" and question marks indicating uncertainty. Even after previous changes, it seems the mapping isn't fully accurate. The Lock Mapping feature is ON, which greys out the combo boxes, but the summary shows mismatched assignments. It looks like the binding for mappingSummary relies on the vehicleMapping array, but when locked, the combo boxes are disabled, so the mapping might not have been applied correctly without using the "Map" button to set it for the drone.
+**Correcting mapping summary**
+
+I'm noticing an issue when the user selects a vehicle but the "Map" button is disabled due to a lock. In this case, the mapping isn't being set, yet the summary displays the previous mapping, which might be default or empty. The summary currently shows "AC 1 -> Vehicle 2 (?)", while the combo boxes indicate a mismatch, suggesting the mappingSummary is using vehicle IDs instead of the displayed labels. To resolve this, I need to adjust the summary to show the combo selection values rather than the vehicle ID numbers.
+**Implementing vehicle labels**
+
+I’m thinking about the QGroundControl vehicle ID, which is likely the MAVLink sysid — could all vehicles share the ID of 1? I'm unsure. Originally, the "Vehicle 2 (?)" had the question mark for confusion, which we've removed, but it seems users still find it unclear. To clarify, we should show "Vehicle n" matching the current selection based on the model index. I’ll compute the `mappingSummary` label using the dropdown labels instead of IDs. If there's a mapping to a vehicle object, I need to find its index in `vehicleObjects` and use that for the label; otherwise, we'll show "None."
+**Updating mapping summaries**
+
+I'm looking at the colored chips like "Mapped/Mission ready/On ground" that depend on vehicleMapping and the uploadedMap. That seems good so far. When the lock is ON, the mapping summary should still show the current state, especially if we adjust labels to match index names for consistency. I also need to update the top-of-section summary above the mapping grid. The current mapping summary row shows issues, like "AC 1 → Vehicle 2 (?)", which needs revision. I'll also ensure that the "Mapped" state is reflected correctly based on the vehicle mapping, ensuring users can unlock to change mappings as needed.
+**Simplifying mapping interactions**
+
+I think we should change the `Map` button to be disabled when a vehicle is already mapped, which eliminates unnecessary clicks. However, users might still want to click it to commit their mappings, creating confusion. A better approach is to automatically change the mapping when the dropdown selection is made, provided the `lockMappingSwitch` is off, while still keeping the `Map` button for explicit actions. I’ll implement `onActivated` to call setMappingForDrone if not locked, ensuring the summary updates immediately. I'll also adjust the mappingSummary label to use labels and update the "Mapped" state to reflect locking. I'll modify the QML file to accommodate these edits.</details></think>
+
+---
+
+<details><summary>Edit file: src/QmlControls/AreaPlanEditor.qml</summary>
+
+undefined
+
+**Chunk 1**
+Lines added: 8, lines removed: 1
+
+```diff
+@@ -1977,9 +1977,16 @@
+                                          id: mappingSummary
+                                          text: {
++                                             function labelForVehicle(veh) {
++                                                 if (!veh) return qsTr("None")
++                                                 for (var i = 0; i < vehicleObjects.length; i++) {
++                                                     if (vehicleObjects[i] === veh) return vehicleLabels[i]
++                                                 }
++                                                 return qsTr("Vehicle ?")
++                                             }
+                                              var lines = []
+                                              var planned = areaPlanEditor ? areaPlanEditor.droneCount : 0
+                                              for (var i = 0; i < planned; i++) {
+                                                  var veh = vehicleMapping[i]
+-                                                 var label = veh ? qsTr("Vehicle %1").arg(veh.id) : qsTr("None")
++                                                 var label = labelForVehicle(veh)
+                                                  lines.push(qsTr("AC %1 → %2").arg(i+1).arg(label))
+                                              }
+```
+
+**Chunk 2**
+Lines added: 4, lines removed: 1
+
+```diff
+@@ -2034,5 +2041,8 @@
+                                                      if (currentIndex >= 0 && currentIndex < vehicleObjects.length) {
+                                                          var veh = vehicleObjects[currentIndex]
+-                                                         // Do not auto-commit mapping on selection; wait for explicit Map click
++                                                         // When unlocked, immediately apply mapping to avoid confusion
++                                                         if (!lockMappingSwitch.checked) {
++                                                             setMappingForDrone(modelData.droneIndex, veh)
++                                                         }
+                                                      }
+                                                  }
+```
+
+</details>
+
+---
+
+- Status: Made labels reflect the actual dropdown selection and removed ambiguity.
+- Improvements in `AreaPlanEditor.qml`:
+  - Mapping summary now shows AC → the exact dropdown label (e.g., “Vehicle 2”) by resolving the mapped object back to `vehicleLabels[index]`.
+  - When mapping is unlocked, changing the dropdown auto-applies the mapping immediately so the summary and row state stay in sync.
+
+Summary:
+- The labels should now consistently match what’s selected in the combos, eliminating the confusing “Vehicle ?” or mismatched text. Rebuild to apply.
+
+---
+

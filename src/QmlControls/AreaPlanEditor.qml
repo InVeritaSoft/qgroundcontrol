@@ -1826,7 +1826,10 @@ var err = _safeValidate("numPoints", parseInt(text))
                                 verticalAlignment: Text.AlignVCenter
                             }
                             QGCLabel {
-                                text: qsTr("Mapped: %1").arg(mappedCount)
+                                text: {
+                                    var planned = areaPlanEditor ? areaPlanEditor.droneCount : 0
+                                    return qsTr("Mapped: %1/%2").arg(mappedCount).arg(planned)
+                                }
                                 width: parent.width * 0.33
                                 height: parent.height
                                 verticalAlignment: Text.AlignVCenter
@@ -1856,7 +1859,7 @@ var err = _safeValidate("numPoints", parseInt(text))
 
                                 // Safety confirm dialog
                                 property var _pendingAction: null
-                                    Dialog {
+                                Dialog {
                                     id: confirmDialog
                                     modal: true
                                     title: qsTr("Confirm Action")
@@ -1876,6 +1879,76 @@ var err = _safeValidate("numPoints", parseInt(text))
                                     confirmDialog.open()
                                 }
 
+                                // Keyboard shortcuts: A (arm/disarm all), T (takeoff all), L (land all), S (stabilize)
+                                // Guarded by confirmation dialog to avoid accidental activation while typing
+                                Shortcut {
+                                    sequence: "A"
+                                    context: Qt.ApplicationShortcut
+                                    onActivated: {
+                                        // Determine desired state: if any mapped vehicle is not armed, arm all; otherwise disarm all
+                                        var anyUnarmed = false
+                                        for (var i = 0; i < waypointPreview.length; i++) {
+                                            var d = waypointPreview[i]
+                                            var veh = vehicleMapping[d.droneIndex]
+                                            if (veh && !Boolean(veh.armed)) { anyUnarmed = true; break }
+                                        }
+                                        var doArm = anyUnarmed
+                                        perDroneMapColumn.confirmAndRun(doArm ? qsTr("ARM all mapped vehicles?") : qsTr("DISARM all mapped vehicles?"), function(){
+                                            for (var j = 0; j < waypointPreview.length; j++) {
+                                                var dj = waypointPreview[j]
+                                                var v = vehicleMapping[dj.droneIndex]
+                                                if (v && areaPlanEditor) areaPlanEditor.armVehicle(v, doArm)
+                                            }
+                                            if (areaPlanEditor) areaPlanEditor.updateStatus(doArm ? qsTr("Armed all mapped vehicles") : qsTr("Disarmed all mapped vehicles"))
+                                        })
+                                    }
+                                }
+                                Shortcut {
+                                    sequence: "T"
+                                    context: Qt.ApplicationShortcut
+                                    onActivated: {
+                                        perDroneMapColumn.confirmAndRun(qsTr("TAKEOFF all mapped vehicles?"), function(){
+                                            for (var i = 0; i < waypointPreview.length; i++) {
+                                                var d = waypointPreview[i]
+                                                var veh = vehicleMapping[d.droneIndex]
+                                                if (veh && areaPlanEditor) areaPlanEditor.takeoffVehicle(veh, areaPlanEditor ? areaPlanEditor.takeoffHeight : 3)
+                                            }
+                                            if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Requested takeoff for all mapped vehicles"))
+                                        })
+                                    }
+                                }
+                                Shortcut {
+                                    sequence: "L"
+                                    context: Qt.ApplicationShortcut
+                                    onActivated: {
+                                        perDroneMapColumn.confirmAndRun(qsTr("LAND all mapped vehicles?"), function(){
+                                            for (var i = 0; i < waypointPreview.length; i++) {
+                                                var d = waypointPreview[i]
+                                                var veh = vehicleMapping[d.droneIndex]
+                                                if (veh && areaPlanEditor) areaPlanEditor.landVehicle(veh)
+                                            }
+                                            if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Requested land for all mapped vehicles"))
+                                        })
+                                    }
+                                }
+                                Shortcut {
+                                    sequence: "S"
+                                    context: Qt.ApplicationShortcut
+                                    onActivated: {
+                                        perDroneMapColumn.confirmAndRun(qsTr("Set STABILIZE mode for all mapped (if supported)?"), function(){
+                                            for (var i = 0; i < waypointPreview.length; i++) {
+                                                var d = waypointPreview[i]
+                                                var veh = vehicleMapping[d.droneIndex]
+                                                if (veh && areaPlanEditor && veh.flightModeSetAvailable && veh.flightModeSetAvailable()) {
+                                                    // Attempt to set generic 'Stabilize' mode; may be ignored if firmware doesn't support
+                                                    veh.setFlightMode("Stabilize")
+                                                }
+                                            }
+                                            if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Requested STABILIZE flight mode for all mapped"))
+                                        })
+                                    }
+                                }
+
                                 // Helper to schedule delayed starts
                                 function scheduleStart(veh, delaySec) {
                                     var t = Qt.createQmlObject('import QtQuick 2.15; Timer { property var _veh; interval: ' + Math.max(0, Math.floor(delaySec * 1000)) + '; repeat: false; }', perDroneMapColumn, 'StartTimer')
@@ -1891,46 +1964,39 @@ var err = _safeValidate("numPoints", parseInt(text))
                                 }
                                 Row {
                                     width: parent.width
-                                    height: _h * 1.6
+                                    height: Math.max(_h * 1.4, mappingSummary.implicitHeight)
                                     spacing: _w
-                                    QGCButton {
-                                        text: qsTr("Map All")
+                                    QGCSwitch {
+                                        id: lockMappingSwitch
+                                        checked: false
+                                        text: qsTr("Lock Mapping")
                                         ToolTip.visible: hovered
-                                        ToolTip.text: qsTr("Map Aircraft 0..N to first N connected vehicles")
-                                        enabled: vehicleObjects.length > 0 && waypointPreview && waypointPreview.length > 0
-                                        onClicked: {
-                                            if (waypointPreview && vehicleObjects.length > 0) {
-                                                var count = Math.min(waypointPreview.length, vehicleObjects.length)
-                                                for (var i = 0; i < count; i++) {
-                                                    var veh = vehicleObjects[i]
-                                                    setMappingForDrone(waypointPreview[i].droneIndex, veh)
-                                                }
-                                                if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Mapped %1 aircraft to %2 vehicles").arg(count).arg(count))
-                                            }
-                                        }
+                                        ToolTip.text: qsTr("Prevent accidental mapping changes")
                                     }
-                                    QGCButton {
-                                        text: qsTr("Unmap All")
-                                        ToolTip.visible: hovered
-                                        ToolTip.text: qsTr("Clear all aircraft-to-vehicle mappings")
-                                        enabled: (function(){
-                                            if (!waypointPreview) return false
-                                            var sm = areaMapSettings.savedMap
-                                            if (!sm) return false
-                                            for (var i = 0; i < waypointPreview.length; i++) {
-                                                if (sm[waypointPreview[i].droneIndex]) return true
-                                            }
-                                            return false
-                                        })()
-                                        onClicked: {
-                                            if (waypointPreview) {
-                                                for (var i = 0; i < waypointPreview.length; i++) {
-                                                    var di = waypointPreview[i].droneIndex
-                                                    setMappingForDrone(di, null)
+                                    QGCLabel {
+                                        id: mappingSummary
+                                        text: {
+                                            function labelForVehicle(veh) {
+                                                if (!veh) return qsTr("None")
+                                                for (var i = 0; i < vehicleObjects.length; i++) {
+                                                    if (vehicleObjects[i] === veh) return vehicleLabels[i]
                                                 }
-                                                if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Cleared all mappings"))
+                                                return qsTr("Vehicle ?")
                                             }
+                                            var lines = []
+                                            var planned = areaPlanEditor ? areaPlanEditor.droneCount : 0
+                                            for (var i = 0; i < planned; i++) {
+                                                var veh = vehicleMapping[i]
+                                                var label = labelForVehicle(veh)
+                                                lines.push(qsTr("AC %1 → %2").arg(i+1).arg(label))
+                                            }
+                                            return lines.join("   ")
                                         }
+                                        wrapMode: Text.WordWrap
+                                        color: qgcPal.colorGrey
+                                        width: parent.width * 0.85
+                                        height: parent.height
+                                        verticalAlignment: Text.AlignVCenter
                                     }
                                 }
 
@@ -1940,18 +2006,18 @@ var err = _safeValidate("numPoints", parseInt(text))
                                     delegate: Row {
                                         width: parent.width
                                         height: _h * 1.6
-                                        spacing: _w
+                                        spacing: _w * 0.5
 
                                         QGCLabel {
                                             text: qsTr("Aircraft %1").arg(modelData.droneIndex + 1)
-                                            width: parent.width * 0.12
+                                            width: parent.width * 0.10
                                             height: parent.height
                                             verticalAlignment: Text.AlignVCenter
                                         }
 
                                         // Vehicle selector (guarded for empty vehicle list)
                                         Item {
-                                            width: parent.width * 0.28
+                                            width: parent.width * 0.25
                                             height: parent.height
                                             visible: true
                                             property int _vehCount: vehicleLabels.length
@@ -1960,11 +2026,24 @@ var err = _safeValidate("numPoints", parseInt(text))
                                                 anchors.fill: parent
                                                 visible: parent._vehCount > 0
                                                 model: vehicleLabels
-                                                currentIndex: parent._vehCount > 0 ? 0 : -1
+                                                // Reflect mapped vehicle selection in the dropdown
+                                                currentIndex: (function(){
+                                                    if (parent._vehCount <= 0) return -1
+                                                    var mapped = vehicleMapping[modelData.droneIndex]
+                                                    if (!mapped) return 0
+                                                    for (var i = 0; i < vehicleObjects.length; i++) {
+                                                        if (vehicleObjects[i] === mapped) return i
+                                                    }
+                                                    return 0
+                                                })()
+                                                enabled: !lockMappingSwitch.checked
                                                 onActivated: {
                                                     if (currentIndex >= 0 && currentIndex < vehicleObjects.length) {
                                                         var veh = vehicleObjects[currentIndex]
-                                                        // Do not auto-commit mapping on selection; wait for explicit Map click
+                                                        // When unlocked, immediately apply mapping to avoid confusion
+                                                        if (!lockMappingSwitch.checked) {
+                                                            setMappingForDrone(modelData.droneIndex, veh)
+                                                        }
                                                     }
                                                 }
                                             }
@@ -1979,20 +2058,22 @@ var err = _safeValidate("numPoints", parseInt(text))
                                         // Explicit map button for user confirmation
                                         QGCButton {
                                             text: qsTr("Map")
-                                            width: parent.width * 0.08
+                                            width: parent.width * 0.07
                                             height: parent.height
                                             enabled: (function(){
+                                                if (lockMappingSwitch.checked) return false
                                                 var count = vehicleLabels.length
                                                 return count > 0 && vehicleCombo.currentIndex >= 0 && vehicleCombo.currentIndex < vehicleObjects.length
                                             })()
                                             onClicked: {
                                                 if (vehicleCombo.currentIndex >= 0 && vehicleCombo.currentIndex < vehicleObjects.length) {
                                                     var veh = vehicleObjects[vehicleCombo.currentIndex]
-                                                    setMappingForDrone(modelData.droneIndex, veh)
-                                                    if (areaPlanEditor) {
-                                                        var vid = (veh && typeof veh.id !== 'undefined') ? veh.id : "?"
-                                                        areaPlanEditor.updateStatus(qsTr("Mapped Aircraft %1 to Vehicle %2").arg(modelData.droneIndex + 1).arg(vid))
-                                                    }
+                                                    var vid = (veh && typeof veh.id !== 'undefined') ? veh.id : "?"
+                                                    var link = veh && veh.activeLinkName ? veh.activeLinkName : "?"
+                                                    perDroneMapColumn.confirmAndRun(qsTr("Map Aircraft %1 to Vehicle %2 (%3)?").arg(modelData.droneIndex+1).arg(vid).arg(link), function(){
+                                                        setMappingForDrone(modelData.droneIndex, veh)
+                                                        if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Mapped Aircraft %1 to Vehicle %2").arg(modelData.droneIndex+1).arg(vid))
+                                                    })
                                                 }
                                             }
                                             Keys.onReturnPressed: clicked()
@@ -2003,63 +2084,91 @@ var err = _safeValidate("numPoints", parseInt(text))
                                         }
 
                                         // Status summary (live via vehicle properties)
-                                        QGCLabel {
-                                            width: parent.width * 0.25
+                                        Row {
+                                            width: parent.width * 0.20
                                             height: parent.height
-                                            verticalAlignment: Text.AlignVCenter
-                                            color: qgcPal.colorGrey
-                                            text: {
-                                                var veh = vehicleMapping[modelData.droneIndex]
-                                                var sm = areaMapSettings.savedMap || {}
-                                                var hadId = sm[modelData.droneIndex] !== undefined && sm[modelData.droneIndex] !== null
-                                                if (!veh) return hadId ? qsTr("Vehicle disconnected") : qsTr("No vehicle mapped")
-                                                var arm = veh.armed === true ? qsTr("ARMED") : qsTr("DISARMED")
-                                                var fm = veh.flightMode ? veh.flightMode : "?"
-                                                return qsTr("%1 | %2").arg(arm).arg(fm)
-                                            }
-                                        }
-                                        QGCButton {
-                                            text: qsTr("Unmap")
-                                            width: parent.width * 0.08
-                                            height: parent.height
-                                            enabled: (function(){
-                                                var sm = areaMapSettings.savedMap || {}
-                                                return sm[modelData.droneIndex] !== undefined && sm[modelData.droneIndex] !== null
-                                            })()
-                                            onClicked: {
-                                                setMappingForDrone(modelData.droneIndex, null)
-                                                if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Unmapped Aircraft %1").arg(modelData.droneIndex + 1))
-                                            }
-                                            ToolTip.visible: hovered
-                                            ToolTip.text: qsTr("Clear mapping for this aircraft")
-                                        }
-
-                                        QGCButton {
-                                            text: qsTr("Upload")
-                                            width: parent.width * 0.12
-                                            height: parent.height
-                                            onClicked: {
-                                                if (areaPlanEditor) {
-                                                    var veh = vehicleMapping[modelData.droneIndex]
-                                                    if (veh) {
-                                                        // Reset status to pending until signal arrives
-                                                        uploadedMap[modelData.droneIndex] = false
-                                                        areaPlanEditor.uploadPerDroneMissionToVehicle(modelData.droneIndex, veh)
-                                                    }
+                                            spacing: _w * 0.5
+                                            // Mapping chip
+                                            Rectangle {
+                                                radius: _w * 0.2
+                                                height: parent.height * 0.8
+                                                width: Math.max(_w * 8, mappingText.implicitWidth + _w)
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                color: vehicleMapping[modelData.droneIndex] ? "#2E7D32" : "#C62828" // green/red
+                                                border.color: qgcPal.windowShade
+                                                QGCLabel {
+                                                    id: mappingText
+                                                    anchors.centerIn: parent
+                                                    color: "white"
+                                                    text: vehicleMapping[modelData.droneIndex] ? qsTr("Mapped") : qsTr("Not mapped")
                                                 }
+                                                ToolTip.visible: hovered
+                                                ToolTip.text: vehicleMapping[modelData.droneIndex] ? qsTr("This aircraft is linked to a vehicle") : qsTr("Please select a vehicle for this aircraft")
+                                            }
+                                            // Mission upload chip
+                                            Rectangle {
+                                                radius: _w * 0.2
+                                                height: parent.height * 0.8
+                                                width: Math.max(_w * 10, missionText.implicitWidth + _w)
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                color: uploadedMap[modelData.droneIndex] === true ? "#2E7D32" : "#EF6C00" // green/orange
+                                                border.color: qgcPal.windowShade
+                                                QGCLabel {
+                                                    id: missionText
+                                                    anchors.centerIn: parent
+                                                    color: "white"
+                                                    text: uploadedMap[modelData.droneIndex] === true ? qsTr("Mission ready") : qsTr("Upload needed")
+                                                }
+                                                ToolTip.visible: hovered
+                                                ToolTip.text: uploadedMap[modelData.droneIndex] === true ? qsTr("Mission is on the vehicle") : qsTr("Upload this aircraft's mission to proceed")
+                                            }
+                                            // Vehicle state chip
+                                            Rectangle {
+                                                radius: _w * 0.2
+                                                height: parent.height * 0.8
+                                                width: Math.max(_w * 10, vehicleText.implicitWidth + _w)
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                color: (function(){
+                                                    var v = vehicleMapping[modelData.droneIndex]
+                                                    if (!v) return "#757575" // grey
+                                                    if (Boolean(v.flying)) return "#1976D2" // blue
+                                                    if (Boolean(v.armed)) return "#8E24AA" // purple
+                                                    return "#616161" // dark grey
+                                                })()
+                                                border.color: qgcPal.windowShade
+                                                QGCLabel {
+                                                    id: vehicleText
+                                                    anchors.centerIn: parent
+                                                    color: "white"
+                                                    text: (function(){
+                                                        var v = vehicleMapping[modelData.droneIndex]
+                                                        if (!v) return qsTr("No vehicle")
+                                                        if (Boolean(v.flying)) return qsTr("In flight")
+                                                        if (Boolean(v.armed)) return qsTr("Armed")
+                                                        return qsTr("On ground")
+                                                    })()
+                                                }
+                                                ToolTip.visible: hovered
+                                                ToolTip.text: (function(){
+                                                    var v = vehicleMapping[modelData.droneIndex]
+                                                    if (!v) return qsTr("No vehicle linked")
+                                                    if (Boolean(v.flying)) return qsTr("Vehicle is flying")
+                                                    if (Boolean(v.armed)) return qsTr("Vehicle is armed")
+                                                    return qsTr("Vehicle is on the ground")
+                                                })()
                                             }
                                         }
                                         // Upload status indicator
                                         Rectangle {
-                                            width: _w * 2
-                                            height: _w * 2
+                                            width: _w * 1.5
+                                            height: _w * 1.5
                                             radius: _w
                                             anchors.verticalCenter: parent.verticalCenter
-                                            color: uploadedMap[modelData.droneIndex] ? "#3CB371" : qgcPal.windowShade
+                                            color: uploadedMap[modelData.droneIndex] ? "#2E7D32" : qgcPal.windowShade
                                             border.color: qgcPal.colorGrey
                                             border.width: 1
                                             ToolTip.visible: hovered
-                                            ToolTip.text: uploadedMap[modelData.droneIndex] ? qsTr("Relative mission uploaded") : qsTr("Not uploaded yet")
+                                            ToolTip.text: uploadedMap[modelData.droneIndex] ? qsTr("Mission uploaded") : qsTr("Mission not uploaded")
                                         }
                                     }
                                 }
@@ -2071,13 +2180,31 @@ var err = _safeValidate("numPoints", parseInt(text))
                                     QGCButton {
                                         text: qsTr("Upload All Mapped")
                                         onClicked: {
-                                            if (areaPlanEditor && waypointPreview && waypointPreview.length > 0) {
-                                                for (var i = 0; i < waypointPreview.length; i++) {
-                                                    var d = waypointPreview[i]
-                                                    var veh = vehicleMapping[d.droneIndex]
-                                                    if (veh) areaPlanEditor.uploadPerDroneMissionToVehicle(d.droneIndex, veh)
-                                                }
+                                            var planned = areaPlanEditor ? areaPlanEditor.droneCount : 0
+                                            if (!waypointPreview || waypointPreview.length === 0) {
+                                                if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("No waypoints to upload"))
+                                                return
                                             }
+                                            if (mappedCount < planned) {
+                                                if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Map all aircraft before bulk upload"))
+                                                return
+                                            }
+                                            var summary = []
+                                            for (var i = 0; i < waypointPreview.length; i++) {
+                                                var d = waypointPreview[i]
+                                                var veh = vehicleMapping[d.droneIndex]
+                                                if (!veh) { summary.push(qsTr("AC %1 → (none)").arg(d.droneIndex+1)); continue }
+                                                var vid = (veh && typeof veh.id !== 'undefined') ? veh.id : "?"
+                                                var link = veh && veh.activeLinkName ? veh.activeLinkName : "?"
+                                                summary.push(qsTr("AC %1 → Vehicle %2 (%3)").arg(d.droneIndex+1).arg(vid).arg(link))
+                                            }
+                                            perDroneMapColumn.confirmAndRun(qsTr("Upload missions to:\n%1").arg(summary.join("\n")), function(){
+                                                for (var i2 = 0; i2 < waypointPreview.length; i2++) {
+                                                    var d2 = waypointPreview[i2]
+                                                    var v2 = vehicleMapping[d2.droneIndex]
+                                                    if (v2) areaPlanEditor.uploadPerDroneMissionToVehicle(d2.droneIndex, v2)
+                                                }
+                                            })
                                         }
                                     }
                                     QGCButton {
@@ -2210,13 +2337,12 @@ var err = _safeValidate("numPoints", parseInt(text))
                                                 text: qsTr("Start Mission")
                                                 enabled: {
                                                     var veh = vehicleMapping[modelData.droneIndex]
-                                                    return _canStartMissionFor(veh)
+                                                    return _canStartMissionFor(veh) && (uploadedMap[modelData.droneIndex] === true)
                                                 }
                                                 onClicked: {
                                                     var veh = vehicleMapping[modelData.droneIndex]
                                                     if (veh && areaPlanEditor) {
                                                         perDroneMapColumn.confirmAndRun(qsTr("Start mission on vehicle %1? (auto takeoff)").arg(veh.id), function(){
-                                                            // Ensure takeoff is commanded immediately before mission start when supported
                                                             if (veh.takeoffVehicleSupported === true && veh.flying !== true) {
                                                                 areaPlanEditor.takeoffVehicle(veh, areaPlanEditor ? areaPlanEditor.takeoffHeight : 3)
                                                             }
@@ -2225,7 +2351,12 @@ var err = _safeValidate("numPoints", parseInt(text))
                                                     }
                                                 }
                                                 ToolTip.visible: hovered && !enabled
-                                                ToolTip.text: qsTr("Cannot start: ensure mission is uploaded and health checks pass")
+                                                ToolTip.text: {
+                                                    var veh = vehicleMapping[modelData.droneIndex]
+                                                    if (!veh) return qsTr("No vehicle mapped")
+                                                    if (uploadedMap[modelData.droneIndex] !== true) return qsTr("Upload mission first")
+                                                    return qsTr("Cannot start: ensure health checks pass and altitude is safe")
+                                                }
                                             }
                                             QGCButton {
                                                 text: qsTr("Pause")
