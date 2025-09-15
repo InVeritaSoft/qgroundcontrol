@@ -3762,7 +3762,8 @@ void AreaPlanEditor::addPerDroneToMission(int droneIndex)
     if (!wps.isEmpty()) {
         const double altOffset = _altitudeBandStart + droneIndex * _altitudeBandStep;
         const QGeoCoordinate takeoffCoord = _homeLocation.isValid() ? _homeLocation : _areaCenter;
-        VisualMissionItem* tkItem = mission->insertSimpleMissionItem(takeoffCoord, -1, false);
+        // Force takeoff as first mission item after MissionSettings (index 1)
+        VisualMissionItem* tkItem = mission->insertSimpleMissionItem(takeoffCoord, 1, false);
         if (SimpleMissionItem* tk = qobject_cast<SimpleMissionItem*>(tkItem)) {
             tk->setCommand(MAV_CMD_NAV_TAKEOFF);
             if (tk->specifiesAltitude()) {

@@ -2009,8 +2009,8 @@ var err = _safeValidate("numPoints", parseInt(text))
                                                     var d = waypointPreview[i]
                                                     var veh = vehicleMapping[d.droneIndex]
                                                     if (veh) {
-                                                        var altOk = (veh.altitudeRelative !== undefined) ? (veh.altitudeRelative >= 1.0) : Boolean(veh.flying)
-                                                        if (altOk) {
+                                                        var can = Boolean(veh.armed) && uploadedMap[d.droneIndex] === true
+                                                        if (can) {
                                                             perDroneMapColumn.scheduleStart(veh, 0)
                                                             started++
                                                         } else {
@@ -2021,7 +2021,7 @@ var err = _safeValidate("numPoints", parseInt(text))
                                                     }
                                                 }
                                             }
-                                            if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Start requested: %1, skipped: %2 (not airborne or unmapped)").arg(started).arg(skipped))
+                                            if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Start requested: %1, skipped: %2 (not armed, unmapped, or not written)").arg(started).arg(skipped))
                                         })
                                     }
                                 }
@@ -2326,8 +2326,8 @@ var err = _safeValidate("numPoints", parseInt(text))
                                                         var d = waypointPreview[i]
                                                         var veh = vehicleMapping[d.droneIndex]
                                                         if (veh) {
-                                                            var altOk = (veh.altitudeRelative !== undefined) ? (veh.altitudeRelative >= 1.0) : Boolean(veh.flying)
-                                                            if (altOk) {
+                                                            var can = Boolean(veh.armed) && uploadedMap[d.droneIndex] === true
+                                                            if (can) {
                                                                 perDroneMapColumn.scheduleStart(veh, i * stagger)
                                                                 started++
                                                             } else {
@@ -2338,7 +2338,7 @@ var err = _safeValidate("numPoints", parseInt(text))
                                                         }
                                                     }
                                                 }
-                                                if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Start requested: %1, skipped: %2 (not airborne or unmapped)").arg(started).arg(skipped))
+                                                if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Start requested: %1, skipped: %2 (not armed, unmapped, or not written)").arg(started).arg(skipped))
                                             })
                                         }
                                     }
@@ -2352,12 +2352,11 @@ var err = _safeValidate("numPoints", parseInt(text))
                                 }
                                 function _canStartMissionFor(veh) {
                                     if (!veh) return false
-                                    // Require at least 1m relative altitude (airborne) before mission start
-                                    var altOk = (veh.altitudeRelative !== undefined) ? (veh.altitudeRelative >= 1.0) : Boolean(veh.flying)
-                                    // Health and arming report gating
+                                    // Require vehicle armed and mission present; takeoff will be executed as first mission item
+                                    var armedOk = Boolean(veh.armed)
                                     var rep = veh.healthAndArmingCheckReport
                                     var ok = (!rep || rep.supported === false || rep.canStartMission === true)
-                                    return ok && altOk && _hasMissionItems()
+                                    return ok && armedOk && _hasMissionItems()
                                 }
 
                                 // Per-vehicle controls
@@ -2414,7 +2413,7 @@ var err = _safeValidate("numPoints", parseInt(text))
                                                 text: qsTr("Takeoff")
                                                 enabled: {
                                                     var veh = vehicleMapping[modelData.droneIndex]
-                                                    return !!veh && veh.takeoffVehicleSupported === true && veh.flying === false && Boolean(veh.armed) === true
+                                                    return !!veh && veh.takeoffVehicleSupported === true && veh.flying === false && Boolean(veh.armed) === true && uploadedMap[modelData.droneIndex] !== true
                                                 }
                                                 onClicked: {
                                                     var veh = vehicleMapping[modelData.droneIndex]
@@ -2424,6 +2423,7 @@ var err = _safeValidate("numPoints", parseInt(text))
                                                 ToolTip.text: {
                                                     var veh = vehicleMapping[modelData.droneIndex]
                                                     if (!veh) return qsTr("No vehicle mapped")
+                                                    if (uploadedMap[modelData.droneIndex] === true) return qsTr("Takeoff is part of the mission plan")
                                                     if (!Boolean(veh.armed)) return qsTr("Vehicle not armed")
                                                     if (veh.flying === true) return qsTr("Already flying")
                                                     if (veh.takeoffVehicleSupported !== true) return qsTr("Takeoff not supported")
@@ -2449,8 +2449,7 @@ var err = _safeValidate("numPoints", parseInt(text))
                                                     var veh = vehicleMapping[modelData.droneIndex]
                                                     if (!veh) return qsTr("No vehicle mapped")
                                                     if (uploadedMap[modelData.droneIndex] !== true) return qsTr("Write mission to vehicle first")
-                                                    var altOk = (veh.altitudeRelative !== undefined) ? (veh.altitudeRelative >= 1.0) : Boolean(veh.flying)
-                                                    if (!altOk) return qsTr("Take off to start mission")
+                                                    if (!Boolean(veh.armed)) return qsTr("Arm vehicle to start mission")
                                                     return qsTr("Cannot start: ensure health checks pass")
                                                 }
                                             }
