@@ -3755,6 +3755,18 @@ void AreaPlanEditor::addPerDroneToMission(int droneIndex)
     }
 
     const QVariantList wps = generatePerDroneWaypoints(droneIndex);
+    // Insert an initial takeoff before the first waypoint so missions always begin with a takeoff action
+    if (!wps.isEmpty()) {
+        const double altOffset = _altitudeBandStart + droneIndex * _altitudeBandStep;
+        const QGeoCoordinate takeoffCoord = _homeLocation.isValid() ? _homeLocation : _areaCenter;
+        VisualMissionItem* tkItem = mission->insertSimpleMissionItem(takeoffCoord, -1, false);
+        if (SimpleMissionItem* tk = qobject_cast<SimpleMissionItem*>(tkItem)) {
+            tk->setCommand(MAV_CMD_NAV_TAKEOFF);
+            if (tk->specifiesAltitude()) {
+                tk->altitude()->setRawValue(_missionAltitude + altOffset);
+            }
+        }
+    }
     for (int idx = 0; idx < wps.size(); ++idx) {
         QGeoCoordinate c = wps[idx].value<QGeoCoordinate>();
         

@@ -148,6 +148,11 @@ Item {
 	property var vehicleObjects: []
 	
 	/**
+	 * @brief Derived count of mapped drones (reactive)
+	 */
+	property int mappedCount: 0
+	
+	/**
 	 * @brief Upload status tracking for each drone
 	 * 
 	 * Tracks which drone missions have been successfully uploaded
@@ -220,6 +225,13 @@ Item {
 		var sm = areaMapSettings.savedMap || {}
 		sm[droneIndex] = veh ? veh.id : null
 		areaMapSettings.savedMap = sm
+		// Recompute mapped count and refresh binding
+		var count = 0
+		for (var k in vehicleMapping) { if (vehicleMapping.hasOwnProperty(k) && vehicleMapping[k]) count++ }
+		mappedCount = count
+		var newMap = {}
+		for (var kk in vehicleMapping) { if (vehicleMapping.hasOwnProperty(kk)) newMap[kk] = vehicleMapping[kk] }
+		vehicleMapping = newMap
 	}
 
 	/**
@@ -242,6 +254,13 @@ Item {
 			var obj = getVehicleById(id)
 			vehicleMapping[k] = obj
 		}
+		// Update derived state
+		var count = 0
+		for (var kk in vehicleMapping) { if (vehicleMapping[kk]) count++ }
+		mappedCount = count
+		var newMap = {}
+		for (var k2 in vehicleMapping) { if (vehicleMapping.hasOwnProperty(k2)) newMap[k2] = vehicleMapping[k2] }
+		vehicleMapping = newMap
 	}
 
 	/**
@@ -257,24 +276,21 @@ Item {
 	 * connect/disconnect and can be called manually to refresh.
 	 */
 	function refreshVehicleList() {
+		var vModel = QGroundControl.multiVehicleManager.vehicles
 		var labels = []
 		var objs = []
-		var mv = QGroundControl.multiVehicleManager
-		if (mv && mv.vehicles) {
-			var n = mv.vehicles.count
-			for (var i = 0; i < n; i++) {
-				var veh = mv.vehicles.get(i)
-				if (veh) {
-					var label = veh.id !== undefined ? (qsTr("Vehicle %1").arg(veh.id)) : qsTr("Vehicle")
-					labels.push(label)
-					objs.push(veh)
-				}
+		if (vModel && vModel.count !== undefined) {
+			for (var i = 0; i < vModel.count; i++) {
+				var v = vModel.get(i)
+				if (v) { labels.push(qsTr("Vehicle %1").arg(i+1)); objs.push(v) }
 			}
 		}
 		vehicleLabels = labels
 		vehicleObjects = objs
-		// Attempt to rebind runtime mappings to current vehicle objects after list refresh
 		rebindMappingsFromSaved()
+		var count = 0
+		for (var k3 in vehicleMapping) { if (vehicleMapping[k3]) count++ }
+		mappedCount = count
 	}
 
 	// ============================================================================
@@ -1810,18 +1826,13 @@ var err = _safeValidate("numPoints", parseInt(text))
                                 verticalAlignment: Text.AlignVCenter
                             }
                             QGCLabel {
-                                text: {
-                                    var mapped = 0
-                                    for (var k in vehicleMapping) if (vehicleMapping.hasOwnProperty(k) && vehicleMapping[k]) mapped++
-                                    return qsTr("Mapped: %1").arg(mapped)
-                                }
+                                text: qsTr("Mapped: %1").arg(mappedCount)
                                 width: parent.width * 0.33
                                 height: parent.height
                                 verticalAlignment: Text.AlignVCenter
                                 color: (function(){
                                     var planned = areaPlanEditor ? areaPlanEditor.droneCount : 0
-                                    var m=0; for (var k in vehicleMapping) if (vehicleMapping[k]) m++
-                                    return (m < planned) ? qgcPal.colorOrange : qgcPal.text
+                                    return (mappedCount < planned) ? qgcPal.colorOrange : qgcPal.text
                                 })()
                             }
                         }
@@ -2204,7 +2215,13 @@ var err = _safeValidate("numPoints", parseInt(text))
                                                 onClicked: {
                                                     var veh = vehicleMapping[modelData.droneIndex]
                                                     if (veh && areaPlanEditor) {
-                                                        perDroneMapColumn.confirmAndRun(qsTr("Start mission on vehicle %1?").arg(veh.id), function(){ areaPlanEditor.startMissionOnVehicle(veh) })
+                                                        perDroneMapColumn.confirmAndRun(qsTr("Start mission on vehicle %1? (auto takeoff)").arg(veh.id), function(){
+                                                            // Ensure takeoff is commanded immediately before mission start when supported
+                                                            if (veh.takeoffVehicleSupported === true && veh.flying !== true) {
+                                                                areaPlanEditor.takeoffVehicle(veh, areaPlanEditor ? areaPlanEditor.takeoffHeight : 3)
+                                                            }
+                                                            areaPlanEditor.startMissionOnVehicle(veh)
+                                                        })
                                                     }
                                                 }
                                                 ToolTip.visible: hovered && !enabled

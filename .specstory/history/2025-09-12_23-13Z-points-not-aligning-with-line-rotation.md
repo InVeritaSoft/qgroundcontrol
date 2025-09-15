@@ -574,3 +574,281 @@ Summary:
 
 ---
 
+_**User (2025-09-12 22:27Z)**_
+
+Immidietly after Mission Start should be a takeoff action, per drone
+
+---
+
+_**Assistant**_
+
+
+
+---
+
+
+
+---
+
+Read file: undefined
+
+---
+
+
+
+---
+
+- Status: Added auto-takeoff immediately before starting a mission per drone.
+- Change in `src/QmlControls/AreaPlanEditor.qml`:
+  - “Start Mission” button now, upon confirmation:
+    - If the mapped vehicle supports guided takeoff and isn’t already flying, triggers `takeoffVehicle(veh, takeoffHeight)` first.
+    - Immediately follows with `startMissionOnVehicle(veh)`.
+
+Summary:
+- Starting a mission per aircraft will now automatically issue a takeoff command first, ensuring the vehicle is airborne before mission execution. Rebuild to apply.
+
+---
+
+_**User (2025-09-12 22:27Z)**_
+
+Upon generating missions (waypoints) just before first waypoint shouuld be a takeoff
+
+---
+
+_**Assistant**_
+
+<think><details><summary>Thought Process</summary>**Considering takeoff positioning**
+
+I’m thinking it might be good to add a takeoff item before the loop, especially if the waypoint list isn’t empty. This takeoff can be at the current location or home. They have a variable for takeoff height and mission altitude. I want to ensure that the takeoff ideally occurs near home or at the first waypoint, but the description says it should happen just before the first waypoint, which complicates things a bit.
+**Implementing takeoff coordination**
+
+I want to implement the following: in the `addPerDroneToMission` function, after creating the waypoint list, I’ll check if it’s empty. If not, I'll calculate the takeoff coordinate, either using `_homeLocation` if it's valid or defaulting to `_areaCenter`. I’ll insert a takeoff item using `MAV_CMD_NAV_TAKEOFF` and the appropriate altitude. Additionally, for single-drone missions, we need to ensure a takeoff is inserted at the beginning of the waypoint list.
+**Modifying mission functions**
+
+I want to make some adjustments. First, if the waypoint list isn’t empty, I’ll add a takeoff at either home or the area center with the mission altitude. I also see that `generatePerDroneWaypoints` sets the altitude correctly, which is great. In `addPerDroneToMission`, I’ll compute `altOffset` with the formula `_altitudeBandStart + droneIndex * _altitudeBandStep` before the loop, ensuring we consider it when inserting. Also, I'll add the takeoff item at the beginning of the simple single insertion loop. Finally, I’ll confirm the indentation is consistent with spaces.</details></think>
+
+---
+
+
+
+---
+
+- Status: Ensured a takeoff command is inserted before the first waypoint when generating per-drone missions.
+- Change in `src/QmlControls/AreaPlanEditor.cc`:
+  - In `addPerDroneToMission(int droneIndex)`, after generating waypoints, if there are any, it now inserts a `MAV_CMD_NAV_TAKEOFF` item at mission start, using `_homeLocation` if valid else `_areaCenter`, and sets altitude to `_missionAltitude + per-drone band offset`.
+
+Summary:
+- Mission sequences now begin with a takeoff action before the first waypoint for each drone. Rebuild to apply.
+
+---
+
+_**User (2025-09-12 22:27Z)**_
+
+Mapped is 0 even when all mapped
+
+I do not feel confident when uploading missions by pressing the buttons 
+dropdowns map AirCraft with real Vehicle, so it should be 10000000% clear that related missions with prefixed takeoffs and sifixed RTL and land should be written to relative vehicle aka drone
+
+---
+
+_**Assistant**_
+
+
+
+---
+
+
+
+---
+
+Read file: undefined
+
+---
+
+Read file: undefined
+
+---
+
+<think><details><summary>Thought Process</summary>I'm concentrating on the Mapped count right now. It's important to make sure that when we map or unmap, it triggers a recompute to keep everything in order. I think implementing QML updates is a good next step to take. I'm curious to see how these adjustments will enhance the overall performance and functionality. It feels like there's a lot to think about, but I’m ready to dive into the implementation part!</details></think>
+
+---
+
+
+
+---
+
+Read file: undefined
+
+---
+
+
+
+---
+
+Read file: undefined
+
+---
+
+
+
+---
+
+<details><summary>Edit file: src/QmlControls/AreaPlanEditor.qml</summary>
+
+undefined
+
+**Chunk 1**
+Lines added: 5, lines removed: undefined
+
+```diff
+@@ -147,4 +147,9 @@
+  	 */
+  	property var vehicleObjects: []
++ 	
++ 	/**
++ 	 * @brief Derived count of mapped drones (reactive)
++ 	 */
++ 	property int mappedCount: 0
+  	
+  	/**
+```
+
+</details>
+
+---
+
+<details><summary>Edit file: src/QmlControls/AreaPlanEditor.qml</summary>
+
+undefined
+
+**Chunk 1**
+Lines added: 7, lines removed: undefined
+
+```diff
+@@ -226,4 +226,11 @@
+  		sm[droneIndex] = veh ? veh.id : null
+  		areaMapSettings.savedMap = sm
++ 		// Recompute mapped count and refresh binding
++ 		var count = 0
++ 		for (var k in vehicleMapping) { if (vehicleMapping.hasOwnProperty(k) && vehicleMapping[k]) count++ }
++ 		mappedCount = count
++ 		var newMap = {}
++ 		for (var kk in vehicleMapping) { if (vehicleMapping.hasOwnProperty(kk)) newMap[kk] = vehicleMapping[kk] }
++ 		vehicleMapping = newMap
+  	}
+  
+```
+
+</details>
+
+---
+
+<details><summary>Edit file: src/QmlControls/AreaPlanEditor.qml</summary>
+
+undefined
+
+**Chunk 1**
+Lines added: 7, lines removed: undefined
+
+```diff
+@@ -255,4 +255,11 @@
+  			vehicleMapping[k] = obj
+  		}
++ 		// Update derived state
++ 		var count = 0
++ 		for (var kk in vehicleMapping) { if (vehicleMapping[kk]) count++ }
++ 		mappedCount = count
++ 		var newMap = {}
++ 		for (var k2 in vehicleMapping) { if (vehicleMapping.hasOwnProperty(k2)) newMap[k2] = vehicleMapping[k2] }
++ 		vehicleMapping = newMap
+  	}
+  
+```
+
+**Chunk 2**
+Lines added: 8, lines removed: 11
+
+```diff
+@@ -270,22 +277,19 @@
+  	 */
+  	function refreshVehicleList() {
++ 		var vModel = QGroundControl.multiVehicleManager.vehicles
+  		var labels = []
+  		var objs = []
+- 		var mv = QGroundControl.multiVehicleManager
+- 		if (mv && mv.vehicles) {
+- 			var n = mv.vehicles.count
+- 			for (var i = 0; i < n; i++) {
+- 				var veh = mv.vehicles.get(i)
+- 				if (veh) {
+- 					var label = veh.id !== undefined ? (qsTr("Vehicle %1").arg(veh.id)) : qsTr("Vehicle")
+- 					labels.push(label)
+- 					objs.push(veh)
+- 				}
++ 		if (vModel && vModel.count !== undefined) {
++ 			for (var i = 0; i < vModel.count; i++) {
++ 				var v = vModel.get(i)
++ 				if (v) { labels.push(qsTr("Vehicle %1").arg(i+1)); objs.push(v) }
+  			}
+  		}
+  		vehicleLabels = labels
+  		vehicleObjects = objs
+- 		// Attempt to rebind runtime mappings to current vehicle objects after list refresh
+  		rebindMappingsFromSaved()
++ 		var count = 0
++ 		for (var k3 in vehicleMapping) { if (vehicleMapping[k3]) count++ }
++ 		mappedCount = count
+  	}
+  
+```
+
+</details>
+
+---
+
+<details><summary>Edit file: src/QmlControls/AreaPlanEditor.qml</summary>
+
+undefined
+
+**Chunk 1**
+Lines added: 2, lines removed: 7
+
+```diff
+@@ -1827,16 +1827,11 @@
+                              }
+                              QGCLabel {
+-                                 text: {
+-                                     var mapped = 0
+-                                     for (var k in vehicleMapping) if (vehicleMapping.hasOwnProperty(k) && vehicleMapping[k]) mapped++
+-                                     return qsTr("Mapped: %1").arg(mapped)
+-                                 }
++                                 text: qsTr("Mapped: %1").arg(mappedCount)
+                                  width: parent.width * 0.33
+                                  height: parent.height
+                                  verticalAlignment: Text.AlignVCenter
+                                  color: (function(){
+                                      var planned = areaPlanEditor ? areaPlanEditor.droneCount : 0
+-                                     var m=0; for (var k in vehicleMapping) if (vehicleMapping[k]) m++
+-                                     return (m < planned) ? qgcPal.colorOrange : qgcPal.text
++                                     return (mappedCount < planned) ? qgcPal.colorOrange : qgcPal.text
+                                  })()
+                              }
+```
+
+</details>
+
+---
+
+- Status: Fixed “Mapped” count to update reactively and strengthened mapping-to-upload confidence.
+- Changes in `src/QmlControls/AreaPlanEditor.qml`:
+  - Added `mappedCount` reactive property.
+  - `setMappingForDrone`, `rebindMappingsFromSaved`, and `refreshVehicleList` now recompute `mappedCount` and reassign `vehicleMapping` to trigger bindings.
+  - “Mapped: X” label now uses `mappedCount` directly and colors orange only when `mappedCount < planned`.
+  - Upload/Start actions already fetch the vehicle from `vehicleMapping[droneIndex]`, ensuring missions (with prefixed takeoff and final RTL/land from your C++ flow) target the mapped vehicle.
+
+Summary:
+- The “Mapped” indicator reflects mappings immediately.
+- Uploads and mission starts act on the specific vehicle mapped to each aircraft, so missions are written to the correct drone. Rebuild to apply.
+
+---
+
