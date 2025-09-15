@@ -1684,7 +1684,16 @@ var err = _safeValidate("numPoints", parseInt(text))
                             text: qsTr("Clear Mission Items")
                             width: parent.width
                             height: _h * 2.2
-                            onClicked: if (areaPlanEditor) areaPlanEditor.clearMission()
+                            onClicked: {
+                                if (areaPlanEditor) {
+                                    perDroneMapColumn.confirmAndRun(qsTr("Clear all mission items from the plan and all vehicles?"), function(){
+                                        areaPlanEditor.clearAllMissions()
+                                        // Reset UI-side state to reflect cleared missions and avoid stale bindings
+                                        uploadedMap = ({})
+                                        waypointPreview = []
+                                    })
+                                }
+                            }
                         }
 
                         // Per-Drone Mission Insertion (non-aggregated)

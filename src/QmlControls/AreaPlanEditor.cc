@@ -3987,6 +3987,17 @@ void AreaPlanEditor::addWaypointsToMission()
 
     // Simple single-drone insertion: straight waypoints only
     const QVariantList wps = generateWaypoints();
+    // Insert takeoff before first waypoint so mission always begins with takeoff
+    if (!wps.isEmpty()) {
+        QGeoCoordinate tkCoord = _homeLocation.isValid() ? _homeLocation : _areaCenter;
+        VisualMissionItem* tkItem = mission->insertSimpleMissionItem(tkCoord, -1, false);
+        if (SimpleMissionItem* tk = qobject_cast<SimpleMissionItem*>(tkItem)) {
+            tk->setCommand(MAV_CMD_NAV_TAKEOFF);
+            if (tk->specifiesAltitude()) {
+                tk->altitude()->setRawValue(_missionAltitude);
+            }
+        }
+    }
     for (const QVariant& v : wps) {
         QGeoCoordinate c = v.value<QGeoCoordinate>();
         VisualMissionItem* vmi = mission->insertSimpleMissionItem(c, -1, false);
@@ -4102,7 +4113,8 @@ void AreaPlanEditor::clearMission()
     MissionController* mission = getMissionController();
     if (!mission) { handleError("MissionController not set", QString()); return; }
     // Try direct call if API exists
-    bool invoked = QMetaObject::invokeMethod(mission, "removeAll", Qt::DirectConnection);
+    // Queue the removal on the controller thread to avoid blocking UI
+    bool invoked = QMetaObject::invokeMethod(mission, "removeAll", Qt::QueuedConnection);
     if (!invoked) {
         // Fallback: remove everything except MissionSettings (index 0)
         if (mission->visualItems()) {
@@ -4113,6 +4125,41 @@ void AreaPlanEditor::clearMission()
         }
     }
     updateStatus("Mission items cleared");
+}
+
+/**
+ * @brief Clears missions from all connected vehicles and the current plan
+ */
+void AreaPlanEditor::clearAllMissions()
+{
+    // Clear local plan
+    clearMission();
+
+    // Iterate all connected vehicles and clear uploaded missions (asynchronously) to avoid UI stalls
+    QmlObjectListModel* vehicleModel = MultiVehicleManager::instance()->vehicles();
+    if (!vehicleModel) {
+        updateStatus("No vehicles to clear");
+        return;
+    }
+
+    startProgress("clear_all", "Clearing missions from all vehicles...");
+    auto remaining = QSharedPointer<int>::create(vehicleModel->count());
+    for (int i = 0; i < vehicleModel->count(); ++i) {
+        Vehicle* v = qobject_cast<Vehicle*>(vehicleModel->get(i));
+        // Slightly stagger to avoid bursts on the link and keep UI responsive
+        QTimer::singleShot(i * 50, this, [this, v, remaining]() {
+            if (v) {
+                if (MissionManager* mm = v->missionManager()) {
+                    QList<MissionItem*> empty;
+                    mm->writeMissionItems(empty);
+                }
+            }
+            (*remaining) -= 1;
+            if (*remaining <= 0) {
+                finishProgress("Cleared missions from all vehicles");
+            }
+        });
+    }
 }
 
 /**

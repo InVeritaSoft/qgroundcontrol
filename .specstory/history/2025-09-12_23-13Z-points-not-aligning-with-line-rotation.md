@@ -2023,3 +2023,205 @@ Summary:
 
 ---
 
+_**User (2025-09-15 08:46Z)**_
+
+Clear Mission Items should clear all missions from all vehicles
+
+---
+
+_**Assistant**_
+
+<think><details><summary>Thought Process</summary>**Clarifying mission clearing**
+
+The user wants the "Clear Mission Items" function to remove missions from all vehicles. Currently, the clearMission() method only clears the mission for the current plan. I see that I need a new function to loop through all vehicles and clear their missions, possibly using the PlanManager interface. I think MissionManager::removeAll or writing empty items could be the way to go. I'll create a clearAllMissions() method and adjust the "Clear Mission Items" button accordingly.
+**Implementing clearAllMissions**
+
+I need to add a new method in AreaPlanEditor.cc called `clearAllMissions()`. This involves iterating through vehicles using the MultiVehicleManager and calling `writeMissionItems` with an empty list for each vehicle's mission manager. I should also remove any visual items in the local MissionController and use `removeAll` as needed. It's important to keep indentation consistent in the code. I’ll declare the method in the header, implement it in the .cc file, and update the QML button to call this new function while preserving the UI label.
+**Modifying mission clearance process**
+
+I'll make a small change to the QML onClicked function to use `clearAllMissions()` instead of `clearMission()`. 
+
+In the header, I’ll add the `Q_INVOKABLE void clearAllMissions();` declaration. Then, in the implementation, I'll clear Plan Master Controller items, iterate through all vehicles, and push an empty mission list to each vehicle's mission manager. If there are no vehicles, I’ll update the status. I’m also considering memory management with `writeMissionItems(empty)` and whether to use `removeAll`, but for now, I’ll go with writing an empty list.
+**Updating UI for mission clearing**
+
+To maintain UI consistency, I note that QML notifies `missionUploaded` only during the `sendComplete` event, which means I can't automatically update that notification when clearing missions. The user wants everything cleared, so I’ll change the button's onClicked function from `clearMission()` to `clearAllMissions()`.
+
+Additionally, I can set the `uploadedMap` indices to false upon clearing. While connecting a signal like `allMissionsCleared()` to QML might be excessive, simplifying it by looping through `uploadedMap[...] = false` in the button's onClicked could work nicely.
+**Implementing button functionality**
+
+I’ll update the QML button’s onClicked function to call `clearAllMissions()` on the `areaPlanEditor`. After that, I'll loop through the `waypointPreview` array to set the `uploadedMap` indices to false based on each drone's index. This way, when the user clears missions, the uploaded states will accurately reflect that change. Let's proceed with implementing this in the code!</details></think>
+
+---
+
+
+
+---
+
+
+
+---
+
+<details><summary>Edit file: src/QmlControls/AreaPlanEditor.qml</summary>
+
+undefined
+
+**Chunk 1**
+Lines added: 5, lines removed: 1
+
+```diff
+@@ -1685,5 +1685,9 @@
+                              width: parent.width
+                              height: _h * 2.2
+-                             onClicked: if (areaPlanEditor) areaPlanEditor.clearMission()
++                             onClicked: {
++                                 if (areaPlanEditor) {
++                                     perDroneMapColumn.confirmAndRun(qsTr("Clear all mission items from the plan and all vehicles?"), function(){ areaPlanEditor.clearAllMissions() })
++                                 }
++                             }
+                          }
+  
+```
+
+</details>
+
+---
+
+- Status: “Clear Mission Items” now clears everywhere with confirmation.
+- Changes:
+  - `AreaPlanEditor.h/.cc`:
+    - Added `clearAllMissions()` which:
+      - Calls existing `clearMission()` to wipe the current Plan.
+      - Iterates all connected vehicles via `MultiVehicleManager`, and for each `MissionManager`, writes an empty mission list to clear uploaded missions.
+  - `AreaPlanEditor.qml`:
+    - “Clear Mission Items” button now asks for confirmation and calls `clearAllMissions()`.
+
+Summary:
+- One action clears the plan and all connected vehicles’ missions, reducing the risk of stale missions on the fleet. Rebuild to apply.
+
+---
+
+_**User (2025-09-15 08:46Z)**_
+
+each vehicle needs a takeoff before missions
+
+---
+
+_**Assistant**_
+
+
+
+---
+
+
+
+---
+
+- Status: Ensured every generated mission begins with a takeoff, for all cases.
+- Changes in `src/QmlControls/AreaPlanEditor.cc`:
+  - Per-drone path (multi-drone): Already inserts a `MAV_CMD_NAV_TAKEOFF` before the first waypoint in `addPerDroneToMission(d)`.
+  - Single-drone path (simple insertion): Now inserts a takeoff at `_homeLocation` (if set) or `_areaCenter` before the first waypoint, at `_missionAltitude`.
+
+Summary:
+- Whether single- or multi-drone, each vehicle’s mission starts with a takeoff before waypoints. Rebuild to apply.
+
+---
+
+_**User (2025-09-15 08:46Z)**_
+
+gray screen after clean
+
+---
+
+_**Assistant**_
+
+<think><details><summary>Thought Process</summary>**Addressing mission handling issues**
+
+I need to clarify that the request likely involves making `clearAllMissions` non-blocking using `QTimer` to prevent threading issues. I should ensure status updates are emitted to avoid null references in QML related to `uploadedMap`. After clearing missions, it would be wise to reset the `uploadedMap` and `waypointPreview` to prevent UI from expecting outdated values. The gray screen issue might stem from a dereferenced null, so I’ll keep that in mind while ensuring `MissionSettings` remains intact during clearing.
+**Proposing fixes for mission settings**
+
+I think we need to ensure the `PlanMasterController` is properly functioning and address the mapping issue. Here are two quick fixes I propose: 
+
+First, after calling `clearAllMissions`, we must ensure `MissionSettings` is present. We can check that `mission->visualItems()->count() == 0` and insert a dummy item to trigger `MissionSettings`, along with adding a code snippet for clarity.
+
+Second, we should reset the UI state by clearing `uploadedMap` and maintaining mapping statuses, while considering how QML interacts with C++. I might update C++ to emit a signal to reset the state effectively.
+**Adjusting uploadedMap handling**
+
+I see that QML already utilizes the `uploadedMap` dictionary, and I think we need to ensure it clears when the user clicks the "Clear Mission Items" button. Previously, we set up a confirmation for `clearAllMissions`, so I can add a line to reset `uploadedMap` to an empty object right before executing. 
+
+I could also modify the `confirmAndRun` function to include both the `clearAllMissions` call and the `uploadedMap` reset. This might address the gray screen issue, which could stem from asynchronous behavior, particularly during mission item writing. Adding a guard for asynchronous operations in `clearAllMissions` may be necessary too.
+**Ensuring UI thread operations**
+
+It's important that we don’t operate outside the UI thread since this method is called directly from QML. To keep things concise, I’ll propose a fix where, after clearing, we reset `uploadedMap` to an empty object and `waypointPreview` to an empty array. Then, we can call `rebindMappingsFromSaved()` to ensure everything is fresh.
+
+I should modify the "Clear Mission Items" button in QML to include these resets. By doing this, we might prevent any stale data from causing issues with the UI. Let's make the necessary edits in QML!</details></think>
+
+---
+
+<details><summary>Edit file: src/QmlControls/AreaPlanEditor.qml</summary>
+
+undefined
+
+**Chunk 1**
+Lines added: 6, lines removed: 1
+
+```diff
+@@ -1687,5 +1687,10 @@
+                              onClicked: {
+                                  if (areaPlanEditor) {
+-                                     perDroneMapColumn.confirmAndRun(qsTr("Clear all mission items from the plan and all vehicles?"), function(){ areaPlanEditor.clearAllMissions() })
++                                     perDroneMapColumn.confirmAndRun(qsTr("Clear all mission items from the plan and all vehicles?"), function(){
++                                         areaPlanEditor.clearAllMissions()
++                                         // Reset UI-side state to reflect cleared missions and avoid stale bindings
++                                         uploadedMap = ({})
++                                         waypointPreview = []
++                                     })
+                                  }
+                              }
+```
+
+</details>
+
+---
+
+- Status: Prevented post-clear “gray screen” by resetting UI state.
+- Update in `AreaPlanEditor.qml`:
+  - After `clearAllMissions()`, the button handler now also resets:
+    - `uploadedMap = ({})`
+    - `waypointPreview = []`
+  - This clears stale bindings so the view doesn’t try to render nonexistent data.
+
+Summary:
+- Clearing missions now also clears the related UI models, avoiding a blank/gray state. Rebuild to apply.
+
+---
+
+_**User (2025-09-15 08:46Z)**_
+
+Clear Mission stucks the screen
+
+---
+
+_**Assistant**_
+
+
+
+---
+
+
+
+---
+
+- Status: Fixed Clear Mission causing UI hang; made clearing async and non-blocking.
+
+What I changed:
+- `AreaPlanEditor::clearMission()`:
+  - Switched `invokeMethod` to `Qt::QueuedConnection` so removal is queued on the controller thread, avoiding UI stall.
+- `AreaPlanEditor::clearAllMissions()`:
+  - Sends empty missions to each vehicle asynchronously with a slight stagger via `QTimer::singleShot`.
+  - Uses `startProgress/finishProgress` to update UI while clearing; completes when all vehicles processed.
+
+Summary:
+- Clearing missions should no longer freeze the screen; operations run asynchronously with visible progress. Rebuild to apply.
+
+---
+

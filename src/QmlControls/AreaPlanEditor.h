@@ -160,6 +160,8 @@ public:
     // Save separate WPL files per-drone using current multi-drone configuration
     Q_INVOKABLE void savePerDroneMissionFiles();
     Q_INVOKABLE void clearMission();
+    // Clear missions from all vehicles and current plan
+    Q_INVOKABLE void clearAllMissions();
     Q_INVOKABLE void uploadToVehicle();
     // Upload a specific drone's mission to a selected vehicle (or active vehicle if null)
     Q_INVOKABLE void uploadPerDroneMissionToVehicle(int droneIndex, QObject* vehicleObject = nullptr);
