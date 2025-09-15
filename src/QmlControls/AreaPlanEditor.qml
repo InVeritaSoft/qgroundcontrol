@@ -282,7 +282,7 @@ Item {
 		if (vModel && vModel.count !== undefined) {
 			for (var i = 0; i < vModel.count; i++) {
 				var v = vModel.get(i)
-				if (v) { labels.push(qsTr("Vehicle %1").arg(i+1)); objs.push(v) }
+				if (v) { labels.push(vehicleDisplayNameFor(v)); objs.push(v) }
 			}
 		}
 		vehicleLabels = labels
@@ -291,6 +291,22 @@ Item {
 		var count = 0
 		for (var k3 in vehicleMapping) { if (vehicleMapping[k3]) count++ }
 		mappedCount = count
+	}
+
+	// Pretty display name for vehicle based on sysid
+	function vehicleDisplayNameFor(v) {
+		if (!v) return qsTr("None")
+		var id = (v.id !== undefined) ? v.id : -1
+		if (id === 1 || id === 0) return qsTr("Main")
+		return qsTr("Worker %1").arg(id)
+	}
+
+	// Provide a fallback model for mapping rows when preview is empty
+	function mappingModel() {
+		var out = []
+		var n = areaPlanEditor ? areaPlanEditor.droneCount : 0
+		for (var i = 0; i < n; i++) out.push({ droneIndex: i })
+		return out
 	}
 
 	// ============================================================================
@@ -1799,18 +1815,16 @@ var err = _safeValidate("numPoints", parseInt(text))
                                 validator: IntValidator { bottom: 1; top: 99 }
                             }
                             QGCButton {
-                                text: qsTr("Upload")
-                                width: parent.width * 0.2
+                                text: qsTr("Write Mission to Vehicle")
+                                width: parent.width * 0.10
                                 height: parent.height
                                 onClicked: {
                                     if (areaPlanEditor) {
-                                        var idx = parseInt(uploadDroneIndexField.text) - 1
-                                        if (!isNaN(idx) && idx >= 0) {
-                                            if (selectedVehicle) {
-                                                areaPlanEditor.uploadPerDroneMissionToVehicle(idx, selectedVehicle)
-                                            } else {
-                                                areaPlanEditor.uploadPerDroneMissionToVehicle(idx)
-                                            }
+                                        var veh = vehicleMapping[modelData.droneIndex]
+                                        if (veh) {
+                                            // Reset status to pending until signal arrives
+                                            uploadedMap[modelData.droneIndex] = false
+                                            areaPlanEditor.uploadPerDroneMissionToVehicle(modelData.droneIndex, veh)
                                         }
                                     }
                                 }
@@ -1917,12 +1931,22 @@ var err = _safeValidate("numPoints", parseInt(text))
                                     context: Qt.ApplicationShortcut
                                     onActivated: {
                                         perDroneMapColumn.confirmAndRun(qsTr("TAKEOFF all mapped vehicles?"), function(){
+                                            var requested = 0
+                                            var skipped = 0
                                             for (var i = 0; i < waypointPreview.length; i++) {
                                                 var d = waypointPreview[i]
                                                 var veh = vehicleMapping[d.droneIndex]
-                                                if (veh && areaPlanEditor) areaPlanEditor.takeoffVehicle(veh, areaPlanEditor ? areaPlanEditor.takeoffHeight : 3)
+                                                if (veh && Boolean(veh.armed) === true) {
+                                                    if (areaPlanEditor) areaPlanEditor.takeoffVehicle(veh, areaPlanEditor ? areaPlanEditor.takeoffHeight : 3)
+                                                    requested++
+                                                } else {
+                                                    skipped++
+                                                }
                                             }
-                                            if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Requested takeoff for all mapped vehicles"))
+                                            if (areaPlanEditor) {
+                                                if (skipped > 0) areaPlanEditor.updateStatus(qsTr("Requested takeoff for %1 vehicles; skipped %2 (not armed or unmapped)").arg(requested).arg(skipped))
+                                                else areaPlanEditor.updateStatus(qsTr("Requested takeoff for all mapped vehicles"))
+                                            }
                                         })
                                     }
                                 }
@@ -1945,15 +1969,59 @@ var err = _safeValidate("numPoints", parseInt(text))
                                     context: Qt.ApplicationShortcut
                                     onActivated: {
                                         perDroneMapColumn.confirmAndRun(qsTr("Set STABILIZE mode for all mapped (if supported)?"), function(){
-                                            for (var i = 0; i < waypointPreview.length; i++) {
-                                                var d = waypointPreview[i]
-                                                var veh = vehicleMapping[d.droneIndex]
-                                                if (veh && areaPlanEditor && veh.flightModeSetAvailable && veh.flightModeSetAvailable()) {
-                                                    // Attempt to set generic 'Stabilize' mode; may be ignored if firmware doesn't support
-                                                    veh.setFlightMode("Stabilize")
+                                            var planned = areaPlanEditor ? areaPlanEditor.droneCount : 0
+                                            var requested = 0
+                                            var skipped = 0
+                                            for (var i = 0; i < planned; i++) {
+                                                var veh = vehicleMapping[i]
+                                                if (veh) {
+                                                    var canSet = true
+                                                    if (veh.flightModeSetAvailable) {
+                                                        try { canSet = veh.flightModeSetAvailable() } catch (e) { canSet = true }
+                                                    }
+                                                    if (canSet) {
+                                                        var mode = undefined
+                                                        if (veh.stabilizeFlightMode !== undefined && veh.stabilizeFlightMode) mode = veh.stabilizeFlightMode
+                                                        else if (veh.flightModes && veh.flightModes.indexOf && veh.flightModes.indexOf("STABILIZE") >= 0) mode = "STABILIZE"
+                                                        else if (veh.flightModes && veh.flightModes.indexOf && veh.flightModes.indexOf("Stabilize") >= 0) mode = "Stabilize"
+                                                        else mode = "STABILIZE"
+                                                        try { veh.setFlightMode(mode); requested++ } catch (e2) { skipped++ }
+                                                    } else {
+                                                        skipped++
+                                                    }
+                                                } else {
+                                                    skipped++
                                                 }
                                             }
-                                            if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Requested STABILIZE flight mode for all mapped"))
+                                            if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Stabilize requested: %1, skipped: %2").arg(requested).arg(skipped))
+                                        })
+                                    }
+                                }
+                                Shortcut {
+                                    sequence: "M"
+                                    context: Qt.ApplicationShortcut
+                                    onActivated: {
+                                        perDroneMapColumn.confirmAndRun(qsTr("Start missions on all mapped vehicles?"), function(){
+                                            var started = 0
+                                            var skipped = 0
+                                            if (waypointPreview) {
+                                                for (var i = 0; i < waypointPreview.length; i++) {
+                                                    var d = waypointPreview[i]
+                                                    var veh = vehicleMapping[d.droneIndex]
+                                                    if (veh) {
+                                                        var altOk = (veh.altitudeRelative !== undefined) ? (veh.altitudeRelative >= 1.0) : Boolean(veh.flying)
+                                                        if (altOk) {
+                                                            perDroneMapColumn.scheduleStart(veh, 0)
+                                                            started++
+                                                        } else {
+                                                            skipped++
+                                                        }
+                                                    } else {
+                                                        skipped++
+                                                    }
+                                                }
+                                            }
+                                            if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Start requested: %1, skipped: %2 (not airborne or unmapped)").arg(started).arg(skipped))
                                         })
                                     }
                                 }
@@ -1963,6 +2031,15 @@ var err = _safeValidate("numPoints", parseInt(text))
                                     var t = Qt.createQmlObject('import QtQuick 2.15; Timer { property var _veh; interval: ' + Math.max(0, Math.floor(delaySec * 1000)) + '; repeat: false; }', perDroneMapColumn, 'StartTimer')
                                     t._veh = veh
                                     t.triggered.connect(function(){ if (areaPlanEditor) areaPlanEditor.startMissionOnVehicle(t._veh); t.destroy() })
+                                    t.start()
+                                }
+                                // Staggered mission upload helper
+                                function scheduleUpload(droneIdx, veh, delayMs) {
+                                    var code = 'import QtQuick 2.15; Timer { property int _idx; property var _veh; interval: ' + Math.max(0, Math.floor(delayMs)) + '; repeat: false; }'
+                                    var t = Qt.createQmlObject(code, perDroneMapColumn, 'UploadTimer')
+                                    t._idx = droneIdx
+                                    t._veh = veh
+                                    t.triggered.connect(function(){ if (areaPlanEditor && t._veh) areaPlanEditor.uploadPerDroneMissionToVehicle(t._idx, t._veh); t.destroy() })
                                     t.start()
                                 }
 
@@ -1990,7 +2067,7 @@ var err = _safeValidate("numPoints", parseInt(text))
                                                 for (var i = 0; i < vehicleObjects.length; i++) {
                                                     if (vehicleObjects[i] === veh) return vehicleLabels[i]
                                                 }
-                                                return qsTr("Vehicle ?")
+                                                return vehicleDisplayNameFor(veh)
                                             }
                                             var lines = []
                                             var planned = areaPlanEditor ? areaPlanEditor.droneCount : 0
@@ -2011,7 +2088,7 @@ var err = _safeValidate("numPoints", parseInt(text))
 
                                 // Build rows dynamically from preview (one row per drone)
                                 Repeater {
-                                    model: waypointPreview
+                                    model: (waypointPreview && waypointPreview.length > 0) ? waypointPreview : mappingModel()
                                     delegate: Row {
                                         width: parent.width
                                         height: _h * 1.6
@@ -2187,32 +2264,30 @@ var err = _safeValidate("numPoints", parseInt(text))
                                     height: _h * 2
                                     spacing: _w
                                     QGCButton {
-                                        text: qsTr("Upload All Mapped")
+                                        text: qsTr("Write Missions to All Vehicles")
                                         onClicked: {
                                             var planned = areaPlanEditor ? areaPlanEditor.droneCount : 0
-                                            if (!waypointPreview || waypointPreview.length === 0) {
-                                                if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("No waypoints to upload"))
-                                                return
-                                            }
-                                            if (mappedCount < planned) {
-                                                if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Map all aircraft before bulk upload"))
-                                                return
-                                            }
+                                            if (planned <= 0) { if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("No aircraft planned")); return }
+                                            if (mappedCount <= 0) { if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Map aircraft to vehicles first")); return }
                                             var summary = []
-                                            for (var i = 0; i < waypointPreview.length; i++) {
-                                                var d = waypointPreview[i]
-                                                var veh = vehicleMapping[d.droneIndex]
-                                                if (!veh) { summary.push(qsTr("AC %1 → (none)").arg(d.droneIndex+1)); continue }
-                                                var vid = (veh && typeof veh.id !== 'undefined') ? veh.id : "?"
-                                                var link = veh && veh.activeLinkName ? veh.activeLinkName : "?"
-                                                summary.push(qsTr("AC %1 → Vehicle %2 (%3)").arg(d.droneIndex+1).arg(vid).arg(link))
+                                            var ready = 0
+                                            for (var i = 0; i < planned; i++) {
+                                                var veh = vehicleMapping[i]
+                                                var label = vehicleDisplayNameFor(veh)
+                                                if (veh) ready++
+                                                summary.push(qsTr("AC %1 → %2").arg(i+1).arg(label))
                                             }
-                                            perDroneMapColumn.confirmAndRun(qsTr("Upload missions to:\n%1").arg(summary.join("\n")), function(){
-                                                for (var i2 = 0; i2 < waypointPreview.length; i2++) {
-                                                    var d2 = waypointPreview[i2]
-                                                    var v2 = vehicleMapping[d2.droneIndex]
-                                                    if (v2) areaPlanEditor.uploadPerDroneMissionToVehicle(d2.droneIndex, v2)
+                                            perDroneMapColumn.confirmAndRun(qsTr("Write missions to:\n%1").arg(summary.join("\n")), function(){
+                                                var delay = 0
+                                                for (var j = 0; j < planned; j++) {
+                                                    var v = vehicleMapping[j]
+                                                    if (v) {
+                                                        uploadedMap[j] = false
+                                                        perDroneMapColumn.scheduleUpload(j, v, delay)
+                                                        delay += 120
+                                                    }
                                                 }
+                                                if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Mission write requested for %1 mapped vehicles").arg(ready))
                                             })
                                         }
                                     }
@@ -2244,13 +2319,26 @@ var err = _safeValidate("numPoints", parseInt(text))
                                             var stagger = parseFloat(staggerField.text)
                                             if (isNaN(stagger) || stagger < 0) stagger = 0
                                             perDroneMapColumn.confirmAndRun(qsTr("Start missions on all mapped vehicles?\nStagger: %1 s").arg(stagger), function(){
+                                                var started = 0
+                                                var skipped = 0
                                                 if (waypointPreview) {
                                                     for (var i = 0; i < waypointPreview.length; i++) {
                                                         var d = waypointPreview[i]
                                                         var veh = vehicleMapping[d.droneIndex]
-                                                        if (veh) perDroneMapColumn.scheduleStart(veh, i * stagger)
+                                                        if (veh) {
+                                                            var altOk = (veh.altitudeRelative !== undefined) ? (veh.altitudeRelative >= 1.0) : Boolean(veh.flying)
+                                                            if (altOk) {
+                                                                perDroneMapColumn.scheduleStart(veh, i * stagger)
+                                                                started++
+                                                            } else {
+                                                                skipped++
+                                                            }
+                                                        } else {
+                                                            skipped++
+                                                        }
                                                     }
                                                 }
+                                                if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Start requested: %1, skipped: %2 (not airborne or unmapped)").arg(started).arg(skipped))
                                             })
                                         }
                                     }
@@ -2264,9 +2352,8 @@ var err = _safeValidate("numPoints", parseInt(text))
                                 }
                                 function _canStartMissionFor(veh) {
                                     if (!veh) return false
-                                    if (veh.flying === true) return false
-                                    // Require at least 1m relative altitude before mission start
-                                    var altOk = (veh.altitudeRelative !== undefined) ? (veh.altitudeRelative >= 1.0) : true
+                                    // Require at least 1m relative altitude (airborne) before mission start
+                                    var altOk = (veh.altitudeRelative !== undefined) ? (veh.altitudeRelative >= 1.0) : Boolean(veh.flying)
                                     // Health and arming report gating
                                     var rep = veh.healthAndArmingCheckReport
                                     var ok = (!rep || rep.supported === false || rep.canStartMission === true)
@@ -2327,7 +2414,7 @@ var err = _safeValidate("numPoints", parseInt(text))
                                                 text: qsTr("Takeoff")
                                                 enabled: {
                                                     var veh = vehicleMapping[modelData.droneIndex]
-                                                    return !!veh && veh.takeoffVehicleSupported === true && veh.flying === false
+                                                    return !!veh && veh.takeoffVehicleSupported === true && veh.flying === false && Boolean(veh.armed) === true
                                                 }
                                                 onClicked: {
                                                     var veh = vehicleMapping[modelData.droneIndex]
@@ -2337,6 +2424,7 @@ var err = _safeValidate("numPoints", parseInt(text))
                                                 ToolTip.text: {
                                                     var veh = vehicleMapping[modelData.droneIndex]
                                                     if (!veh) return qsTr("No vehicle mapped")
+                                                    if (!Boolean(veh.armed)) return qsTr("Vehicle not armed")
                                                     if (veh.flying === true) return qsTr("Already flying")
                                                     if (veh.takeoffVehicleSupported !== true) return qsTr("Takeoff not supported")
                                                     return qsTr("Unavailable")
@@ -2351,10 +2439,7 @@ var err = _safeValidate("numPoints", parseInt(text))
                                                 onClicked: {
                                                     var veh = vehicleMapping[modelData.droneIndex]
                                                     if (veh && areaPlanEditor) {
-                                                        perDroneMapColumn.confirmAndRun(qsTr("Start mission on vehicle %1? (auto takeoff)").arg(veh.id), function(){
-                                                            if (veh.takeoffVehicleSupported === true && veh.flying !== true) {
-                                                                areaPlanEditor.takeoffVehicle(veh, areaPlanEditor ? areaPlanEditor.takeoffHeight : 3)
-                                                            }
+                                                        perDroneMapColumn.confirmAndRun(qsTr("Start mission on vehicle %1?").arg(veh.id), function(){
                                                             areaPlanEditor.startMissionOnVehicle(veh)
                                                         })
                                                     }
@@ -2363,8 +2448,10 @@ var err = _safeValidate("numPoints", parseInt(text))
                                                 ToolTip.text: {
                                                     var veh = vehicleMapping[modelData.droneIndex]
                                                     if (!veh) return qsTr("No vehicle mapped")
-                                                    if (uploadedMap[modelData.droneIndex] !== true) return qsTr("Upload mission first")
-                                                    return qsTr("Cannot start: ensure health checks pass and altitude is safe")
+                                                    if (uploadedMap[modelData.droneIndex] !== true) return qsTr("Write mission to vehicle first")
+                                                    var altOk = (veh.altitudeRelative !== undefined) ? (veh.altitudeRelative >= 1.0) : Boolean(veh.flying)
+                                                    if (!altOk) return qsTr("Take off to start mission")
+                                                    return qsTr("Cannot start: ensure health checks pass")
                                                 }
                                             }
                                             QGCButton {
@@ -2453,7 +2540,7 @@ var err = _safeValidate("numPoints", parseInt(text))
                         }
 
 						QGCButton {
-							text: qsTr("Upload to Vehicle")
+							text: qsTr("Write Mission to Active Vehicle")
 							width: parent.width
                             height: _h * 2.2
 							enabled: false // TODO: Implement vehicle connection
@@ -2580,7 +2667,7 @@ var err = _safeValidate("numPoints", parseInt(text))
                                 }
 
                                 Repeater {
-                                    model: waypointPreview
+                                    model: (waypointPreview && waypointPreview.length > 0) ? waypointPreview : mappingModel()
                                     delegate: Row {
                                         width: parent.width
                                         height: _h * 1.4
