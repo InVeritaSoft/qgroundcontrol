@@ -55,6 +55,14 @@ target_sources(${CMAKE_PROJECT_NAME}
         ToolStripAction.h
         ToolStripActionList.cc
         ToolStripActionList.h
+        # AreaPlanEditor split folder (reserved for future extractions)
+        AreaPlanEditor/AreaPlanEditor_Properties.cc
+        AreaPlanEditor/AreaPlanEditor_MissionGeneration.cc
+        AreaPlanEditor/AreaPlanEditor_SwarmCoordination.cc
+        AreaPlanEditor/AreaPlanEditor_VehicleControl.cc
+        AreaPlanEditor/AreaPlanEditor_Validation.cc
+        AreaPlanEditor/AreaPlanEditor_Utilities.cc
+        AreaPlanEditor/AreaPlanEditor_Performance.cc
         AreaPlanEditor.cc
         AreaPlanEditor.h
 )

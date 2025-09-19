@@ -6,7 +6,7 @@
       "name": "Windows",
       "displayName": "Windows configuration using Qt6",
       "generator": "Ninja Multi-Config",
-      "binaryDir": "${sourceParentDir}/build/qt6-Windows",
+      "binaryDir": "${sourceParentDir}/qgroundcontrol/build/qt6-Windows",
       "toolchainFile": "${QT_ROOT_DIR}/lib/cmake/Qt6/qt.toolchain.cmake",
       "cacheVariables": {
         "CMAKE_CONFIGURATION_TYPES": "Release;Debug"

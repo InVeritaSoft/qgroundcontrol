@@ -72,6 +72,10 @@
 #include "SimpleMissionItem.h"
 #include "MissionManager/AreaPartition.h"
 #include "QmlObjectListModel.h"
+#include "MissionManager/MissionSettingsItem.h"
+
+// Forward declaration for serialization helper used throughout this file
+static QVariantMap serializeMissionItem(const MissionItem* mi);
 
 /**
  * @brief Constructor for AreaPlanEditor
@@ -126,6 +130,7 @@ AreaPlanEditor::AreaPlanEditor(QObject* parent)
     , _formationSpacing(5.0)
     , _isFormationTransitioning(false)
     , _leaderVehicle(nullptr)
+    , _drawingPresent(false)
 {
     // Initialize any additional members if needed
 }
@@ -3068,47 +3073,43 @@ QList<QVariant> AreaPlanEditor::generateWaypoints()
     const qreal cosT = qCos(theta);
     const qreal sinT = qSin(theta);
 
+    // Precompute meters-to-degrees factors at center latitude (single conversion, no extra trig per point)
+    const qreal metersPerDegreeLat = 111319.9;
+    const qreal metersPerDegreeLon = 111319.9 * qCos(qDegreesToRadians(_areaCenter.latitude()));
+
     auto rotateXY = [&](qreal x, qreal y) {
         // Rotate local (x,y) around origin by theta
         return QPointF(x * cosT - y * sinT, x * sinT + y * cosT);
     };
 
-    auto offsetByXY = [&](const QGeoCoordinate& c, qreal dx_m, qreal dy_m) {
-        // Approximate translation by dy north, then dx east
-        QGeoCoordinate tmp = calculateOffsetCoordinate(c, qAbs(dy_m), dy_m >= 0 ? 0.0 : 180.0);
-        QGeoCoordinate res = calculateOffsetCoordinate(tmp, qAbs(dx_m), dx_m >= 0 ? 90.0 : 270.0);
-        return res;
-    };
-
     auto clamp = [](qreal v, qreal lo, qreal hi){ return v < lo ? lo : (v > hi ? hi : v); };
 
-    // Y coordinates for each line (evenly distributed from -halfH to +halfH)
-    for (int li = 0; li < lineCount; ++li) {
-        qreal y;
-        if (lineCount == 1) {
-            y = 0.0;
+    // Reserve and precompute coordinate arrays to reduce allocations
+    waypoints.reserve(lineCount * _numPoints);
+    QList<qreal> xs; xs.resize(_numPoints);
+    QList<qreal> ys; ys.resize(lineCount);
+    if (_numPoints == 1) {
+        xs[0] = 0.0;
         } else {
-            y = -halfH + (static_cast<qreal>(li) * (_areaHeight / (lineCount - 1)));
-        }
-
-        // X coordinates along width
-        for (int pi = 0; pi < _numPoints; ++pi) {
-            qreal x;
-            if (_numPoints == 1) {
-                x = 0.0;
+        const qreal stepX = _areaWidth / (_numPoints - 1);
+        for (int pi = 0; pi < _numPoints; ++pi) xs[pi] = -halfW + stepX * pi;
+    }
+    if (lineCount == 1) {
+        ys[0] = 0.0;
             } else {
-                x = -halfW + (static_cast<qreal>(pi) * (_areaWidth / (_numPoints - 1)));
-            }
+        const qreal stepY = _areaHeight / (lineCount - 1);
+        for (int li = 0; li < lineCount; ++li) ys[li] = -halfH + stepY * li;
+    }
 
-            // Clamp to bounds in local space (safety against FP drift)
-            x = clamp(x, -halfW, halfW);
-            y = clamp(y, -halfH, halfH);
-
-            // Apply rotation around center
+    for (int li = 0; li < lineCount; ++li) {
+        const qreal y = clamp(ys[li], -halfH, halfH);
+        for (int pi = 0; pi < _numPoints; ++pi) {
+            const qreal x = clamp(xs[pi], -halfW, halfW);
             const QPointF r = rotateXY(x, y);
-
-// Convert to geo coordinate
-            QGeoCoordinate wp = offsetByXY(_areaCenter, r.x(), r.y());
+            // Convert meters offsets directly to degrees relative to center
+            const qreal lat = _areaCenter.latitude()  + (r.y() / metersPerDegreeLat);
+            const qreal lon = _areaCenter.longitude() + (r.x() / metersPerDegreeLon);
+            QGeoCoordinate wp(lat, lon);
             // Set altitude as mission altitude for downstream consumers/tests
             wp.setAltitude(_missionAltitude);
             waypoints.append(QVariant::fromValue(wp));
@@ -3741,137 +3742,226 @@ void AreaPlanEditor::insertGripperRelease(MissionController* mission, const QGeo
  */
 void AreaPlanEditor::addPerDroneToMission(int droneIndex)
 {
-    MissionController* mission = getMissionController();
-    if (!mission) {
-        qWarning() << "AreaPlanEditor::addPerDroneToMission: MissionController not set";
-        return;
-    }
-    
-    // Ensure mission has MissionSettings
-    if (mission->visualItems()->count() == 0) {
-        // Trigger init by inserting and removing a dummy to create settings if needed
-        mission->insertSimpleMissionItem(_areaCenter, -1, false);
-        // Remove the inserted item, keep settings
-        if (mission->visualItems()->count() > 1) {
-            mission->removeVisualItem(1);
-        }
-    }
+	if (!hasDrawing()) { updateStatus("Cannot generate: add area lines/points first"); return; }
+	MissionController* mission = getMissionController();
+	if (!mission) {
+		qWarning() << "AreaPlanEditor::addPerDroneToMission: MissionController not set";
+		return;
+	}
+	
+	// Ensure mission has MissionSettings
+	if (mission->visualItems()->count() == 0) {
+		// Trigger init by inserting and removing a dummy to create settings if needed
+		mission->insertSimpleMissionItem(_areaCenter, -1, false);
+		// Remove the inserted item, keep settings
+		if (mission->visualItems()->count() > 1) {
+			mission->removeVisualItem(1);
+		}
+	}
 
-    const QVariantList wps = generatePerDroneWaypoints(droneIndex);
-    // Insert an initial takeoff before the first waypoint so missions always begin with a takeoff action
-    if (!wps.isEmpty()) {
-        const double altOffset = _altitudeBandStart + droneIndex * _altitudeBandStep;
-        const QGeoCoordinate takeoffCoord = _homeLocation.isValid() ? _homeLocation : _areaCenter;
-        // Force takeoff as first mission item after MissionSettings (index 1)
-        VisualMissionItem* tkItem = mission->insertSimpleMissionItem(takeoffCoord, 1, false);
-        if (SimpleMissionItem* tk = qobject_cast<SimpleMissionItem*>(tkItem)) {
-            tk->setCommand(MAV_CMD_NAV_TAKEOFF);
-            if (tk->specifiesAltitude()) {
-                tk->altitude()->setRawValue(_missionAltitude + altOffset);
-            }
-        }
-    }
-    for (int idx = 0; idx < wps.size(); ++idx) {
-        QGeoCoordinate c = wps[idx].value<QGeoCoordinate>();
-        
-        // Slotting to avoid conflicts at start and between cycles
-        qreal startDelay = (idx == 0) ? (droneIndex * _timeOffsetPerDrone) : _perTargetSeparationS;
-        if (startDelay > 0.0) {
-            // Use the first waypoint location for hold, not home location
-            QGeoCoordinate holdLocation = c;
-            VisualMissionItem* hold = mission->insertSimpleMissionItem(holdLocation, -1, false);
-            if (SimpleMissionItem* h = qobject_cast<SimpleMissionItem*>(hold)) {
-                h->setCommand(MAV_CMD_NAV_LOITER_TIME);
-                h->missionItem().setParam1(startDelay);
-                if (h->specifiesAltitude()) {
-                    h->altitude()->setRawValue(_missionAltitude);
-                }
-            }
-        }
-        
-        if (_landAtTargetReturn) {
-            // Land at target with offset per drone to avoid same-spot conflicts (>=1m separation)
-            QGeoCoordinate targetLand = calculateOffsetCoordinate(c, 1.5 + 1.0 * droneIndex, fmod(45.0 + 60.0 * droneIndex, 360.0));
-            VisualMissionItem* landTargetItem = mission->insertSimpleMissionItem(targetLand, -1, false);
-            if (SimpleMissionItem* lti = qobject_cast<SimpleMissionItem*>(landTargetItem)) {
-                lti->setCommand(MAV_CMD_NAV_LAND);
-                if (lti->specifiesAltitude()) {
-                    lti->altitude()->setRawValue(0.0);
-                }
-            }
-            // Optional: Payload release command
-            insertGripperRelease(mission, c);
-            // Hold on target for configured time
-            if (_targetHoldTimeS > 0) {
-                VisualMissionItem* hold = mission->insertSimpleMissionItem(c, -1, false);
-                if (SimpleMissionItem* h = qobject_cast<SimpleMissionItem*>(hold)) {
-                    h->setCommand(MAV_CMD_NAV_LOITER_TIME);
-                    h->missionItem().setParam1(_targetHoldTimeS);
-                    if (h->specifiesAltitude()) {
-                        h->altitude()->setRawValue(_missionAltitude);
-                    }
-                }
-            }
-            // Takeoff from target back to altitude
-            VisualMissionItem* tkItem = mission->insertSimpleMissionItem(c, -1, false);
-            if (SimpleMissionItem* tk = qobject_cast<SimpleMissionItem*>(tkItem)) {
-                tk->setCommand(MAV_CMD_NAV_TAKEOFF);
-                if (tk->specifiesAltitude()) {
-                    tk->altitude()->setRawValue(_missionAltitude);
-                }
-            }
-            // Return and land near home with offset per drone
-            QGeoCoordinate baseHome = _homeLocation.isValid() ? _homeLocation : c;
-            QGeoCoordinate homeLand = calculateOffsetCoordinate(baseHome, 1.5 + 1.0 * droneIndex, fmod(90.0 + 60.0 * droneIndex, 360.0));
-            VisualMissionItem* landHomeItem = mission->insertSimpleMissionItem(homeLand, -1, false);
-            if (SimpleMissionItem* lhi = qobject_cast<SimpleMissionItem*>(landHomeItem)) {
-                lhi->setCommand(MAV_CMD_NAV_LAND);
-                if (lhi->specifiesAltitude()) {
-                    lhi->altitude()->setRawValue(0.0);
-                }
-            }
-            // Loiter at home for turnaround (use configured wait)
-            VisualMissionItem* loiterItem = mission->insertSimpleMissionItem(_homeLocation.isValid() ? _homeLocation : c, -1, false);
-            if (SimpleMissionItem* loiter = qobject_cast<SimpleMissionItem*>(loiterItem)) {
-                loiter->setCommand(MAV_CMD_NAV_LOITER_TIME);
-                loiter->missionItem().setParam1(_homeTurnaroundWaitS > 0 ? _homeTurnaroundWaitS : _loiterTime);
-                if (loiter->specifiesAltitude()) {
-                    loiter->altitude()->setRawValue(_missionAltitude);
-                }
-            }
-        } else {
-            // Insert waypoint transit only
-            VisualMissionItem* vmi = mission->insertSimpleMissionItem(c, -1, false);
-            if (SimpleMissionItem* smi = qobject_cast<SimpleMissionItem*>(vmi)) {
-                if (smi->specifiesAltitude()) {
-                    smi->altitude()->setRawValue(c.altitude());
-                }
-            }
-            // Policy: RTL after every waypoint
-            if (_rtlAfterEveryWaypoint) {
-                // Land near home with offset per drone
-                QGeoCoordinate baseHome = _homeLocation.isValid() ? _homeLocation : c;
-                QGeoCoordinate homeLand = calculateOffsetCoordinate(baseHome, 1.5 + 1.0 * droneIndex, fmod(90.0 + 60.0 * droneIndex, 360.0));
-                VisualMissionItem* landItem = mission->insertSimpleMissionItem(homeLand, -1, false);
-                if (SimpleMissionItem* li = qobject_cast<SimpleMissionItem*>(landItem)) {
-                    li->setCommand(MAV_CMD_NAV_LAND);
-                    if (li->specifiesAltitude()) {
-                        li->altitude()->setRawValue(0.0);
-                    }
-                }
-                if (_loiterAfterRtl) {
-                    VisualMissionItem* lItem = mission->insertSimpleMissionItem(c, -1, false);
-                    if (SimpleMissionItem* loiter = qobject_cast<SimpleMissionItem*>(lItem)) {
-                        loiter->setCommand(MAV_CMD_NAV_LOITER_TIME);
-                        loiter->missionItem().setParam1(_loiterTime);
-                        if (loiter->specifiesAltitude()) {
-                            loiter->altitude()->setRawValue(_missionAltitude);
-                        }
-                    }
-                }
-            }
-        }
-    }
+	QVariantList stored; // per-drone memory we will fill
+	
+	const QVariantList wps = generatePerDroneWaypoints(droneIndex);
+	// Insert an initial takeoff before the first waypoint so missions always begin with a takeoff action
+	if (!wps.isEmpty()) {
+		const double altOffset = _altitudeBandStart + droneIndex * _altitudeBandStep;
+		const QGeoCoordinate takeoffCoord = _homeLocation.isValid() ? _homeLocation : _areaCenter;
+		// Force takeoff as first mission item after MissionSettings (index 1)
+		VisualMissionItem* tkItem = mission->insertSimpleMissionItem(takeoffCoord, 1, false);
+		if (SimpleMissionItem* tk = qobject_cast<SimpleMissionItem*>(tkItem)) {
+			tk->setCommand(MAV_CMD_NAV_TAKEOFF);
+			if (tk->specifiesAltitude()) {
+				tk->altitude()->setRawValue(_missionAltitude + altOffset);
+			}
+			stored.append(serializeMissionItem(&tk->missionItem()));
+		}
+	}
+	for (int idx = 0; idx < wps.size(); ++idx) {
+		QGeoCoordinate c = wps[idx].value<QGeoCoordinate>();
+		
+		// Slotting to avoid conflicts at start and between cycles
+		qreal startDelay = (idx == 0) ? (droneIndex * _timeOffsetPerDrone) : _perTargetSeparationS;
+		if (startDelay > 0.0) {
+			// Use the first waypoint location for hold, not home location
+			QGeoCoordinate holdLocation = c;
+			VisualMissionItem* hold = mission->insertSimpleMissionItem(holdLocation, -1, false);
+			if (SimpleMissionItem* h = qobject_cast<SimpleMissionItem*>(hold)) {
+				h->setCommand(MAV_CMD_NAV_LOITER_TIME);
+				h->missionItem().setParam1(startDelay);
+				if (h->specifiesAltitude()) {
+					h->altitude()->setRawValue(_missionAltitude);
+				}
+				stored.append(serializeMissionItem(&h->missionItem()));
+			}
+		}
+		
+		if (_landAtTargetReturn) {
+			// Land at target with offset per drone to avoid same-spot conflicts (>=1m separation)
+			QGeoCoordinate targetLand = calculateOffsetCoordinate(c, 1.5 + 1.0 * droneIndex, fmod(45.0 + 60.0 * droneIndex, 360.0));
+			VisualMissionItem* landTargetItem = mission->insertSimpleMissionItem(targetLand, -1, false);
+			if (SimpleMissionItem* lti = qobject_cast<SimpleMissionItem*>(landTargetItem)) {
+				lti->setCommand(MAV_CMD_NAV_LAND);
+				if (lti->specifiesAltitude()) {
+					lti->altitude()->setRawValue(0.0);
+				}
+				stored.append(serializeMissionItem(&lti->missionItem()));
+			}
+			// Optional: Payload release command
+			insertGripperRelease(mission, c);
+			// Hold on target for configured time
+			if (_targetHoldTimeS > 0) {
+				VisualMissionItem* hold = mission->insertSimpleMissionItem(c, -1, false);
+				if (SimpleMissionItem* h = qobject_cast<SimpleMissionItem*>(hold)) {
+					h->setCommand(MAV_CMD_NAV_LOITER_TIME);
+					h->missionItem().setParam1(_targetHoldTimeS);
+					if (h->specifiesAltitude()) {
+						h->altitude()->setRawValue(_missionAltitude);
+					}
+					stored.append(serializeMissionItem(&h->missionItem()));
+				}
+			}
+			// Takeoff from target back to altitude
+			VisualMissionItem* tkItem = mission->insertSimpleMissionItem(c, -1, false);
+			if (SimpleMissionItem* tk = qobject_cast<SimpleMissionItem*>(tkItem)) {
+				tk->setCommand(MAV_CMD_NAV_TAKEOFF);
+				if (tk->specifiesAltitude()) {
+					tk->altitude()->setRawValue(_missionAltitude);
+				}
+				stored.append(serializeMissionItem(&tk->missionItem()));
+			}
+			// Explicit RTL to home area, then land near home with offset per drone
+			{
+				VisualMissionItem* rtl = mission->insertSimpleMissionItem(_homeLocation.isValid() ? _homeLocation : c, -1, false);
+				if (SimpleMissionItem* rtli = qobject_cast<SimpleMissionItem*>(rtl)) {
+					rtli->setCommand(MAV_CMD_NAV_RETURN_TO_LAUNCH);
+					stored.append(serializeMissionItem(&rtli->missionItem()));
+				}
+			}
+			QGeoCoordinate baseHome = _homeLocation.isValid() ? _homeLocation : c;
+			QGeoCoordinate homeLand = calculateOffsetCoordinate(baseHome, 1.5 + 1.0 * droneIndex, fmod(90.0 + 60.0 * droneIndex, 360.0));
+			VisualMissionItem* landHomeItem = mission->insertSimpleMissionItem(homeLand, -1, false);
+			if (SimpleMissionItem* lhi = qobject_cast<SimpleMissionItem*>(landHomeItem)) {
+				lhi->setCommand(MAV_CMD_NAV_LAND);
+				if (lhi->specifiesAltitude()) {
+					lhi->altitude()->setRawValue(0.0);
+				}
+				stored.append(serializeMissionItem(&lhi->missionItem()));
+			}
+			VisualMissionItem* loiterItem = mission->insertSimpleMissionItem(_homeLocation.isValid() ? _homeLocation : c, -1, false);
+			if (SimpleMissionItem* loiter = qobject_cast<SimpleMissionItem*>(loiterItem)) {
+				loiter->setCommand(MAV_CMD_NAV_LOITER_TIME);
+				loiter->missionItem().setParam1(_homeTurnaroundWaitS > 0 ? _homeTurnaroundWaitS : _loiterTime);
+				if (loiter->specifiesAltitude()) {
+					loiter->altitude()->setRawValue(_missionAltitude);
+				}
+				stored.append(serializeMissionItem(&loiter->missionItem()));
+			}
+		} else {
+			// Transit waypoint
+			VisualMissionItem* vmi = mission->insertSimpleMissionItem(c, -1, false);
+			if (SimpleMissionItem* smi = qobject_cast<SimpleMissionItem*>(vmi)) {
+				if (smi->specifiesAltitude()) {
+					smi->altitude()->setRawValue(c.altitude());
+				}
+				stored.append(serializeMissionItem(&smi->missionItem()));
+			}
+			// Policy: RTL after every waypoint (with relay + 2s hold implemented earlier)
+			if (_rtlAfterEveryWaypoint) {
+				// Initial LOITER at target (if configured)
+				const qreal initialHoldS = _targetHoldTimeS > 0 ? _targetHoldTimeS : _loiterTime;
+				if (initialHoldS > 0) {
+					VisualMissionItem* holdInit = mission->insertSimpleMissionItem(c, -1, false);
+					if (SimpleMissionItem* h0 = qobject_cast<SimpleMissionItem*>(holdInit)) {
+						h0->setCommand(MAV_CMD_NAV_LOITER_TO_ALT);
+						// Time is not used here; we hold to altitude instead
+						if (h0->specifiesAltitude()) {
+							// Low hold at ~1 m before drop
+							h0->altitude()->setRawValue(1.0);
+						}
+					}
+				}
+				// Set relay #10 to ON (1) at target
+				{
+					VisualMissionItem* relayItem = mission->insertSimpleMissionItem(c, -1, false);
+					if (SimpleMissionItem* rel = qobject_cast<SimpleMissionItem*>(relayItem)) {
+						rel->setCommand(MAV_CMD_DO_SET_SERVO);
+						rel->missionItem().setParam1(10); // channel 10 (M10)
+						rel->missionItem().setParam2(2000);  // ON (high PWM)
+					}
+				}
+				// Post-relay short loiter (2s)
+				{
+					VisualMissionItem* hold2 = mission->insertSimpleMissionItem(c, -1, false);
+					if (SimpleMissionItem* h2 = qobject_cast<SimpleMissionItem*>(hold2)) {
+						h2->setCommand(MAV_CMD_NAV_LOITER_TIME);
+						h2->missionItem().setParam1(2.0);
+						if (h2->specifiesAltitude()) {
+							h2->altitude()->setRawValue(_missionAltitude);
+						}
+					}
+				}
+				// Set relay #10 to OFF (0)
+				{
+					VisualMissionItem* relayOff = mission->insertSimpleMissionItem(c, -1, false);
+					if (SimpleMissionItem* ro = qobject_cast<SimpleMissionItem*>(relayOff)) {
+						ro->setCommand(MAV_CMD_DO_SET_SERVO);
+						ro->missionItem().setParam1(10);
+						ro->missionItem().setParam2(1000); // OFF (low PWM)
+					}
+				}
+				// Climb back to working height at target before RTL
+				{
+					const double altOffsetThis = _altitudeBandStart + droneIndex * _altitudeBandStep;
+					VisualMissionItem* tkBack = mission->insertSimpleMissionItem(c, -1, false);
+					if (SimpleMissionItem* tb = qobject_cast<SimpleMissionItem*>(tkBack)) {
+						tb->setCommand(MAV_CMD_NAV_LOITER_TO_ALT);
+						if (tb->specifiesAltitude()) {
+							tb->altitude()->setRawValue(_missionAltitude + altOffsetThis);
+						}
+					}
+				}
+				// Explicit RTL to home area
+				{
+					VisualMissionItem* rtl2 = mission->insertSimpleMissionItem(_homeLocation.isValid() ? _homeLocation : c, -1, false);
+					if (SimpleMissionItem* rtli2 = qobject_cast<SimpleMissionItem*>(rtl2)) {
+						rtli2->setCommand(MAV_CMD_NAV_RETURN_TO_LAUNCH);
+					}
+				}
+				// Land near home with offset per drone
+				QGeoCoordinate baseHome = _homeLocation.isValid() ? _homeLocation : c;
+				QGeoCoordinate homeLand = calculateOffsetCoordinate(baseHome, 1.5 + 1.0 * droneIndex, fmod(90.0 + 60.0 * droneIndex, 360.0));
+				VisualMissionItem* landItem = mission->insertSimpleMissionItem(homeLand, -1, false);
+				if (SimpleMissionItem* li = qobject_cast<SimpleMissionItem*>(landItem)) {
+					li->setCommand(MAV_CMD_NAV_LAND);
+					if (li->specifiesAltitude()) {
+						li->altitude()->setRawValue(0.0);
+					}
+				}
+				if (_loiterAfterRtl || _homeTurnaroundWaitS > 0) {
+					VisualMissionItem* lItemHome = mission->insertSimpleMissionItem(baseHome, -1, false);
+					if (SimpleMissionItem* loiterHome = qobject_cast<SimpleMissionItem*>(lItemHome)) {
+						loiterHome->setCommand(MAV_CMD_NAV_LOITER_TIME);
+						loiterHome->missionItem().setParam1(_homeTurnaroundWaitS > 0 ? _homeTurnaroundWaitS : _loiterTime);
+						if (loiterHome->specifiesAltitude()) loiterHome->altitude()->setRawValue(_missionAltitude);
+						stored.append(serializeMissionItem(&loiterHome->missionItem()));
+					}
+				}
+				{
+					double altOffsetNext = _altitudeBandStart + droneIndex * _altitudeBandStep;
+					VisualMissionItem* tkNext = mission->insertSimpleMissionItem(baseHome, -1, false);
+					if (SimpleMissionItem* tkCmd = qobject_cast<SimpleMissionItem*>(tkNext)) {
+						tkCmd->setCommand(MAV_CMD_NAV_WAYPOINT);
+						if (tkCmd->specifiesAltitude()) tkCmd->altitude()->setRawValue(_missionAltitude + altOffsetNext);
+						stored.append(serializeMissionItem(&tkCmd->missionItem()));
+					}
+				}
+			}
+		}
+	}
+
+	// Store per-drone mission in memory and notify
+	_storedPerDroneMissions[droneIndex] = stored;
+	emit storedMissionChanged(droneIndex);
 }
 
 /**
@@ -3927,9 +4017,25 @@ void AreaPlanEditor::addPerDroneToMission(int droneIndex)
  */
 void AreaPlanEditor::addAllDronesToMission()
 {
-    for (int d = 0; d < _droneCount; ++d) {
-        addPerDroneToMission(d);
-    }
+	if (!hasDrawing()) { updateStatus("Cannot generate: drawing not present"); return; }
+	// Ensure we rebuild the Mission tab from current parameters for immediate reflection
+	if (MissionController* mission = getMissionController()) {
+		if (mission->visualItems() && mission->visualItems()->count() > 1) {
+			for (int i = mission->visualItems()->count() - 1; i >= 1; --i) {
+				mission->removeVisualItem(i);
+			}
+		}
+		// Sync Mission Start initial altitude to working height of drone 0
+		if (mission->visualItems() && mission->visualItems()->count() > 0) {
+			if (auto* ms = qobject_cast<MissionSettingsItem*>(mission->visualItems()->get(0))) {
+				double workingAlt0 = _missionAltitude + _altitudeBandStart; // drone 0
+				ms->plannedHomePositionAltitude()->setRawValue(workingAlt0);
+			}
+		}
+	}
+	for (int d = 0; d < _droneCount; ++d) {
+		addPerDroneToMission(d);
+	}
 }
 
 /**
@@ -3985,56 +4091,64 @@ void AreaPlanEditor::addAllDronesToMission()
  */
 void AreaPlanEditor::addWaypointsToMission()
 {
-    MissionController* mission = getMissionController();
-    if (!mission) {
-        qWarning() << "AreaPlanEditor::addWaypointsToMission: MissionController not set";
-        return;
-    }
-    
-    // Ensure mission has MissionSettings initialized
-    if (mission->visualItems()->count() == 0) {
-        // Only insert a temporary item to trigger MissionSettings creation
-        VisualMissionItem* tmp = mission->insertSimpleMissionItem(_areaCenter, -1, false);
-        if (mission->visualItems()->count() > 1) {
-            mission->removeVisualItem(1);
-        }
-        Q_UNUSED(tmp);
-    }
+	if (!hasDrawing()) { updateStatus("Cannot generate: drawing not present"); return; }
+	MissionController* mission = getMissionController();
+	if (!mission) {
+		qWarning() << "AreaPlanEditor::addWaypointsToMission: MissionController not set";
+		return;
+	}
+	
+	// Ensure mission has MissionSettings initialized
+	if (mission->visualItems()->count() == 0) {
+		// Only insert a temporary item to trigger MissionSettings creation
+		VisualMissionItem* tmp = mission->insertSimpleMissionItem(_areaCenter, -1, false);
+		if (mission->visualItems()->count() > 1) {
+			mission->removeVisualItem(1);
+		}
+		Q_UNUSED(tmp);
+	}
+	// Sync Mission Start initial altitude to working height of drone 0
+	if (mission->visualItems() && mission->visualItems()->count() > 0) {
+		if (auto* ms = qobject_cast<MissionSettingsItem*>(mission->visualItems()->get(0))) {
+			double workingAlt0 = _missionAltitude + _altitudeBandStart; // drone 0
+			ms->plannedHomePositionAltitude()->setRawValue(workingAlt0);
+		}
+	}
 
-    // If advanced business-flow is enabled or multi-drone planning is in use,
-    // delegate to per-drone insertion which handles LAND/LOITER/TAKEOFF/returns.
-    const bool advanced = (_droneCount > 1) || _landAtTargetReturn || _payloadReleaseEnabled ||
-                          _rtlAfterEveryWaypoint || _loiterAfterRtl ||
-                          (_timeOffsetPerDrone > 0) || (_perTargetSeparationS > 0);
-    if (advanced) {
-        for (int d = 0; d < _droneCount; ++d) {
-            addPerDroneToMission(d);
-        }
-        return;
-    }
+	// If advanced business-flow is enabled or multi-drone planning is in use,
+	// delegate to per-drone insertion which handles LAND/LOITER/TAKEOFF/returns.
+	const bool advanced = (_droneCount > 1) || _landAtTargetReturn || _payloadReleaseEnabled ||
+						  _rtlAfterEveryWaypoint || _loiterAfterRtl ||
+						  (_timeOffsetPerDrone > 0) || (_perTargetSeparationS > 0);
+	if (advanced) {
+		for (int d = 0; d < _droneCount; ++d) {
+			addPerDroneToMission(d);
+		}
+		return;
+	}
 
-    // Simple single-drone insertion: straight waypoints only
-    const QVariantList wps = generateWaypoints();
-    // Insert takeoff before first waypoint so mission always begins with takeoff
-    if (!wps.isEmpty()) {
-        QGeoCoordinate tkCoord = _homeLocation.isValid() ? _homeLocation : _areaCenter;
-        VisualMissionItem* tkItem = mission->insertSimpleMissionItem(tkCoord, -1, false);
-        if (SimpleMissionItem* tk = qobject_cast<SimpleMissionItem*>(tkItem)) {
-            tk->setCommand(MAV_CMD_NAV_TAKEOFF);
-            if (tk->specifiesAltitude()) {
-                tk->altitude()->setRawValue(_missionAltitude);
-            }
-        }
-    }
-    for (const QVariant& v : wps) {
-        QGeoCoordinate c = v.value<QGeoCoordinate>();
-        VisualMissionItem* vmi = mission->insertSimpleMissionItem(c, -1, false);
-        if (SimpleMissionItem* smi = qobject_cast<SimpleMissionItem*>(vmi)) {
-            if (smi->specifiesAltitude()) {
-                smi->altitude()->setRawValue(c.altitude());
-            }
-        }
-    }
+	// Simple single-drone insertion: straight waypoints only
+	const QVariantList wps = generateWaypoints();
+	// Insert takeoff before first waypoint so mission always begins with takeoff
+	if (!wps.isEmpty()) {
+		QGeoCoordinate tkCoord = _homeLocation.isValid() ? _homeLocation : _areaCenter;
+		VisualMissionItem* tkItem = mission->insertSimpleMissionItem(tkCoord, -1, false);
+		if (SimpleMissionItem* tk = qobject_cast<SimpleMissionItem*>(tkItem)) {
+			tk->setCommand(MAV_CMD_NAV_TAKEOFF);
+			if (tk->specifiesAltitude()) {
+				tk->altitude()->setRawValue(_missionAltitude);
+			}
+		}
+	}
+	for (const QVariant& v : wps) {
+		QGeoCoordinate c = v.value<QGeoCoordinate>();
+		VisualMissionItem* vmi = mission->insertSimpleMissionItem(c, -1, false);
+		if (SimpleMissionItem* smi = qobject_cast<SimpleMissionItem*>(vmi)) {
+			if (smi->specifiesAltitude()) {
+				smi->altitude()->setRawValue(c.altitude());
+			}
+		}
+	}
 }
 
 /**
@@ -4160,34 +4274,91 @@ void AreaPlanEditor::clearMission()
  */
 void AreaPlanEditor::clearAllMissions()
 {
-    // Clear local plan
-    clearMission();
+	QmlObjectListModel* vehicleModel = MultiVehicleManager::instance()->vehicles();
+	if (!vehicleModel) {
+		updateStatus("No vehicles to clear");
+		clearMission();
+		return;
+	}
 
-    // Iterate all connected vehicles and clear uploaded missions (asynchronously) to avoid UI stalls
-    QmlObjectListModel* vehicleModel = MultiVehicleManager::instance()->vehicles();
-    if (!vehicleModel) {
-        updateStatus("No vehicles to clear");
-        return;
-    }
+	startProgress("clear_all", "Grounding vehicles and switching to STABILIZE...");
+	auto remainingGround = QSharedPointer<int>::create(vehicleModel->count());
 
-    startProgress("clear_all", "Clearing missions from all vehicles...");
-    auto remaining = QSharedPointer<int>::create(vehicleModel->count());
-    for (int i = 0; i < vehicleModel->count(); ++i) {
-        Vehicle* v = qobject_cast<Vehicle*>(vehicleModel->get(i));
-        // Slightly stagger to avoid bursts on the link and keep UI responsive
-        QTimer::singleShot(i * 50, this, [this, v, remaining]() {
-            if (v) {
-                if (MissionManager* mm = v->missionManager()) {
-                    QList<MissionItem*> empty;
-                    mm->writeMissionItems(empty);
-                }
-            }
-            (*remaining) -= 1;
-            if (*remaining <= 0) {
-                finishProgress("Cleared missions from all vehicles");
-            }
-        });
-    }
+	// Helper to proceed with mission clears after all vehicles grounded + stabilized
+	auto proceedClear = [this, vehicleModel]() {
+		// Clear local plan after vehicles are safe on ground
+		clearMission();
+		// Iterate all connected vehicles and clear uploaded missions (asynchronously)
+		startProgress("clear_all_send", "Clearing missions from all vehicles...");
+		auto remaining = QSharedPointer<int>::create(vehicleModel->count());
+		for (int i = 0; i < vehicleModel->count(); ++i) {
+			Vehicle* v = qobject_cast<Vehicle*>(vehicleModel->get(i));
+			QTimer::singleShot(i * 50, this, [this, v, remaining]() {
+				if (v) {
+					if (MissionManager* mm = v->missionManager()) {
+						QList<MissionItem*> empty;
+						mm->writeMissionItems(empty);
+					}
+				}
+				(*remaining) -= 1;
+				if (*remaining <= 0) {
+					finishProgress("Cleared missions from all vehicles");
+				}
+			});
+		}
+	};
+
+	// If there are no vehicles, just clear plan
+	if (vehicleModel->count() == 0) {
+		finishProgress("No vehicles connected; plan cleared");
+		clearMission();
+		return;
+	}
+
+	for (int i = 0; i < vehicleModel->count(); ++i) {
+		Vehicle* v = qobject_cast<Vehicle*>(vehicleModel->get(i));
+		if (!v) {
+			(*remainingGround) -= 1;
+			if (*remainingGround <= 0) proceedClear();
+			continue;
+		}
+
+		// Request landing if airborne
+		bool flying = v->property("flying").toBool();
+		double altRel = v->property("altitudeRelative").toDouble();
+		if (flying || altRel > 0.5) {
+			if (v->guidedModeSupported()) {
+				v->guidedModeLand();
+				updateStatus(QString("Vehicle %1 landing requested").arg(v->id()));
+			}
+		}
+
+		// Poll until grounded, then set STABILIZE
+		auto pollGround = QSharedPointer<QMetaObject::Connection>::create();
+		std::function<void()> checkFn;
+		checkFn = [this, v, remainingGround, &checkFn, proceedClear]() {
+			bool onGround = !v->property("flying").toBool() || v->property("altitudeRelative").toDouble() <= 0.2;
+			if (onGround) {
+				if (v->flightModeSetAvailable()) {
+					QString stabilizeMode;
+					if (v->metaObject()->indexOfMethod("stabilizeFlightMode()const") != -1) {
+						QVariant ret = v->property("stabilizeFlightMode");
+						stabilizeMode = ret.isValid() ? ret.toString() : QStringLiteral("STABILIZE");
+					} else {
+						stabilizeMode = QStringLiteral("STABILIZE");
+					}
+					v->setFlightMode(stabilizeMode);
+				}
+				(*remainingGround) -= 1;
+				if (*remainingGround <= 0) {
+					proceedClear();
+				}
+			} else {
+				QTimer::singleShot(500, this, checkFn);
+			}
+		};
+		QTimer::singleShot(0, this, checkFn);
+	}
 }
 
 /**
@@ -4370,98 +4541,144 @@ void AreaPlanEditor::uploadToVehicle()
  */
 void AreaPlanEditor::uploadPerDroneMissionToVehicle(int droneIndex, QObject* vehicleObject)
 {
-    Vehicle* vehicle = qobject_cast<Vehicle*>(vehicleObject);
-    if (!vehicle) {
-        handleError("Invalid vehicle object", QString());
-        return;
-    }
-    
-    // Generate per-drone waypoints (pattern defined around _areaCenter)
-    QList<QVariant> waypoints = generatePerDroneWaypoints(droneIndex);
-    if (waypoints.isEmpty()) {
-        handleError("No waypoints generated for drone", QString::number(droneIndex));
-        return;
-    }
-    
-    // Get the vehicle's mission manager
-    MissionManager* missionManager = vehicle->missionManager();
-    if (!missionManager) {
-        handleError("Vehicle mission manager not available", QString("Vehicle %1").arg(vehicle->id()));
-        return;
-    }
-    
-    // Convert waypoints to MissionItems
-    QList<MissionItem*> missionItems;
-    
-    // Add home position if available
-    if (_homeLocation.isValid()) {
-        MissionItem* homeItem = new MissionItem(0, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT, 0.0, 0.0, 0.0, 0.0, _homeLocation.latitude(), _homeLocation.longitude(), _missionAltitude, true, false, missionManager);
-        missionItems.append(homeItem);
-    }
-    
-    // Takeoff and mission should be relative to the vehicle's current position (not operator or arbitrary center)
-    // Use vehicle coordinate as takeoff origin; fall back to home if available
-    QGeoCoordinate vehicleOrigin = vehicle->coordinate();
-    QGeoCoordinate takeoffCoord = vehicleOrigin.isValid() ? vehicleOrigin : (_homeLocation.isValid() ? _homeLocation : _areaCenter);
-    double takeoffAltitude = _missionAltitude + (_altitudeBandStart + droneIndex * _altitudeBandStep);
-    MissionItem* takeoffItem = new MissionItem(missionItems.count(), MAV_CMD_NAV_TAKEOFF, MAV_FRAME_GLOBAL_RELATIVE_ALT, 0.0, 0.0, 0.0, 0.0, takeoffCoord.latitude(), takeoffCoord.longitude(), takeoffAltitude, true, false, missionManager);
-    missionItems.append(takeoffItem);
-    
-    // Add waypoints with proper altitude offsets, anchored at planned coordinates (drawn area)
-    for (int i = 0; i < waypoints.size(); ++i) {
-        QGeoCoordinate coord = waypoints[i].value<QGeoCoordinate>();
-        double waypointAltitude = (_missionAltitude + (_altitudeBandStart + droneIndex * _altitudeBandStep));
-        MissionItem* wpItem = new MissionItem(missionItems.count(), MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT, 0.0, 0.0, 0.0, 0.0, coord.latitude(), coord.longitude(), waypointAltitude, true, false, missionManager);
-        missionItems.append(wpItem);
-        
-        // Add loiter at waypoint if configured
-        if (_loiterTime > 0) {
-            MissionItem* loiterItem = new MissionItem(missionItems.count(), MAV_CMD_NAV_LOITER_TIME, MAV_FRAME_GLOBAL_RELATIVE_ALT, _loiterTime, 0.0, 0.0, 0.0, coord.latitude(), coord.longitude(), waypointAltitude, true, false, missionManager);
-            missionItems.append(loiterItem);
-        }
-        
-        // Add RTL after every waypoint if configured
-        if (_rtlAfterEveryWaypoint) {
-            MissionItem* rtlItem = new MissionItem(missionItems.count(), MAV_CMD_NAV_RETURN_TO_LAUNCH, MAV_FRAME_GLOBAL_RELATIVE_ALT, 0.0, 0.0, 0.0, 0.0, takeoffCoord.latitude(), takeoffCoord.longitude(), _missionAltitude, true, false, missionManager);
-            missionItems.append(rtlItem);
-            
-            // Add loiter after RTL if configured
-            if (_loiterAfterRtl && _loiterTime > 0) {
-                MissionItem* postRtlLoiterItem = new MissionItem(missionItems.count(), MAV_CMD_NAV_LOITER_TIME, MAV_FRAME_GLOBAL_RELATIVE_ALT, _loiterTime, 0.0, 0.0, 0.0, takeoffCoord.latitude(), takeoffCoord.longitude(), _missionAltitude, true, false, missionManager);
-                missionItems.append(postRtlLoiterItem);
-            }
-        }
-    }
-    
-    // Add final RTL
-    MissionItem* finalRtlItem = new MissionItem(missionItems.count(), MAV_CMD_NAV_RETURN_TO_LAUNCH, MAV_FRAME_GLOBAL_RELATIVE_ALT, 0.0, 0.0, 0.0, 0.0, takeoffCoord.latitude(), takeoffCoord.longitude(), _missionAltitude, true, false, missionManager);
-    missionItems.append(finalRtlItem);
-    
-    // Add landing command
-    MissionItem* landItem = new MissionItem(missionItems.count(), MAV_CMD_NAV_LAND, MAV_FRAME_GLOBAL_RELATIVE_ALT, 0.0, 0.0, 0.0, 0.0, takeoffCoord.latitude(), takeoffCoord.longitude(), 0.0, true, false, missionManager);
-    missionItems.append(landItem);
-    
-    // Connect to upload progress signals
-    connect(missionManager, &PlanManager::progressPctChanged, this, [this, droneIndex](double progress) {
-        updateStatus(QString("Uploading drone %1 mission: %2%").arg(droneIndex).arg(qRound(progress)));
-    });
-    
-    connect(missionManager, &PlanManager::error, this, [this, droneIndex](int errorCode, const QString& errorMsg) {
-        handleError(QString("Drone %1 upload failed").arg(droneIndex), errorMsg);
-    });
-    
-    connect(missionManager, &PlanManager::sendComplete, this, [this, droneIndex, vehicle](bool error) {
-        if (!error) {
-            updateStatus(QString("Drone %1 mission uploaded successfully to vehicle %2").arg(droneIndex).arg(vehicle->id()));
-            emit missionUploaded(droneIndex, vehicle);
-        } else {
-            handleError(QString("Drone %1 mission upload failed").arg(droneIndex), "Upload completed with errors");
-        }
-    });
-    
-    // Upload to the specific vehicle
-    updateStatus(QString("Uploading drone %1 mission to vehicle %2...").arg(droneIndex).arg(vehicle->id()));
-    missionManager->writeMissionItems(missionItems);
+	if (!hasDrawing()) { updateStatus("Cannot upload: drawing not present"); return; }
+	Vehicle* vehicle = qobject_cast<Vehicle*>(vehicleObject);
+	if (!vehicle) {
+		handleError("Invalid vehicle object", QString());
+		return;
+	}
+	
+	// Generate per-drone waypoints (pattern defined around _areaCenter)
+	QList<QVariant> waypoints = generatePerDroneWaypoints(droneIndex);
+	if (waypoints.isEmpty()) {
+		handleError("No waypoints generated for drone", QString::number(droneIndex));
+		return;
+	}
+	
+	// Get the vehicle's mission manager
+	MissionManager* missionManager = vehicle->missionManager();
+	if (!missionManager) {
+		handleError("Vehicle mission manager not available", QString("Vehicle %1").arg(vehicle->id()));
+		return;
+	}
+	
+	// Convert waypoints to MissionItems
+	QList<MissionItem*> missionItems;
+	QVariantList stored; // for memory
+	
+	// Add home position if available
+	if (_homeLocation.isValid()) {
+		MissionItem* homeItem = new MissionItem(0, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT, 0.0, 0.0, 0.0, 0.0, _homeLocation.latitude(), _homeLocation.longitude(), _missionAltitude, true, false, missionManager);
+		missionItems.append(homeItem);
+		stored.append(serializeMissionItem(homeItem));
+	}
+	
+	// Takeoff and mission should be relative to the vehicle's current position (not operator or arbitrary center)
+	// Use vehicle coordinate as takeoff origin; fall back to home if available
+	QGeoCoordinate vehicleOrigin = vehicle->coordinate();
+	QGeoCoordinate takeoffCoord = vehicleOrigin.isValid() ? vehicleOrigin : (_homeLocation.isValid() ? _homeLocation : _areaCenter);
+	double takeoffAltitude = _missionAltitude + (_altitudeBandStart + droneIndex * _altitudeBandStep);
+	MissionItem* takeoffItem = new MissionItem(missionItems.count(), MAV_CMD_NAV_TAKEOFF, MAV_FRAME_GLOBAL_RELATIVE_ALT, 0.0, 0.0, 0.0, 0.0, takeoffCoord.latitude(), takeoffCoord.longitude(), takeoffAltitude, true, false, missionManager);
+	missionItems.append(takeoffItem);
+	stored.append(serializeMissionItem(takeoffItem));
+	
+	// Add waypoints with proper altitude offsets, anchored at planned coordinates (drawn area)
+	for (int i = 0; i < waypoints.size(); ++i) {
+		QGeoCoordinate coord = waypoints[i].value<QGeoCoordinate>();
+		double waypointAltitude = (_missionAltitude + (_altitudeBandStart + droneIndex * _altitudeBandStep));
+		MissionItem* wpItem = new MissionItem(missionItems.count(), MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT, 0.0, 0.0, 0.0, 0.0, coord.latitude(), coord.longitude(), waypointAltitude, true, false, missionManager);
+		missionItems.append(wpItem);
+		stored.append(serializeMissionItem(wpItem));
+		
+		// If not using RTL-after-every-waypoint, optional single loiter at target
+		if (!_rtlAfterEveryWaypoint && _loiterTime > 0) {
+			MissionItem* loiterItem = new MissionItem(missionItems.count(), MAV_CMD_NAV_LOITER_TIME, MAV_FRAME_GLOBAL_RELATIVE_ALT, _loiterTime, 0.0, 0.0, 0.0, coord.latitude(), coord.longitude(), waypointAltitude, true, false, missionManager);
+			missionItems.append(loiterItem);
+			stored.append(serializeMissionItem(loiterItem));
+		}
+		
+		// Add RTL after every waypoint if configured
+		if (_rtlAfterEveryWaypoint) {
+			// Initial LOITER at target (use targetHoldTimeS if set, else loiterTime)
+			const qreal initialHoldS = _targetHoldTimeS > 0 ? _targetHoldTimeS : _loiterTime;
+			if (initialHoldS > 0) {
+				MissionItem* holdInit = new MissionItem(missionItems.count(), MAV_CMD_NAV_LOITER_TO_ALT, MAV_FRAME_GLOBAL_RELATIVE_ALT, 0.0, 0.0, 0.0, 0.0, coord.latitude(), coord.longitude(), /*alt*/ 1.0, true, false, missionManager);
+				missionItems.append(holdInit);
+				stored.append(serializeMissionItem(holdInit));
+			}
+			// Set relay #10 ON at target
+			{
+				MissionItem* relayItem = new MissionItem(missionItems.count(), MAV_CMD_DO_SET_SERVO, MAV_FRAME_MISSION, 10.0, 2000.0, 0.0, 0.0, 0.0, 0.0, 0.0, true, false, missionManager);
+				missionItems.append(relayItem);
+				stored.append(serializeMissionItem(relayItem));
+			}
+			// Post-relay short LOITER (2s)
+			{
+				MissionItem* hold2 = new MissionItem(missionItems.count(), MAV_CMD_NAV_LOITER_TIME, MAV_FRAME_GLOBAL_RELATIVE_ALT, 2.0, 0.0, 0.0, 0.0, coord.latitude(), coord.longitude(), waypointAltitude, true, false, missionManager);
+				missionItems.append(hold2);
+				stored.append(serializeMissionItem(hold2));
+			}
+			// Relay OFF
+			{
+				MissionItem* relayOff = new MissionItem(missionItems.count(), MAV_CMD_DO_SET_SERVO, MAV_FRAME_MISSION, 10.0, 1000.0, 0.0, 0.0, 0.0, 0.0, 0.0, true, false, missionManager);
+				missionItems.append(relayOff);
+				stored.append(serializeMissionItem(relayOff));
+			}
+			// Climb back to working height before RTL
+			{
+				MissionItem* tkBack = new MissionItem(missionItems.count(), MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT, 0.0, 0.0, 0.0, 0.0, coord.latitude(), coord.longitude(), waypointAltitude, true, false, missionManager);
+				missionItems.append(tkBack);
+				stored.append(serializeMissionItem(tkBack));
+			}
+			// RTL
+			MissionItem* rtlItem = new MissionItem(missionItems.count(), MAV_CMD_NAV_RETURN_TO_LAUNCH, MAV_FRAME_GLOBAL_RELATIVE_ALT, 0.0, 0.0, 0.0, 0.0, takeoffCoord.latitude(), takeoffCoord.longitude(), _missionAltitude, true, false, missionManager);
+			missionItems.append(rtlItem);
+			stored.append(serializeMissionItem(rtlItem));
+			
+			// Add loiter after RTL if configured
+			if (_loiterAfterRtl && _loiterTime > 0) {
+				MissionItem* postRtlLoiterItem = new MissionItem(missionItems.count(), MAV_CMD_NAV_LOITER_TIME, MAV_FRAME_GLOBAL_RELATIVE_ALT, _loiterTime, 0.0, 0.0, 0.0, takeoffCoord.latitude(), takeoffCoord.longitude(), _missionAltitude, true, false, missionManager);
+				missionItems.append(postRtlLoiterItem);
+				stored.append(serializeMissionItem(postRtlLoiterItem));
+			}
+		}
+	}
+	
+	// Add final RTL and landing only if we didn't RTL each waypoint
+	if (!_rtlAfterEveryWaypoint) {
+		MissionItem* finalRtlItem = new MissionItem(missionItems.count(), MAV_CMD_NAV_RETURN_TO_LAUNCH, MAV_FRAME_GLOBAL_RELATIVE_ALT, 0.0, 0.0, 0.0, 0.0, takeoffCoord.latitude(), takeoffCoord.longitude(), _missionAltitude, true, false, missionManager);
+		missionItems.append(finalRtlItem);
+		stored.append(serializeMissionItem(finalRtlItem));
+		MissionItem* landItem = new MissionItem(missionItems.count(), MAV_CMD_NAV_LAND, MAV_FRAME_GLOBAL_RELATIVE_ALT, 0.0, 0.0, 0.0, 0.0, takeoffCoord.latitude(), takeoffCoord.longitude(), 0.0, true, false, missionManager);
+		missionItems.append(landItem);
+		stored.append(serializeMissionItem(landItem));
+	}
+	
+	// Store per-drone mission memory
+	_storedPerDroneMissions[droneIndex] = stored;
+	emit storedMissionChanged(droneIndex);
+	
+	// Connect to upload progress signals
+	connect(missionManager, &PlanManager::progressPctChanged, this, [this, droneIndex](double progress) {
+		updateStatus(QString("Uploading drone %1 mission: %2%").arg(droneIndex).arg(qRound(progress)));
+	});
+	
+	connect(missionManager, &PlanManager::error, this, [this, droneIndex](int errorCode, const QString& errorMsg) {
+		handleError(QString("Drone %1 upload failed").arg(droneIndex), errorMsg);
+	});
+	
+	connect(missionManager, &PlanManager::sendComplete, this, [this, droneIndex, vehicle](bool error) {
+		if (!error) {
+			updateStatus(QString("Drone %1 mission uploaded successfully to vehicle %2").arg(droneIndex).arg(vehicle->id()));
+			emit missionUploaded(droneIndex, vehicle);
+		} else {
+			handleError(QString("Drone %1 mission upload failed").arg(droneIndex), "Upload completed with errors");
+		}
+	});
+	
+	// Upload to the specific vehicle
+	updateStatus(QString("Uploading drone %1 mission to vehicle %2...").arg(droneIndex).arg(vehicle->id()));
+	missionManager->writeMissionItems(missionItems);
 }
 
 /**
@@ -4516,25 +4733,34 @@ void AreaPlanEditor::uploadPerDroneMissionToVehicle(int droneIndex, QObject* veh
  */
 void AreaPlanEditor::uploadToAllDrones()
 {
-    // Get all available vehicles
-    QVariantList vehicles = getAvailableVehicles();
-    if (vehicles.isEmpty()) {
-        handleError("No vehicles available", "Connect vehicles before uploading");
-        return;
-    }
-    
-    // Upload missions to each vehicle
-    for (int droneIndex = 0; droneIndex < _droneCount && droneIndex < vehicles.size(); ++droneIndex) {
-        QObject* vehicleObject = vehicles[droneIndex].value<QObject*>();
-        if (vehicleObject) {
-            // Upload with a small delay to avoid overwhelming the system
-            QTimer::singleShot(droneIndex * 1000, this, [this, droneIndex, vehicleObject]() {
-                uploadPerDroneMissionToVehicle(droneIndex, vehicleObject);
-            });
-        }
-    }
-    
-    updateStatus(QString("Uploading missions to %1 drones...").arg(qMin(_droneCount, vehicles.size())));
+	if (!hasDrawing()) { updateStatus("Cannot upload: drawing not present"); return; }
+	// Ensure Mission tab reflects current split missions: if empty, auto-generate per-drone plan
+	if (MissionController* mc = getMissionController()) {
+		if (mc->visualItems() && mc->visualItems()->count() <= 1) {
+			// Mission has only MissionSettings; populate per-drone sequences for operator visibility
+			addAllDronesToMission();
+		}
+	}
+
+	// Get all available vehicles
+	QVariantList vehicles = getAvailableVehicles();
+	if (vehicles.isEmpty()) {
+		handleError("No vehicles available", "Connect vehicles before uploading");
+		return;
+	}
+	
+	// Upload missions to each vehicle
+	for (int droneIndex = 0; droneIndex < _droneCount && droneIndex < vehicles.size(); ++droneIndex) {
+		QObject* vehicleObject = vehicles[droneIndex].value<QObject*>();
+		if (vehicleObject) {
+			// Upload with a small delay to avoid overwhelming the system
+			QTimer::singleShot(droneIndex * 1000, this, [this, droneIndex, vehicleObject]() {
+				uploadPerDroneMissionToVehicle(droneIndex, vehicleObject);
+			});
+		}
+	}
+	
+	updateStatus(QString("Uploading missions to %1 drones...").arg(qMin(_droneCount, vehicles.size())));
 }
 
 /**
@@ -4702,17 +4928,36 @@ void AreaPlanEditor::takeoffVehicle(QObject* vehicleObject, qreal altitude)
  */
 void AreaPlanEditor::landVehicle(QObject* vehicleObject)
 {
-    Vehicle* v = qobject_cast<Vehicle*>(vehicleObject);
-    if (!v) { handleError("Invalid vehicle object", QString()); return; }
-    
-    // Use guided landing if supported, similar to FlyView logic
-    if (v->guidedModeSupported()) {
-        v->guidedModeLand();
-        updateStatus(QString("Vehicle %1 guided landing requested").arg(v->id()));
-    } else {
-        // Fallback: try to set flight mode to Land
-        updateStatus(QString("Vehicle %1 landing not supported in guided mode").arg(v->id()));
-    }
+	Vehicle* v = qobject_cast<Vehicle*>(vehicleObject);
+	if (!v) { handleError("Invalid vehicle object", QString()); return; }
+	
+	// Use guided landing if supported, similar to FlyView logic
+	if (v->guidedModeSupported()) {
+		v->guidedModeLand();
+		updateStatus(QString("Vehicle %1 guided landing requested").arg(v->id()));
+	} else {
+		// Fallback: try to set flight mode to Land
+		updateStatus(QString("Vehicle %1 landing not supported in guided mode").arg(v->id()));
+	}
+
+	// After landing completes, switch to STABILIZE once (ArduPilot). Use a one-shot connection to flyingChanged.
+	auto conn = QSharedPointer<QMetaObject::Connection>::create();
+	*conn = QObject::connect(v, &Vehicle::flyingChanged, this, [this, v, conn](bool flying){
+		if (!flying) {
+			QString desired = QStringLiteral("STABILIZE");
+			QVariant modesVar = v->property("flightModes");
+			if (modesVar.isValid()) {
+				const QStringList modes = modesVar.toStringList();
+				for (const QString& m : modes) { if (m.compare("STABILIZE", Qt::CaseInsensitive) == 0) { desired = m; break; } }
+				if (desired == "STABILIZE") {
+					for (const QString& m2 : modes) { if (m2.contains("Stabilize", Qt::CaseInsensitive)) { desired = m2; break; } }
+				}
+			}
+			v->setFlightMode(desired);
+			updateStatus(QString("Vehicle %1 set to %2 after landing").arg(v->id()).arg(desired));
+			QObject::disconnect(*conn);
+		}
+	}, Qt::QueuedConnection);
 }
 
 /**
@@ -4762,12 +5007,31 @@ void AreaPlanEditor::landVehicle(QObject* vehicleObject)
  */
 void AreaPlanEditor::startMissionOnVehicle(QObject* vehicleObject)
 {
-    Vehicle* v = qobject_cast<Vehicle*>(vehicleObject);
-    if (!v) { handleError("Invalid vehicle object", QString()); return; }
-    
-    // Use the proper Vehicle method directly
-    v->startMission();
-    updateStatus(QString("Vehicle %1 mission start requested").arg(v->id()));
+	Vehicle* v = qobject_cast<Vehicle*>(vehicleObject);
+	if (!v) { handleError("Invalid vehicle object", QString()); return; }
+	
+	// Use the proper Vehicle method directly
+	v->startMission();
+	updateStatus(QString("Vehicle %1 mission start requested").arg(v->id()));
+
+	// Switch to STABILIZE when mission ends and vehicle touches down
+	auto conn = QSharedPointer<QMetaObject::Connection>::create();
+	*conn = QObject::connect(v, &Vehicle::flyingChanged, this, [this, v, conn](bool flying){
+		if (!flying) {
+			QString desired = QStringLiteral("STABILIZE");
+			QVariant modesVar = v->property("flightModes");
+			if (modesVar.isValid()) {
+				const QStringList modes = modesVar.toStringList();
+				for (const QString& m : modes) { if (m.compare("STABILIZE", Qt::CaseInsensitive) == 0) { desired = m; break; } }
+				if (desired == "STABILIZE") {
+					for (const QString& m2 : modes) { if (m2.contains("Stabilize", Qt::CaseInsensitive)) { desired = m2; break; } }
+				}
+			}
+			v->setFlightMode(desired);
+			updateStatus(QString("Vehicle %1 set to %2 after landing").arg(v->id()).arg(desired));
+			QObject::disconnect(*conn);
+		}
+	}, Qt::QueuedConnection);
 }
 
 /**
@@ -6128,4 +6392,59 @@ void AreaPlanEditor::saveMissionToFile(const QList<MissionItem*>& missionItems, 
            << QString::number(c.altitude(), 'f', 2) << "\n";
     }
     f.close();
+}
+
+static QVariantMap serializeMissionItem(const MissionItem* mi)
+{
+	QVariantMap m;
+	if (!mi) return m;
+	m["cmd"] = mi->command();
+	m["frame"] = mi->frame();
+	m["p1"] = mi->param1();
+	m["p2"] = mi->param2();
+	m["p3"] = mi->param3();
+	m["p4"] = mi->param4();
+	const QGeoCoordinate c = mi->coordinate();
+	m["lat"] = c.latitude();
+	m["lon"] = c.longitude();
+	m["alt"] = c.altitude();
+	return m;
+}
+
+QVariantList AreaPlanEditor::getStoredMissionForDrone(int droneIndex) const
+{
+	return _storedPerDroneMissions.value(droneIndex);
+}
+
+void AreaPlanEditor::clearStoredMissionForDrone(int droneIndex)
+{
+	if (_storedPerDroneMissions.remove(droneIndex) > 0) {
+		emit storedMissionChanged(droneIndex);
+	}
+}
+
+void AreaPlanEditor::clearAllStoredMissions()
+{
+	_storedPerDroneMissions.clear();
+	// Emit change for known indices (optional: emit for -1 as wildcard)
+	for (int i = 0; i < _droneCount; ++i) emit storedMissionChanged(i);
+}
+
+void AreaPlanEditor::setDrawingPresent(bool present)
+{
+	if (_drawingPresent == present) return;
+	_drawingPresent = present;
+	emit drawingPresentChanged(present);
+}
+
+bool AreaPlanEditor::hasDrawing() const
+{
+	// If UI explicitly set drawing flag, trust it
+	if (_drawingPresent) return true;
+	// Fallback heuristic: valid center and positive dimensions and at least one computed stripe
+	if (_areaCenter.isValid() && _areaWidth > 0 && _areaHeight > 0 && _lineSpacing > 0 && _numPoints > 0) {
+		const int lineCount = qMax(1, static_cast<int>(qFloor(_areaHeight / _lineSpacing)));
+		return lineCount >= 1;
+	}
+	return false;
 }

@@ -19,6 +19,9 @@
 #include "JsonHelper.h"
 #include "QGCVideoStreamInfo.h"
 
+#include <QtQml/QQmlEngine>
+#include <QtQml/QQmlContext>
+
 #include <QtCore/QFile>
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>

@@ -147,7 +147,7 @@ set_target_properties(${CMAKE_PROJECT_NAME}
         OUTPUT_NAME ${CMAKE_PROJECT_NAME}
 )
 
-target_precompile_headers(${CMAKE_PROJECT_NAME} PRIVATE pch.h)
+# target_precompile_headers(${CMAKE_PROJECT_NAME} PRIVATE pch.h)
 
 if(QGC_CUSTOM_BUILD)
     find_package(Qt6 REQUIRED COMPONENTS ${CUSTOM_QT_COMPONENTS})

@@ -1682,10 +1682,8 @@ var err = _safeValidate("numPoints", parseInt(text))
 							width: parent.width
                             height: _h * 2.2
 							onClicked: {
-								if (areaPlanEditor) {
-									console.log("Generate Mission button clicked")
-									areaPlanEditor.addWaypointsToMission()
-								}
+								console.log("Generate Mission button clicked")
+								areaPlanEditor.addAllDronesToMission()
 							}
 						}
 
@@ -1908,21 +1906,18 @@ var err = _safeValidate("numPoints", parseInt(text))
                                     sequence: "A"
                                     context: Qt.ApplicationShortcut
                                     onActivated: {
-                                        // Determine desired state: if any mapped vehicle is not armed, arm all; otherwise disarm all
+                                        var planned = areaPlanEditor ? areaPlanEditor.droneCount : 0
                                         var anyUnarmed = false
-                                        for (var i = 0; i < waypointPreview.length; i++) {
-                                            var d = waypointPreview[i]
-                                            var veh = vehicleMapping[d.droneIndex]
-                                            if (veh && !Boolean(veh.armed)) { anyUnarmed = true; break }
+                                        for (var i = 0; i < planned; i++) {
+                                            var veh0 = vehicleMapping[i]
+                                            if (veh0 && !Boolean(veh0.armed)) { anyUnarmed = true; break }
                                         }
-                                        var doArm = anyUnarmed
-                                        perDroneMapColumn.confirmAndRun(doArm ? qsTr("ARM all mapped vehicles?") : qsTr("DISARM all mapped vehicles?"), function(){
-                                            for (var j = 0; j < waypointPreview.length; j++) {
-                                                var dj = waypointPreview[j]
-                                                var v = vehicleMapping[dj.droneIndex]
-                                                if (v && areaPlanEditor) areaPlanEditor.armVehicle(v, doArm)
+                                        _root.confirmAndRunGlobal(anyUnarmed ? qsTr("ARM all mapped vehicles?") : qsTr("DISARM all mapped vehicles?"), function(){
+                                            for (var j = 0; j < planned; j++) {
+                                                var v = vehicleMapping[j]
+                                                if (v && areaPlanEditor) areaPlanEditor.armVehicle(v, anyUnarmed)
                                             }
-                                            if (areaPlanEditor) areaPlanEditor.updateStatus(doArm ? qsTr("Armed all mapped vehicles") : qsTr("Disarmed all mapped vehicles"))
+                                            if (areaPlanEditor) areaPlanEditor.updateStatus(anyUnarmed ? qsTr("Armed all mapped vehicles") : qsTr("Disarmed all mapped vehicles"))
                                         })
                                     }
                                 }
@@ -1972,19 +1967,55 @@ var err = _safeValidate("numPoints", parseInt(text))
                                             var planned = areaPlanEditor ? areaPlanEditor.droneCount : 0
                                             var requested = 0
                                             var skipped = 0
+
+                                            function pickStabilizeLikeMode(veh) {
+                                                // Prefer explicit stabilizeFlightMode if provided by backend
+                                                if (veh.stabilizeFlightMode !== undefined && veh.stabilizeFlightMode)
+                                                    return veh.stabilizeFlightMode
+                                                // Search reported flight modes case-insensitively
+                                                var modes = veh.flightModes || []
+                                                var best = undefined
+                                                for (var mi = 0; mi < modes.length; mi++) {
+                                                    var m = modes[mi]
+                                                    var ml = (m + "").toLowerCase()
+                                                    if (ml.indexOf("stabilize") >= 0) { best = m; break }
+                                                }
+                                                if (best !== undefined) return best
+                                                for (var mj = 0; mj < modes.length; mj++) {
+                                                    var n = modes[mj]
+                                                    var nl = (n + "").toLowerCase()
+                                                    if (nl.indexOf("althold") >= 0 || (nl.indexOf("alt") >= 0 && nl.indexOf("hold") >= 0)) { best = n; break }
+                                                }
+                                                if (best !== undefined) return best
+                                                for (var mk = 0; mk < modes.length; mk++) {
+                                                    var p = modes[mk]
+                                                    var pl = (p + "").toLowerCase()
+                                                    if (pl.indexOf("loiter") >= 0) { best = p; break }
+                                                }
+                                                if (best !== undefined) return best
+                                                for (var mm = 0; mm < modes.length; mm++) {
+                                                    var q = modes[mm]
+                                                    var ql = (q + "").toLowerCase()
+                                                    if (ql.indexOf("poshold") >= 0 || (ql.indexOf("position") >= 0 && ql.indexOf("hold") >= 0)) { best = q; break }
+                                                }
+                                                return best !== undefined ? best : "STABILIZE"
+                                            }
+
                                             for (var i = 0; i < planned; i++) {
                                                 var veh = vehicleMapping[i]
                                                 if (veh) {
                                                     var canSet = true
-                                                    if (veh.flightModeSetAvailable) {
-                                                        try { canSet = veh.flightModeSetAvailable() } catch (e) { canSet = true }
+                                                    // Some firmwares expose this as a property (bool) not a function; handle both
+                                                    try {
+                                                        if (veh.flightModeSetAvailable !== undefined) {
+                                                            if (typeof veh.flightModeSetAvailable === "function") canSet = veh.flightModeSetAvailable()
+                                                            else canSet = Boolean(veh.flightModeSetAvailable)
+                                                        }
+                                                    } catch (e) {
+                                                        canSet = true
                                                     }
                                                     if (canSet) {
-                                                        var mode = undefined
-                                                        if (veh.stabilizeFlightMode !== undefined && veh.stabilizeFlightMode) mode = veh.stabilizeFlightMode
-                                                        else if (veh.flightModes && veh.flightModes.indexOf && veh.flightModes.indexOf("STABILIZE") >= 0) mode = "STABILIZE"
-                                                        else if (veh.flightModes && veh.flightModes.indexOf && veh.flightModes.indexOf("Stabilize") >= 0) mode = "Stabilize"
-                                                        else mode = "STABILIZE"
+                                                        var mode = pickStabilizeLikeMode(veh)
                                                         try { veh.setFlightMode(mode); requested++ } catch (e2) { skipped++ }
                                                     } else {
                                                         skipped++
@@ -2022,6 +2053,15 @@ var err = _safeValidate("numPoints", parseInt(text))
                                                 }
                                             }
                                             if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Start requested: %1, skipped: %2 (not armed, unmapped, or not written)").arg(started).arg(skipped))
+                                        })
+                                    }
+                                }
+                                Shortcut {
+                                    sequence: "C"
+                                    context: Qt.ApplicationShortcut
+                                    onActivated: {
+                                        perDroneMapColumn.confirmAndRun(qsTr("CLEAR all missions from all vehicles and Mission tab?"), function(){
+                                            if (areaPlanEditor) areaPlanEditor.clearAllMissions()
                                         })
                                     }
                                 }
@@ -2422,7 +2462,6 @@ var err = _safeValidate("numPoints", parseInt(text))
                                                 ToolTip.visible: hovered && !enabled
                                                 ToolTip.text: {
                                                     var veh = vehicleMapping[modelData.droneIndex]
-                                                    if (!veh) return qsTr("No vehicle mapped")
                                                     if (uploadedMap[modelData.droneIndex] === true) return qsTr("Takeoff is part of the mission plan")
                                                     if (!Boolean(veh.armed)) return qsTr("Vehicle not armed")
                                                     if (veh.flying === true) return qsTr("Already flying")
@@ -2880,5 +2919,83 @@ var err = _safeValidate("numPoints", parseInt(text))
 	// 			}
 	// 		}
 	// 	}
+	}
+
+	// Global confirmation dialog and pending action
+	property var _globalPendingAction: null
+	Dialog {
+		id: globalConfirmDialog
+		modal: true
+		title: qsTr("Confirm Action")
+		standardButtons: Dialog.Ok | Dialog.Cancel
+		onAccepted: { if (_root._globalPendingAction) { _root._globalPendingAction(); _root._globalPendingAction = null } }
+		onRejected: { _root._globalPendingAction = null }
+		contentItem: Column {
+			padding: ScreenTools.defaultFontPixelHeight * 0.5
+			spacing: ScreenTools.defaultFontPixelHeight * 0.5
+			QGCLabel { id: globalConfirmText; wrapMode: Text.WordWrap }
+		}
+	}
+	function confirmAndRunGlobal(msg, fn) {
+		globalConfirmText.text = msg
+		_root._globalPendingAction = fn
+		globalConfirmDialog.open()
+	}
+
+	// Global keyboard shortcuts (A,T,L,S,M,C)
+	Shortcut {
+		sequence: "A"
+		context: Qt.ApplicationShortcut
+		onActivated: {
+			var planned = areaPlanEditor ? areaPlanEditor.droneCount : 0
+			var anyUnarmed = false
+			for (var i = 0; i < planned; i++) {
+				var veh0 = vehicleMapping[i]
+				if (veh0 && !Boolean(veh0.armed)) { anyUnarmed = true; break }
+			}
+			_root.confirmAndRunGlobal(anyUnarmed ? qsTr("ARM all mapped vehicles?") : qsTr("DISARM all mapped vehicles?"), function(){
+				for (var j = 0; j < planned; j++) {
+					var v = vehicleMapping[j]
+					if (v && areaPlanEditor) areaPlanEditor.armVehicle(v, anyUnarmed)
+				}
+				if (areaPlanEditor) areaPlanEditor.updateStatus(anyUnarmed ? qsTr("Armed all mapped vehicles") : qsTr("Disarmed all mapped vehicles"))
+			})
+		}
+	}
+	Shortcut {
+		sequence: "T"
+		context: Qt.ApplicationShortcut
+		onActivated: {
+			_root.confirmAndRunGlobal(qsTr("TAKEOFF all mapped vehicles?"), function(){
+				var requested = 0, skipped = 0
+				if (waypointPreview) {
+					for (var i = 0; i < waypointPreview.length; i++) {
+						var d = waypointPreview[i]; var veh = vehicleMapping[d.droneIndex]
+						if (veh && Boolean(veh.armed) === true) { if (areaPlanEditor) areaPlanEditor.takeoffVehicle(veh, areaPlanEditor ? areaPlanEditor.takeoffHeight : 3); requested++ } else { skipped++ }
+					}
+				}
+				if (areaPlanEditor) areaPlanEditor.updateStatus(skipped > 0 ? qsTr("Requested takeoff for %1; skipped %2 (not armed/unmapped)").arg(requested).arg(skipped) : qsTr("Requested takeoff for all mapped vehicles"))
+			})
+		}
+	}
+	Shortcut {
+		sequence: "L"
+		context: Qt.ApplicationShortcut
+		onActivated: { _root.confirmAndRunGlobal(qsTr("LAND all mapped vehicles?"), function(){ if (waypointPreview) { for (var i = 0; i < waypointPreview.length; i++) { var d = waypointPreview[i]; var v = vehicleMapping[d.droneIndex]; if (v && areaPlanEditor) areaPlanEditor.landVehicle(v) } } if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Requested land for all mapped vehicles")) }) }
+	}
+	Shortcut {
+		sequence: "S"
+		context: Qt.ApplicationShortcut
+		onActivated: { _root.confirmAndRunGlobal(qsTr("Set STABILIZE for all mapped?"), function(){ var planned = areaPlanEditor ? areaPlanEditor.droneCount : 0; var requested = 0, skipped = 0; function pickMode(veh){ if (veh.stabilizeFlightMode) return veh.stabilizeFlightMode; var modes = veh.flightModes || []; for (var i=0;i<modes.length;i++){ var ml=(modes[i]+"").toLowerCase(); if (ml.indexOf("stabilize")>=0) return modes[i] } for (var j=0;j<modes.length;j++){ var nl=(modes[j]+"").toLowerCase(); if (nl.indexOf("althold")>=0 || (nl.indexOf("alt")>=0 && nl.indexOf("hold")>=0)) return modes[j] } for (var k=0;k<modes.length;k++){ var pl=(modes[k]+"").toLowerCase(); if (pl.indexOf("loiter")>=0) return modes[k] } for (var m=0;m<modes.length;m++){ var ql=(modes[m]+"").toLowerCase(); if (ql.indexOf("poshold")>=0 || (ql.indexOf("position")>=0 && ql.indexOf("hold")>=0)) return modes[m] } return "STABILIZE" } for (var x=0;x<planned;x++){ var veh = vehicleMapping[x]; if (veh){ var canSet=true; try{ if (veh.flightModeSetAvailable!==undefined){ if (typeof veh.flightModeSetAvailable==="function") canSet=veh.flightModeSetAvailable(); else canSet=Boolean(veh.flightModeSetAvailable) } }catch(e){ canSet=true } if (canSet){ try{ veh.setFlightMode(pickMode(veh)); requested++ }catch(e2){ skipped++ } } else { skipped++ } } else { skipped++ } } if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Stabilize requested: %1, skipped: %2").arg(requested).arg(skipped)) }) }
+	}
+	Shortcut {
+		sequence: "M"
+		context: Qt.ApplicationShortcut
+		onActivated: { _root.confirmAndRunGlobal(qsTr("Start missions on all mapped vehicles?"), function(){ var started=0, skipped=0; if (waypointPreview){ for (var i=0;i<waypointPreview.length;i++){ var d=waypointPreview[i]; var veh=vehicleMapping[d.droneIndex]; if (veh){ var can=Boolean(veh.armed) && uploadedMap[d.droneIndex]===true; if (can){ var t=Qt.createQmlObject('import QtQuick 2.15; Timer { property var _veh; interval: 0; repeat: false; }', _root, 'StartTimer'); t._veh=veh; t.triggered.connect(function(){ if (areaPlanEditor) areaPlanEditor.startMissionOnVehicle(t._veh); t.destroy() }); t.start(); started++ } else { skipped++ } } else { skipped++ } } } if (areaPlanEditor) areaPlanEditor.updateStatus(qsTr("Start requested: %1, skipped: %2 (not armed, unmapped, or not written)").arg(started).arg(skipped)) }) }
+	}
+	Shortcut {
+		sequence: "C"
+		context: Qt.ApplicationShortcut
+		onActivated: { _root.confirmAndRunGlobal(qsTr("CLEAR all missions from all vehicles and Mission tab?"), function(){ if (areaPlanEditor) areaPlanEditor.clearAllMissions() }) }
 	}
 }

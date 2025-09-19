@@ -1,10 +1,5 @@
 #pragma once
 
-#include <functional>
-#include <memory>
-#include <string>
-#include <vector>
-
 #include <QtCore/QDebug>
 #include <QtCore/QList>
 #include <QtCore/QMap>
@@ -21,6 +16,10 @@
 #include <QtGui/QImage>
 #include <QtGui/QPainter>
 #include <QtGui/QTransform>
+
+#include <QtQml/QQmlEngine>
+#include <QtQml/QQmlContext>
+#include <QtQml/QQmlComponent>
 
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkReply>

@@ -184,6 +184,17 @@ public:
     Q_INVOKABLE QVariantMap getVehicleStatus(QObject* vehicleObject) const;
     // Insert helper commands
     void insertGripperRelease(MissionController* mission, const QGeoCoordinate& atCoord);
+
+    // Drawing state (to enable/disable generation from UI)
+    Q_INVOKABLE void setDrawingPresent(bool present);
+    Q_INVOKABLE bool isDrawingPresent() const { return _drawingPresent; }
+    Q_INVOKABLE bool hasDrawing() const;
+    Q_INVOKABLE bool canGenerateMissionNow() const { return hasDrawing(); }
+
+    // Per-drone mission memory (serialized mission entries per drone)
+    Q_INVOKABLE QVariantList getStoredMissionForDrone(int droneIndex) const;
+    Q_INVOKABLE void clearStoredMissionForDrone(int droneIndex);
+    Q_INVOKABLE void clearAllStoredMissions();
     
     // Mission upload helper methods
     Q_INVOKABLE Vehicle* getCurrentVehicle() const;
@@ -220,10 +231,13 @@ public:
     // Swarm status getters
     bool isSwarmReady() const;
     QString swarmStatus() const;
+    void setSwarmStatus(const QString& status);
     bool isCoordinatedMissionActive() const;
     FormationType currentFormation() const;
     qreal formationSpacing() const { return _formationSpacing; }
     void setFormationSpacing(qreal spacing);
+    QList<QPointF> formationPositions() const { return _formationPositions; }
+    FormationType formationType() const { return _formationType; }
     bool isFormationTransitioning() const;
     
 private:
@@ -247,7 +261,9 @@ private:
     
     // Formation state
     FormationType _currentFormation = NoFormation;
+    FormationType _formationType = NoFormation;
     qreal _formationSpacing = 5.0;  // meters
+    QList<QPointF> _formationPositions;  // Formation positions for each drone
     bool _isFormationTransitioning = false;
     Vehicle* _leaderVehicle = nullptr;
     QMap<int, QGeoCoordinate> _formationOffsets;  // Maps vehicle ID to formation position offset
@@ -307,6 +323,7 @@ signals:
     void loiterTimeChanged();
     void statusChanged(const QString& message);
     void validationErrorChanged();
+    void errorOccurred(const QString& errorMessage, const QString& recoverySuggestion);
     void isProcessingChanged();
     void progressValueChanged();
     void progressMessageChanged();
@@ -323,11 +340,17 @@ signals:
     
     // Formation signals
     void formationChanged();
+    void formationTypeChanged();
     void formationSpacingChanged();
     void formationTransitioningChanged();
     void formationRolesChanged();
     void leaderVehicleChanged();
     void formationPositionsChanged();
+    
+    // Per-drone mission memory updates
+    void storedMissionChanged(int droneIndex);
+    // Drawing state
+    void drawingPresentChanged(bool present);
     
     // Swarm configuration signals
     void isValidChanged();
@@ -348,14 +371,14 @@ signals:
 private:
 
     // Default values
-    static constexpr qreal _defaultAreaWidth = 10.0;   // Changed from 100.0 to 10.0
-    static constexpr qreal _defaultAreaHeight = 10.0;  // Changed from 100.0 to 10.0
-    static constexpr qreal _defaultLineSpacing = 1.0; // per defaults UI
+    static constexpr qreal _defaultAreaWidth = 20.0;   // default area width (meters)
+    static constexpr qreal _defaultAreaHeight = 20.0;  // default area height (meters)
+    static constexpr qreal _defaultLineSpacing = 2.0;  // default line spacing (meters)
     static constexpr int _defaultNumPoints = 1;
     static constexpr qreal _defaultAltitude = 5.0;
     static constexpr int   _defaultDroneCount = 3;
-    static constexpr qreal _defaultAltitudeBandStart = 2.0;
-    static constexpr qreal _defaultAltitudeBandStep  = 2.0;
+    static constexpr qreal _defaultAltitudeBandStart = 3.0; // meters
+    static constexpr qreal _defaultAltitudeBandStep  = 3.0;
     static constexpr qreal _defaultTimeOffsetPerDrone = 2.0; // seconds
     static constexpr qreal _defaultPerTargetSeparationS = 60.0; // seconds
 
@@ -399,7 +422,7 @@ private:
     qreal _altitudeBandStep = _defaultAltitudeBandStep;
     qreal _timeOffsetPerDrone = _defaultTimeOffsetPerDrone;
     qreal _perTargetSeparationS = _defaultPerTargetSeparationS;
-    bool  _rtlAfterEveryWaypoint = false;
+    bool  _rtlAfterEveryWaypoint = true;
     bool  _loiterAfterRtl = false;
     QString _validationError;
     
@@ -415,4 +438,10 @@ private:
     qreal _homeTurnaroundWaitS = 30.0;     // default 30s wait at home between trips
     bool  _payloadReleaseEnabled = false;  // default disabled
     qreal _takeoffHeight = 5.0;            // default takeoff height in meters
+
+    // Serialized per-drone mission memory: droneIndex -> [ {cmd,lat,lon,alt,p1,p2,p3,p4} ]
+    QMap<int, QVariantList> _storedPerDroneMissions;
+
+    // Drawing availability (set from QML when user has created lines/points)
+    bool _drawingPresent = false;
 };
