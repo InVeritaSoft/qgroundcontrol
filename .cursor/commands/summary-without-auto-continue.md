@@ -1,0 +1,1 @@
+Provide a concise summary of the current task or code context, but do not include or trigger any automatic continuation actions.

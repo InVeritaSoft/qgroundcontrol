@@ -23,6 +23,7 @@ class ADSBVehicleManager;
 class FactGroup;
 class LinkManager;
 class MissionCommandTree;
+class MissionService;
 class MultiVehicleManager;
 class QGCCorePlugin;
 class QGCMapEngineManager;
@@ -73,6 +74,7 @@ public:
 
     Q_PROPERTY(QString              appName                 READ    appName                 CONSTANT)
     Q_PROPERTY(LinkManager*         linkManager             READ    linkManager             CONSTANT)
+    Q_PROPERTY(MissionService*      missionService          READ    missionService          CONSTANT)
     Q_PROPERTY(MultiVehicleManager* multiVehicleManager     READ    multiVehicleManager     CONSTANT)
     Q_PROPERTY(QGCMapEngineManager* mapEngineManager        READ    mapEngineManager        CONSTANT)
     Q_PROPERTY(QGCPositionManager*  qgcPositionManger       READ    qgcPositionManger       CONSTANT)
@@ -165,6 +167,7 @@ public:
 
     static QString appName();
     LinkManager*            linkManager         ()  { return _linkManager; }
+    MissionService*         missionService      ()  { return _missionService; }
     MultiVehicleManager*    multiVehicleManager ()  { return _multiVehicleManager; }
     QGCMapEngineManager*    mapEngineManager    ()  { return _mapEngineManager; }
     QGCPositionManager*     qgcPositionManger   ()  { return _qgcPositionManager; }
@@ -250,6 +253,7 @@ private:
     MissionCommandTree*     _missionCommandTree     = nullptr;
     VideoManager*           _videoManager           = nullptr;
     LinkManager*            _linkManager            = nullptr;
+    MissionService*         _missionService         = nullptr;
     MultiVehicleManager*    _multiVehicleManager    = nullptr;
     SettingsManager*        _settingsManager        = nullptr;
     QGCCorePlugin*          _corePlugin             = nullptr;

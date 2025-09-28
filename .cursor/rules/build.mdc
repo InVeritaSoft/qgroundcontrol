@@ -1,0 +1,13 @@
+---
+description: Build operations are always executed on the USER's machine for security and control
+globs: **/*
+alwaysApply: true
+---
+- **Build operations are always executed on the USER's machine for security and control**
+- **NEVER run build commands automatically** - never
+- **Provide build instructions** instead of executing builds
+- **Analyze build logs** that users provide, don't generate them
+- **Focus on code modifications** and let users handle compilation
+- **Only suggest build commands** when explicitly asked
+- **Respect user preference** for manual build control
+- **Focus on code** keep focus on implementation over build check

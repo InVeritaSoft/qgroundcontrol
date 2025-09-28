@@ -102,6 +102,7 @@ qt_add_qml_module(QGroundControlControlsModule
         MAVLinkChart.qml
         MAVLinkMessageButton.qml
         MissionCommandDialog.qml
+        MissionGeneratorDialogue.qml
         MissionItemIndexLabel.qml
         MvPanelPage.qml
         OfflineMapButton.qml

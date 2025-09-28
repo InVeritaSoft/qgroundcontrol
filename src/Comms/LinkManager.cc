@@ -33,12 +33,13 @@
 #include "GPSRtk.h"
 #endif
 
-#ifdef QT_DEBUG
-#include "MockLink.h"
-#endif
-
 #ifndef QGC_AIRLINK_DISABLED
 #include "AirLinkLink.h"
+#endif
+
+#ifdef QT_DEBUG
+#include "MockLink/MockLink.h"
+#include "MockLink/MockConfiguration.h"
 #endif
 
 #ifdef QGC_ZEROCONF_ENABLED

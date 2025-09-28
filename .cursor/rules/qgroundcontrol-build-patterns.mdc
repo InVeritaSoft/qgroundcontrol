@@ -1,0 +1,54 @@
+---
+globs: CMakeLists.txt,*.cmake
+description: Build configuration patterns for QGroundControl custom modules
+---
+
+# QGroundControl Build Configuration
+
+## Custom Module Structure
+- Place custom modules in `src/Custom/` directory
+- Create separate CMakeLists.txt for each module
+- Include all source files in `target_sources()`
+- Add include directories with `target_include_directories()`
+
+## Qt Module Linking
+```cmake
+# Link required Qt modules
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
+    Qt6::Positioning
+    Qt6::Core
+    Qt6::Qml
+)
+```
+
+## Include Directory Patterns
+```cmake
+target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/..  # Add src directory to include path
+)
+```
+
+## Source File Organization
+```cmake
+target_sources(${CMAKE_PROJECT_NAME}
+    PRIVATE
+        MissionGenerator/MissionService.cc
+        MissionGenerator/MissionService.h
+        MissionGenerator/PtahMissionGenerator.cc
+        MissionGenerator/PtahMissionGenerator.h
+        MissionGenerator/MissionUploadService.cc
+        MissionGenerator/MissionUploadService.h
+)
+```
+
+## Common Build Issues
+- **Algorithm Header**: Avoid `<algorithm>` includes, use Qt alternatives
+- **Qt Positioning**: Always link `Qt6::Positioning` for coordinate operations
+- **QML Types**: Ensure QML_ELEMENT is used for QML type registration
+- **Dependencies**: Check that all required Qt modules are linked
+
+## Build Commands
+- **Debug Build**: `cmake --build build/qt6-Windows --target QGroundControl --config Debug`
+- **Release Build**: `cmake --build build/qt6-Windows --target QGroundControl --config Release`
+- **Clean Build**: Delete build directory and reconfigure

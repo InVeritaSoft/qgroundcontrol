@@ -24,12 +24,13 @@
 #include "VideoManager.h"
 #include "MultiVehicleManager.h"
 #include "QGCLoggingCategory.h"
+#include "Custom/MissionGenerator/MissionService.h"
 #ifndef QGC_NO_SERIAL_LINK
 #include "GPSManager.h"
 #include "GPSRtk.h"
 #endif
 #ifdef QT_DEBUG
-#include "MockLink.h"
+#include "MockLink/MockLink.h"
 #endif
 #ifndef QGC_AIRLINK_DISABLED
 #include "AirLinkManager.h"
@@ -54,6 +55,7 @@ QGroundControlQmlGlobal::QGroundControlQmlGlobal(QObject *parent)
     , _missionCommandTree(MissionCommandTree::instance())
     , _videoManager(VideoManager::instance())
     , _linkManager(LinkManager::instance())
+    , _missionService(new MissionService(this))
     , _multiVehicleManager(MultiVehicleManager::instance())
     , _settingsManager(SettingsManager::instance())
     , _corePlugin(QGCCorePlugin::instance())

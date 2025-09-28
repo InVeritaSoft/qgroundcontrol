@@ -18,7 +18,7 @@
 #include "BluetoothLink.h"
 #endif
 #ifdef QT_DEBUG
-#include "MockLink.h"
+#include "MockLink/MockLink.h"
 #endif
 #ifndef QGC_AIRLINK_DISABLED
 #include "AirLinkLink.h"

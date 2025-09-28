@@ -1,0 +1,4 @@
+---
+alwaysApply: true
+---
+Ensure a comprehensive summary of the chat is provided once the conversation reaches or exceeds 50% completion, capturing key decisions, context, and rationale to facilitate continuity and future reference.

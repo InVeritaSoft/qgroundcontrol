@@ -1,0 +1,53 @@
+---
+globs: *MissionGenerator*,*MissionService*,*MissionUpload*
+description: Mission generation logic patterns and algorithms
+---
+
+# Mission Generation Logic Patterns
+
+## Waypoint Generation Algorithm
+- **Sequential Pattern**: Generate waypoints in order 1,2,3,4,5,6,7,8... (not zigzag)
+- **Reference Point**: Use vehicle position or calculated center point
+- **Bearing**: Use fixed bearing (e.g., 180° for North-South pattern)
+- **Distance**: Calculate based on gap and total distance parameters
+
+## Multi-Drone Distribution
+- **Filter Non-ID-1**: Exclude vehicle ID 1 from waypoint distribution
+- **Alternating Pattern**: 
+  - Drone 0 (ID 2): waypoints 1,3,5,7,9,11,13...
+  - Drone 1 (ID 3): waypoints 2,4,6,8,10,12...
+- **Altitude Separation**: 10m difference per drone (base + 0m, +10m, +20m...)
+
+## Special Mission for Drone ID 1
+- **Safe Observation Position**: Calculate northeast of mission area
+- **Safety Margin**: 1.5x mission area size for safe distance
+- **Altitude**: 20m higher than mission drones
+- **Mission Type**: Takeoff → Loiter (5 min) → Land
+
+## Coordinate Calculations
+```cpp
+// Calculate new coordinates from reference point
+QGeoCoordinate calculateNewCoordinates(const QGeoCoordinate& reference, 
+                                     double bearing, double distanceMeters);
+
+// Calculate mission area bounds
+double minLat = waypoints[0].latitude();
+double maxLat = waypoints[0].latitude();
+// ... find min/max for all waypoints
+
+// Calculate safe observation position
+double observerLat = maxLat + safeDistanceLat;
+double observerLng = maxLng + safeDistanceLng;
+```
+
+## Mission Upload Patterns
+- **Takeoff**: At vehicle's current position
+- **Waypoints**: Set altitude for each coordinate
+- **Land**: Return to starting position
+- **Loiter**: Use `MAV_CMD_NAV_LOITER_TIME` with duration parameter
+
+## Debugging Patterns
+- Use GenCall numbers for tracing execution flow
+- Log all waypoint coordinates with `toString()`
+- Log vehicle assignments and altitudes
+- Include mission area bounds in logs

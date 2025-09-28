@@ -1,0 +1,56 @@
+---
+globs: *.h,*.cc,*.cpp
+description: Qt and QGroundControl specific coding patterns and best practices
+---
+
+# Qt and QGroundControl Coding Patterns
+
+## Qt Includes and Dependencies
+- Use `#include <QtPositioning/QGeoCoordinate>` for coordinate operations
+- Include `#include <QtMath>` for mathematical functions
+- Avoid direct `<algorithm>` includes - use Qt alternatives or manual implementations
+- Link Qt modules in CMakeLists.txt: `Qt6::Positioning`, `Qt6::Core`
+
+## QObject and QML Integration
+- Inherit from `QObject` for classes used in QML
+- Use `Q_OBJECT` macro for signal/slot support
+- Add `QML_ELEMENT` for QML type registration
+- Use `Q_INVOKABLE` for methods called from QML
+
+## Signal/Slot Patterns
+```cpp
+// Declare signals in header
+signals:
+    void missionGenerationStarted();
+    void missionGenerationCompleted(bool success, const QString& message);
+
+// Connect in constructor or setup
+connect(service, &MissionService::missionGenerationCompleted, 
+        this, &SomeClass::onMissionCompleted);
+
+// Emit signals
+emit missionGenerationCompleted(true, "Mission generated successfully");
+```
+
+## QGeoCoordinate Operations
+- Always check `isValid()` before using coordinates
+- Use `QGeoCoordinate::distanceTo()` for distance calculations
+- Use `QGeoCoordinate::azimuthTo()` for bearing calculations
+- Set altitude with `setAltitude()` method
+
+## Memory Management
+- Use `QObject` parent-child relationships for automatic cleanup
+- Pass `QObject* parent` parameter to constructors
+- Let Qt handle deletion of child objects
+
+## Error Handling
+- Use `qCWarning` and `qCDebug` for logging
+- Check for null pointers before dereferencing
+- Return early on error conditions
+- Provide meaningful error messages
+
+## MAVLink Integration
+- Use `MAV_CMD_NAV_WAYPOINT` for waypoint commands
+- Use `MAV_CMD_NAV_LOITER_TIME` for loiter commands
+- Use `MAV_FRAME_GLOBAL_RELATIVE_ALT` for altitude frames
+- Create `MissionItem` objects with proper parameters

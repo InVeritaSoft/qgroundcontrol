@@ -1,5 +1,14 @@
-if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
-    return()
+# MockLink is only available in Debug builds
+if(CMAKE_CONFIGURATION_TYPES)
+    # Multi-config generator (like Visual Studio)
+    if(NOT "Debug" IN_LIST CMAKE_CONFIGURATION_TYPES)
+        return()
+    endif()
+else()
+    # Single-config generator
+    if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+        return()
+    endif()
 endif()
 
 target_sources(${CMAKE_PROJECT_NAME}

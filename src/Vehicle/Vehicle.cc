@@ -63,7 +63,7 @@
 #include "UTMSPManager.h"
 #endif
 #ifdef QT_DEBUG
-#include "MockLink.h"
+#include "MockLink/MockLink.h"
 #endif
 
 #include <QtCore/QDateTime>
