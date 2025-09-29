@@ -1,0 +1,113 @@
+---
+description: QGroundControl Takeoff Implementation Patterns
+---
+
+# QGroundControl Takeoff Implementation
+
+## Working Takeoff Pattern
+
+### Mission Structure
+```cpp
+// Item 0: Home position (deleted by system)
+MissionItem* homeItem = new MissionItem(0, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT, 
+                                       0, 0, 0, 0, homeLat, homeLng, 0, false, false, parent);
+
+// Item 1: Takeoff (first real mission item)
+MissionItem* takeoffItem = new MissionItem(1, MAV_CMD_NAV_TAKEOFF, MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                          0, 0, 0, 0, takeoffLat, takeoffLng, takeoffAlt, false, false, parent);
+
+// Item 2+: Waypoints
+MissionItem* waypointItem = new MissionItem(2, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                           0, 0, 0, 0, wpLat, wpLng, wpAlt, false, false, parent);
+
+// Item N: Land
+MissionItem* landItem = new MissionItem(n, MAV_CMD_NAV_LAND, MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                       0, 0, 0, 0, landLat, landLng, 0, false, false, parent);
+```
+
+### Complete Implementation Example
+```cpp
+void MissionUploadService::uploadMissionToVehicle(Vehicle* vehicle, const QList<QGeoCoordinate>& waypoints, int altitude)
+{
+    if (!vehicle || !vehicle->missionManager() || waypoints.isEmpty()) {
+        return;
+    }
+    
+    QGeoCoordinate droneCurrentPosition = vehicle->coordinate();
+    if (!droneCurrentPosition.isValid()) {
+        return;
+    }
+    
+    QList<MissionItem*> missionItems;
+    QObject* missionItemParent = vehicle;
+    
+    // 1. Home position (will be deleted by system)
+    QGeoCoordinate homeCoord = droneCurrentPosition;
+    homeCoord.setAltitude(0);
+    MissionItem* homeItem = new MissionItem(0, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT, 
+                                           0, 0, 0, 0, homeCoord.latitude(), homeCoord.longitude(), homeCoord.altitude(), 
+                                           false, false, missionItemParent);
+    missionItems.append(homeItem);
+    
+    // 2. Takeoff (first real mission item)
+    QGeoCoordinate takeoffCoord = droneCurrentPosition;
+    takeoffCoord.setAltitude(altitude);
+    MissionItem* takeoffItem = new MissionItem(1, MAV_CMD_NAV_TAKEOFF, MAV_FRAME_GLOBAL_RELATIVE_ALT, 
+                                              0, 0, 0, 0, takeoffCoord.latitude(), takeoffCoord.longitude(), takeoffCoord.altitude(), 
+                                              false, false, missionItemParent);
+    missionItems.append(takeoffItem);
+    
+    // 3. Waypoints
+    for (int i = 0; i < waypoints.size(); i++) {
+        QGeoCoordinate coord = waypoints[i];
+        coord.setAltitude(altitude);
+        MissionItem* waypointItem = new MissionItem(i + 2, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                                   0, 0, 0, 0, coord.latitude(), coord.longitude(), coord.altitude(), 
+                                                   false, false, missionItemParent);
+        missionItems.append(waypointItem);
+    }
+    
+    // 4. Land
+    QGeoCoordinate landCoord = droneCurrentPosition;
+    landCoord.setAltitude(0);
+    MissionItem* landItem = new MissionItem(waypoints.size() + 2, MAV_CMD_NAV_LAND, MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                           0, 0, 0, 0, landCoord.latitude(), landCoord.longitude(), landCoord.altitude(), 
+                                           false, false, missionItemParent);
+    missionItems.append(landItem);
+    
+    // 5. Upload
+    vehicle->missionManager()->writeMissionItems(missionItems);
+}
+```
+
+## Key Points
+
+### Why This Works
+- **Home position as item 0**: Gets deleted by QGroundControl's safety logic
+- **Takeoff as item 1**: Becomes the first real mission item sent to vehicle
+- **Sequential numbering**: Required for proper mission execution
+- **Proper coordinate storage**: Uses param5/6/7 for lat/lng/alt
+
+### Common Mistakes
+- ❌ Putting takeoff as first item (gets deleted)
+- ❌ Skipping home position (causes issues)
+- ❌ Wrong sequence numbering
+- ❌ Using setCoordinate() instead of constructor parameters
+
+### Debugging
+- Always log complete mission before upload
+- Verify takeoff appears as item 1 in logs
+- Check that home position is item 0 (will be deleted)
+- Confirm proper coordinate values in param5/6/7
+
+## Mission Types
+
+### Regular Mission
+- Home → Takeoff → Waypoints → Land
+- Used for standard flight missions
+
+### Loiter Mission  
+- Home → Takeoff → Loiter → Land
+- Used for observation/patrol missions
+
+### Both patterns follow the same structure with different middle items

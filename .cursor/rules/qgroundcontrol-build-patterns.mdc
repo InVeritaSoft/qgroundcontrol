@@ -1,54 +1,51 @@
 ---
-globs: CMakeLists.txt,*.cmake
+alwaysApply: true
 description: Build configuration patterns for QGroundControl custom modules
 ---
 
-# QGroundControl Build Configuration
+# QGroundControl Build Patterns
 
-## Custom Module Structure
-- Place custom modules in `src/Custom/` directory
-- Create separate CMakeLists.txt for each module
-- Include all source files in `target_sources()`
-- Add include directories with `target_include_directories()`
+## Build Operations
+- **Build operations are always executed on the USER's machine for security and control**
+- **NEVER run build commands automatically** - never
+- **Provide build instructions** instead of executing builds
+- **Analyze build logs** that users provide, don't generate them
+- **Focus on code modifications** and let users handle compilation
+- **Only suggest build commands** when explicitly asked
+- **Respect user preference** for manual build control
+- **Focus on code** keep focus on implementation over build check
 
-## Qt Module Linking
-```cmake
-# Link required Qt modules
-target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
-    Qt6::Positioning
-    Qt6::Core
-    Qt6::Qml
-)
-```
+## CMake Configuration
+- Custom modules in [src/Custom/CMakeLists.txt](mdc:src/Custom/CMakeLists.txt)
+- Link Qt6::Positioning and Qt6::Core for coordinate operations
+- Include all custom files in main CMakeLists.txt
 
-## Include Directory Patterns
-```cmake
-target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE 
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/..  # Add src directory to include path
-)
-```
+## Build Commands
+```bash
+# Navigate to project directory
+cd D:\WORK\INVERITA\qgroundcontrol
 
-## Source File Organization
-```cmake
-target_sources(${CMAKE_PROJECT_NAME}
-    PRIVATE
-        MissionGenerator/MissionService.cc
-        MissionGenerator/MissionService.h
-        MissionGenerator/PtahMissionGenerator.cc
-        MissionGenerator/PtahMissionGenerator.h
-        MissionGenerator/MissionUploadService.cc
-        MissionGenerator/MissionUploadService.h
-)
+# Build specific target
+cmake --build build\qt6-Windows --config Debug --target QGroundControl
+
+# Run application
+D:\WORK\INVERITA\qgroundcontrol\build\qt6-Windows\Debug\QGroundControl.exe
 ```
 
 ## Common Build Issues
-- **Algorithm Header**: Avoid `<algorithm>` includes, use Qt alternatives
-- **Qt Positioning**: Always link `Qt6::Positioning` for coordinate operations
-- **QML Types**: Ensure QML_ELEMENT is used for QML type registration
-- **Dependencies**: Check that all required Qt modules are linked
+- **C++ Compiler Issues**: `type_traits` not found - environment issue, not code issue
+- **QML Compilation**: Check import paths and module availability
+- **Linking Errors**: Verify CMakeLists.txt includes all dependencies
 
-## Build Commands
-- **Debug Build**: `cmake --build build/qt6-Windows --target QGroundControl --config Debug`
-- **Release Build**: `cmake --build build/qt6-Windows --target QGroundControl --config Release`
-- **Clean Build**: Delete build directory and reconfigure
+## Development Workflow
+1. **Code Changes**: Modify source files
+2. **Build Instructions**: Provide build commands to user
+3. **Error Analysis**: Analyze build logs provided by user
+4. **Fix Issues**: Address compilation errors in code
+5. **Test**: Let user run and test the application
+
+## File Organization
+- Keep custom modules in `src/Custom/`
+- Follow QGroundControl naming conventions
+- Use proper Qt6 patterns and includes
+- Maintain consistent code style

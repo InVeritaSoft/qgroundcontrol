@@ -1,0 +1,69 @@
+---
+globs: *.cc,*.h,*.qml
+description: QGroundControl Debugging and Logging Patterns
+---
+
+# QGroundControl Debugging and Logging
+
+## Logging Categories
+Define logging categories in each source file:
+```cpp
+QGC_LOGGING_CATEGORY(MissionServiceLog, "MissionServiceLog")
+QGC_LOGGING_CATEGORY(MissionUploadServiceLog, "MissionUploadServiceLog")
+QGC_LOGGING_CATEGORY(PtahMissionGeneratorLog, "PtahMissionGeneratorLog")
+```
+
+## Debug Logging Patterns
+```cpp
+// Function entry logging
+qCDebug(MissionServiceLog) << "GenCall1: FunctionName() - Description";
+
+// Parameter logging
+qCDebug(MissionServiceLog) << "Parameters: waypoints=" << waypoints.size() 
+                          << "altitude=" << altitude;
+
+// Coordinate logging
+qCDebug(MissionServiceLog) << "Coordinate:" << coordinate.toString();
+
+// Error logging
+qCWarning(MissionServiceLog) << "Error: Invalid parameter provided";
+```
+
+## GenCall Numbering System
+Use sequential GenCall numbers to trace execution flow:
+- GenCall1: Function entry
+- GenCall2: Parameter validation
+- GenCall3: Main logic
+- GenCall4: Result processing
+- GenCall5: Signal emission
+
+## QML Debugging
+```qml
+// QML debug logging
+console.log("GenCall1: QML function entry");
+console.log("Parameters:", waypointCount, altitude);
+console.log("Signal received:", success);
+```
+
+## Common Debug Points
+- **Function Entry**: Log when entering major functions
+- **Parameter Validation**: Log input parameters and validation results
+- **Coordinate Operations**: Log all coordinate calculations and results
+- **Vehicle Operations**: Log vehicle assignments and mission uploads
+- **Signal Emission**: Log when signals are emitted
+- **Error Conditions**: Log all error conditions and fallbacks
+
+## Debug Output Format
+```
+default:: 34.445 - debug: GenCall26: PtahMissionGenerator::calculateMiddlePoint() - Calculating center point
+default:: 34.445 - debug: GenCall27: Calculating average latitude and longitude
+default:: 34.445 - debug: GenCall28: PtahMissionGenerator::generateCoordinatesInBothDirections() - Generating waypoint grid
+```
+
+## Testing Patterns
+- Test with different waypoint counts (5, 10, 20)
+- Test with different altitudes (5m, 10m, 15m)
+- Test with different vehicle counts (1, 2, 3)
+- Verify waypoint sequence is sequential
+- Verify altitude separation between drones
+- Verify special mission for drone ID 1

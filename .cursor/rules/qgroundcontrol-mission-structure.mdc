@@ -1,0 +1,92 @@
+---
+description: QGroundControl Mission Structure and Upload Patterns
+---
+
+# QGroundControl Mission Structure and Upload Patterns
+
+## Critical Mission Structure
+
+QGroundControl's `PlanManager` has specific logic that affects mission uploads:
+
+### Home Position Handling
+- **First mission item is often deleted** by the system
+- Occurs when `_planType == MAV_MISSION_TYPE_MISSION` and `!_vehicle->firmwarePlugin()->sendHomePositionToVehicle()`
+- This is a safety feature to prevent duplicate home positions
+
+### Correct Mission Structure
+Always structure missions as:
+```
+Item 0: Home Position (MAV_CMD_NAV_WAYPOINT) - DELETED by system
+Item 1: TAKEOFF (MAV_CMD_NAV_TAKEOFF) - SENT to vehicle
+Item 2+: WAYPOINTS (MAV_CMD_NAV_WAYPOINT) - SENT to vehicle  
+Item N: LAND (MAV_CMD_NAV_LAND) - SENT to vehicle
+```
+
+## Mission Upload Implementation
+
+### MissionItem Constructor
+```cpp
+MissionItem* item = new MissionItem(
+    sequenceNumber,    // 0, 1, 2, 3...
+    command,          // MAV_CMD_NAV_TAKEOFF, MAV_CMD_NAV_WAYPOINT, etc.
+    frame,            // MAV_FRAME_GLOBAL_RELATIVE_ALT
+    param1, param2, param3, param4,  // Command-specific parameters
+    param5, param6, param7,          // Latitude, Longitude, Altitude
+    autoContinue,     // false
+    isCurrentItem,    // false
+    parent            // QObject* parent
+);
+```
+
+### Coordinate Storage
+- **param5**: Latitude
+- **param6**: Longitude  
+- **param7**: Altitude
+
+### Upload Process
+```cpp
+// Create mission items list
+QList<MissionItem*> missionItems;
+
+// Add home position (will be deleted)
+MissionItem* homeItem = new MissionItem(0, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT, 
+                                       0, 0, 0, 0, homeLat, homeLng, 0, false, false, parent);
+missionItems.append(homeItem);
+
+// Add takeoff (first real mission item)
+MissionItem* takeoffItem = new MissionItem(1, MAV_CMD_NAV_TAKEOFF, MAV_FRAME_GLOBAL_RELATIVE_ALT,
+                                          0, 0, 0, 0, takeoffLat, takeoffLng, takeoffAlt, false, false, parent);
+missionItems.append(takeoffItem);
+
+// Upload to vehicle
+vehicle->missionManager()->writeMissionItems(missionItems);
+```
+
+## Common Pitfalls
+
+1. **Don't put takeoff as first item** - it will be deleted
+2. **Always include home position** as item 0
+3. **Sequence numbers must be sequential** starting from 0
+4. **Use MAV_FRAME_GLOBAL_RELATIVE_ALT** for most commands
+5. **Set altitude in param7**, not in coordinate object
+
+## Mission Types
+
+- **MAV_MISSION_TYPE_MISSION**: Standard mission (skips first item if no home position)
+- **MAV_MISSION_TYPE_RALLY**: Rally points (different behavior)
+- **MAV_MISSION_TYPE_FENCE**: GeoFence (different behavior)
+
+## Debugging Mission Upload
+
+Always log the complete mission before upload:
+```cpp
+qCDebug() << "Complete mission contains" << missionItems.size() << "items:";
+for (int i = 0; i < missionItems.size(); i++) {
+    MissionItem* item = missionItems[i];
+    qCDebug() << "Item" << i << "- Seq:" << item->sequenceNumber() 
+              << "Cmd:" << item->command() 
+              << "Lat:" << item->param5() 
+              << "Lng:" << item->param6() 
+              << "Alt:" << item->param7();
+}
+```

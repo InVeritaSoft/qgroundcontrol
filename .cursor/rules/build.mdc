@@ -11,3 +11,14 @@ alwaysApply: true
 - **Only suggest build commands** when explicitly asked
 - **Respect user preference** for manual build control
 - **Focus on code** keep focus on implementation over build check
+
+
+# Build operations must always be performed manually by the USER for security and control.
+# Do NOT run build commands automatically.
+# Provide build instructions when requested, but never execute builds.
+# Analyze build logs only if provided by the user; do not generate logs.
+# Focus on code changes and let the user handle compilation.
+# Only suggest build commands if explicitly asked.
+# Always respect the user's preference for manual build control.
+# Keep the focus on code implementation, not on build execution.
+# Never run any build or code execution outside the user's environment.

@@ -1,0 +1,64 @@
+---
+description: QGroundControl Mission Distribution Patterns and Algorithms
+---
+
+# QGroundControl Mission Distribution System
+
+## Distribution Algorithm Overview
+
+The mission distribution system uses a **round-robin algorithm** to distribute waypoints among multiple vehicles:
+
+### Core Distribution Logic
+```cpp
+// In PtahMissionGenerator::distributeWaypointsAmongDrones()
+for (int waypointIndex = 0; waypointIndex < waypoints.size(); waypointIndex++) {
+    int droneIndex = waypointIndex % droneCount;
+    droneWaypoints[droneIndex].append(waypoints[waypointIndex]);
+}
+```
+
+### Distribution Pattern
+- **Sequential Generation**: Waypoints created in order 1,2,3,4,5,6,7...
+- **Alternating Assignment**: Uses modulo operation (`waypointIndex % droneCount`)
+- **Load Balancing**: Ensures nearly equal distribution among vehicles
+- **Vehicle ID 1 Reserved**: Always excluded for special observation mission
+
+## Example Distribution
+
+**With 7 waypoints and 2 vehicles:**
+| Waypoint | Index | Assignment | Vehicle |
+|----------|-------|------------|---------|
+| 1        | 0     | 0 % 2 = 0  | Vehicle 2 |
+| 2        | 1     | 1 % 2 = 1  | Vehicle 3 |
+| 3        | 2     | 2 % 2 = 0  | Vehicle 2 |
+| 4        | 3     | 3 % 2 = 1  | Vehicle 3 |
+| 5        | 4     | 4 % 2 = 0  | Vehicle 2 |
+| 6        | 5     | 5 % 2 = 1  | Vehicle 3 |
+| 7        | 6     | 6 % 2 = 0  | Vehicle 2 |
+
+**Result**: Vehicle 2 gets 4 waypoints, Vehicle 3 gets 3 waypoints
+
+## Key Characteristics
+
+1. **Fair Distribution**: No vehicle gets more than 1 waypoint more than others
+2. **Simple Algorithm**: Easy to understand and maintain
+3. **Scalable**: Works with any number of vehicles
+4. **Predictable**: Consistent distribution pattern
+5. **Sequential Coverage**: Waypoints distributed in order for good coverage
+
+## Altitude Separation
+
+- **Base Altitude**: Set by user parameter
+- **Separation**: 10m difference per vehicle
+- **Vehicle 1**: Base + 20m (observation mission)
+- **Vehicle 2**: Base altitude
+- **Vehicle 3**: Base + 10m
+- **Collision Avoidance**: Enabled via altitude separation
+
+## Special Mission for Vehicle ID 1
+
+- **Mission Type**: Observation/Loiter
+- **Position**: Safe observation position outside mission area
+- **Altitude**: 20m above other vehicles
+- **Pattern**: Takeoff → Loiter → Land
+- **Safety**: Calculated to avoid mission area conflicts

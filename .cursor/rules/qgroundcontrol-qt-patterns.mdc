@@ -1,56 +1,153 @@
 ---
-globs: *.h,*.cc,*.cpp
+globs: *.cc,*.h
 description: Qt and QGroundControl specific coding patterns and best practices
 ---
 
-# Qt and QGroundControl Coding Patterns
+# QGroundControl Qt Patterns
 
-## Qt Includes and Dependencies
-- Use `#include <QtPositioning/QGeoCoordinate>` for coordinate operations
-- Include `#include <QtMath>` for mathematical functions
-- Avoid direct `<algorithm>` includes - use Qt alternatives or manual implementations
-- Link Qt modules in CMakeLists.txt: `Qt6::Positioning`, `Qt6::Core`
-
-## QObject and QML Integration
-- Inherit from `QObject` for classes used in QML
-- Use `Q_OBJECT` macro for signal/slot support
-- Add `QML_ELEMENT` for QML type registration
-- Use `Q_INVOKABLE` for methods called from QML
-
-## Signal/Slot Patterns
+## Signal and Slot Patterns
 ```cpp
-// Declare signals in header
+// Signal declarations
 signals:
     void missionGenerationStarted();
     void missionGenerationCompleted(bool success, const QString& message);
+    void addTakeoffItemRequested(const QGeoCoordinate& coordinate, double altitude, Vehicle* targetVehicle);
 
-// Connect in constructor or setup
-connect(service, &MissionService::missionGenerationCompleted, 
-        this, &SomeClass::onMissionCompleted);
-
-// Emit signals
-emit missionGenerationCompleted(true, "Mission generated successfully");
+// Signal emission
+emit missionGenerationStarted();
+emit addTakeoffItemRequested(takeoffCoord, vehicleAltitude, vehicle);
 ```
 
-## QGeoCoordinate Operations
-- Always check `isValid()` before using coordinates
-- Use `QGeoCoordinate::distanceTo()` for distance calculations
-- Use `QGeoCoordinate::azimuthTo()` for bearing calculations
-- Set altitude with `setAltitude()` method
+## QML Integration
+```cpp
+// Q_INVOKABLE methods for QML
+Q_INVOKABLE void generateMission(const QString& missionType, 
+                               int areaSize, 
+                               int altitude, 
+                               double speed, 
+                               const QString& description);
 
-## Memory Management
-- Use `QObject` parent-child relationships for automatic cleanup
-- Pass `QObject* parent` parameter to constructors
-- Let Qt handle deletion of child objects
+// QML_ELEMENT for QML registration
+class MissionService : public QObject
+{
+    Q_OBJECT
+    QML_ELEMENT
+    // ...
+};
+```
+
+## Coordinate Handling
+```cpp
+// QGeoCoordinate operations
+QGeoCoordinate coordinate = vehicle->coordinate();
+if (!coordinate.isValid()) {
+    qCWarning(MissionServiceLog) << "Invalid coordinate";
+    return;
+}
+
+// Set altitude
+coordinate.setAltitude(altitude);
+
+// Log coordinates
+qCDebug(MissionServiceLog) << "Coordinate:" << coordinate.toString();
+```
+
+## Vehicle Management
+```cpp
+// Get MultiVehicleManager
+MultiVehicleManager* multiVehicleManager = MultiVehicleManager::instance();
+if (!multiVehicleManager) {
+    qCWarning(MissionServiceLog) << "MultiVehicleManager not available";
+    return;
+}
+
+// Get vehicles
+QmlObjectListModel* vehiclesModel = multiVehicleManager->vehicles();
+for (int i = 0; i < vehiclesModel->count(); i++) {
+    Vehicle* vehicle = qobject_cast<Vehicle*>(vehiclesModel->get(i));
+    if (vehicle) {
+        // Process vehicle
+    }
+}
+```
+
+## Mission Manager Operations
+```cpp
+// Clear mission
+if (vehicle->missionManager()) {
+    vehicle->missionManager()->removeAll();
+}
+
+// Upload mission
+if (vehicle->missionManager()) {
+    vehicle->missionManager()->loadFromVehicle();
+}
+```
+
+## Logging Categories
+```cpp
+// Define logging category
+QGC_LOGGING_CATEGORY(MissionServiceLog, "MissionServiceLog")
+
+// Use logging
+qCDebug(MissionServiceLog) << "Debug message";
+qCWarning(MissionServiceLog) << "Warning message";
+qCCritical(MissionServiceLog) << "Critical error";
+```
 
 ## Error Handling
-- Use `qCWarning` and `qCDebug` for logging
-- Check for null pointers before dereferencing
-- Return early on error conditions
-- Provide meaningful error messages
+```cpp
+// Check for null pointers
+if (!vehicle) {
+    qCWarning(MissionServiceLog) << "Vehicle is null";
+    return;
+}
 
-## MAVLink Integration
-- Use `MAV_CMD_NAV_WAYPOINT` for waypoint commands
-- Use `MAV_CMD_NAV_LOITER_TIME` for loiter commands
-- Use `MAV_FRAME_GLOBAL_RELATIVE_ALT` for altitude frames
-- Create `MissionItem` objects with proper parameters
+// Validate parameters
+if (altitude < 0 || altitude > 1000) {
+    qCWarning(MissionServiceLog) << "Invalid altitude:" << altitude;
+    return;
+}
+
+// Check vehicle availability
+if (!vehicle->missionManager()) {
+    qCWarning(MissionServiceLog) << "No mission manager for vehicle" << vehicle->id();
+    return;
+}
+```
+
+## Memory Management
+```cpp
+// Use Qt's parent-child system
+MissionService* service = new MissionService(this);
+
+// Use smart pointers when appropriate
+QScopedPointer<PtahMissionGenerator> generator(new PtahMissionGenerator());
+
+// Clean up in destructor
+MissionService::~MissionService()
+{
+    // Qt will handle most cleanup automatically
+}
+```
+
+## Thread Safety
+```cpp
+// Use QTimer for delayed operations
+QTimer::singleShot(2000, this, [this, areaSize, altitude, speed, description]() {
+    generateMissionAfterClear(areaSize, altitude, speed, description);
+});
+
+// Emit signals from main thread
+emit missionGenerationCompleted(success, message);
+```
+
+## Parameter Management
+```cpp
+// Check vehicle parameters
+if (vehicle->parameterManager()->parameterExists(-1, "MPC_ALT_MAX")) {
+    Fact* maxAltFact = vehicle->parameterManager()->getParameter(-1, "MPC_ALT_MAX");
+    double paramMaxAltitude = maxAltFact->rawValue().toDouble();
+    // Use parameter value
+}
+```

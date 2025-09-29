@@ -1,0 +1,221 @@
+---
+description: QGroundControl Multi-Vehicle Management Patterns and Vehicle Coordination
+---
+
+# QGroundControl Multi-Vehicle Management System
+
+## Vehicle Management Architecture
+
+### Vehicle Discovery Pattern
+```cpp
+// In MissionService::generateWaypointsFromPosition()
+MultiVehicleManager* multiVehicleManager = MultiVehicleManager::instance();
+QmlObjectListModel* vehiclesModel = multiVehicleManager->vehicles();
+
+QList<Vehicle*> nonId1Vehicles;
+for (int i = 0; i < vehiclesModel->count(); i++) {
+    Vehicle* vehicle = qobject_cast<Vehicle*>(vehiclesModel->get(i));
+    if (vehicle && vehicle->id() != 1) {
+        nonId1Vehicles.append(vehicle);
+    }
+}
+```
+
+### Vehicle Filtering Logic
+- **Vehicle ID 1**: Reserved for special observation mission
+- **Other Vehicles**: Used for waypoint distribution
+- **Validation**: Check for valid vehicle objects before processing
+
+## Mission Assignment Patterns
+
+### Altitude Separation Strategy
+```cpp
+// Set different altitude for each drone to avoid collisions
+int vehicleAltitude = altitude + (i * 10); // 10m altitude difference per drone
+
+// Check vehicle's maximum altitude parameter
+double maxAltitude = 50.0; // Conservative default
+if (vehicle->parameterManager()->parameterExists(-1, "MPC_ALT_MAX")) {
+    Fact* maxAltFact = vehicle->parameterManager()->getParameter(-1, "MPC_ALT_MAX");
+    double paramMaxAltitude = maxAltFact->rawValue().toDouble();
+    if (paramMaxAltitude > 0) {
+        maxAltitude = paramMaxAltitude * 0.8; // Use 80% for safety margin
+    }
+}
+```
+
+### Mission Type Assignment
+- **Vehicle ID 1**: Observation/Loiter mission
+- **Vehicle ID 2+**: Waypoint missions with distributed waypoints
+- **Altitude Separation**: 10m between each vehicle level
+
+## Vehicle State Management
+
+### Active Vehicle Handling
+```cpp
+// Get active vehicle for reference
+Vehicle* activeVehicle = multiVehicleManager->activeVehicle();
+if (!activeVehicle) {
+    emit missionGenerationCompleted(false, "No active vehicle");
+    return;
+}
+
+// Use active vehicle's position as reference
+QGeoCoordinate vehiclePosition = activeVehicle->coordinate();
+```
+
+### Vehicle Validation Patterns
+```cpp
+// Validate vehicle before operations
+if (!vehicle) {
+    qDebug() << "WARNING - Invalid vehicle at index" << i;
+    continue;
+}
+
+if (!vehicle->coordinate().isValid()) {
+    qCWarning(MissionServiceLog) << "Vehicle" << vehicle->id() << "has invalid coordinates";
+    continue;
+}
+```
+
+## Mission Upload Patterns
+
+### Per-Vehicle Mission Creation
+```cpp
+// Create mission for each vehicle
+for (int i = 0; i < nonId1Vehicles.size() && i < distributedWaypoints.size(); i++) {
+    Vehicle* vehicle = nonId1Vehicles[i];
+    QList<QGeoCoordinate> vehicleWaypoints = distributedWaypoints[i];
+    
+    // Create mission items
+    createTakeoffItem(vehicle, vehiclePosition, vehicleAltitude);
+    createWaypointItems(vehicle, vehicleWaypoints, vehicleAltitude);
+    createLandItem(vehicle, vehiclePosition, vehicleAltitude);
+}
+```
+
+### Mission Item Creation
+```cpp
+// Takeoff item
+void createTakeoffItem(Vehicle* vehicle, const QGeoCoordinate& position, int altitude) {
+    MissionItem* takeoffItem = new MissionItem(vehicle->missionManager()->mission());
+    takeoffItem->setCommand(MAV_CMD_NAV_TAKEOFF);
+    takeoffItem->setCoordinate(position);
+    takeoffItem->setParam7(altitude);
+}
+
+// Waypoint items
+void createWaypointItems(Vehicle* vehicle, const QList<QGeoCoordinate>& waypoints, int altitude) {
+    for (const QGeoCoordinate& waypoint : waypoints) {
+        MissionItem* wpItem = new MissionItem(vehicle->missionManager()->mission());
+        wpItem->setCommand(MAV_CMD_NAV_WAYPOINT);
+        wpItem->setCoordinate(waypoint);
+        wpItem->setParam7(altitude);
+    }
+}
+```
+
+## Special Mission Handling
+
+### Vehicle ID 1 Observation Mission
+```cpp
+// Calculate safe observation position
+QGeoCoordinate safePosition = m_ptahMissionGenerator->calculateSafeObservationPosition(
+    missionCenter, waypoints, altitude + 20);
+
+// Create observation mission
+createTakeoffItem(vehicle1, vehicle1Position, altitude + 20);
+createLoiterItem(vehicle1, safePosition, altitude + 20);
+createLandItem(vehicle1, vehicle1Position, altitude + 20);
+```
+
+### Safe Position Calculation
+```cpp
+// In PtahMissionGenerator::calculateSafeObservationPosition()
+QGeoCoordinate PtahMissionGenerator::calculateSafeObservationPosition(
+    const QGeoCoordinate& missionCenter, 
+    const QList<QGeoCoordinate>& waypoints, 
+    int altitude)
+{
+    // Calculate mission area bounds
+    double minLat = waypoints[0].latitude();
+    double maxLat = waypoints[0].latitude();
+    double minLng = waypoints[0].longitude();
+    double maxLng = waypoints[0].longitude();
+    
+    for (const QGeoCoordinate& coord : waypoints) {
+        minLat = qMin(minLat, coord.latitude());
+        maxLat = qMax(maxLat, coord.latitude());
+        minLng = qMin(minLng, coord.longitude());
+        maxLng = qMax(maxLng, coord.longitude());
+    }
+    
+    // Calculate safe distance and position
+    double latSpan = maxLat - minLat;
+    double lngSpan = maxLng - minLng;
+    double safeDistance = qMax(latSpan, lngSpan) * 1.5; // 50% safety margin
+    
+    // Position observer outside mission area
+    QGeoCoordinate safePosition = missionCenter;
+    safePosition.setLatitude(missionCenter.latitude() - safeDistance);
+    safePosition.setAltitude(altitude);
+    
+    return safePosition;
+}
+```
+
+## Error Handling Patterns
+
+### Vehicle Connection Validation
+```cpp
+// Check if vehicles are connected and ready
+if (vehiclesModel->count() == 0) {
+    emit missionGenerationCompleted(false, "No vehicles connected");
+    return;
+}
+
+if (nonId1Vehicles.isEmpty()) {
+    emit missionGenerationCompleted(false, "No NON ID 1 vehicles found");
+    return;
+}
+```
+
+### Mission Upload Error Handling
+```cpp
+// Handle mission upload failures
+connect(vehicle->missionManager(), &MissionManager::newMissionItemsAvailable,
+        this, [this, vehicle](bool success) {
+    if (!success) {
+        qCWarning(MissionServiceLog) << "Failed to upload mission to vehicle" << vehicle->id();
+        emit missionUploadFailed(vehicle->id(), "Mission upload failed");
+    } else {
+        qCDebug(MissionServiceLog) << "Mission uploaded successfully to vehicle" << vehicle->id();
+        emit missionUploadCompleted(vehicle->id());
+    }
+});
+```
+
+## Logging and Debugging
+
+### Vehicle Information Logging
+```cpp
+// Log vehicle details
+qDebug() << "GenCall25.2: Total vehicles in MultiVehicleManager:" << vehiclesModel->count();
+qDebug() << "GenCall25.3: Found vehicle ID:" << vehicle->id();
+qDebug() << "GenCall25.4: Added vehicle ID" << vehicle->id() << "to distribution list";
+
+// Log mission assignment
+qDebug() << "GenCall27.1: Processing vehicle ID" << vehicle->id() << "at index" << i;
+qDebug() << "GenCall27.2: Vehicle" << vehicle->id() << "assigned" << vehicleWaypoints.size() << "waypoints";
+qDebug() << "GenCall27.3: Vehicle" << vehicle->id() << "altitude set to" << vehicleAltitude << "m";
+```
+
+### Mission Status Tracking
+```cpp
+// Track mission generation progress
+int completedMissions = 0;
+int totalMissions = nonId1Vehicles.size() + 1; // +1 for vehicle ID 1
+
+// Emit progress updates
+emit missionGenerationProgress(completedMissions, totalMissions);
+```

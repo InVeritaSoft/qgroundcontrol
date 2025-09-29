@@ -1,0 +1,116 @@
+---
+globs: *.qml
+description: QML patterns and best practices for QGroundControl mission generation
+---
+
+# QGroundControl QML Patterns
+
+## Mission Item Management
+```qml
+// Function to add takeoff item using QML mission controller
+function addTakeoffItem(coordinate, altitude, targetVehicle) {
+    console.log("GenCall60: Adding takeoff item at", coordinate.toString(), "altitude", altitude, "to vehicle", targetVehicle ? targetVehicle.id : "unknown");
+    
+    // Store current active vehicle
+    var currentVehicle = QGroundControl.multiVehicleManager.activeVehicle;
+    
+    // Switch to target vehicle if different
+    if (targetVehicle && targetVehicle !== currentVehicle) {
+        QGroundControl.multiVehicleManager.activeVehicle = targetVehicle;
+    }
+    
+    // Always start at index 1 for takeoff
+    var nextIndex = 1;
+    planMasterController.missionController.insertTakeoffItem(coordinate, nextIndex, true);
+    
+    // Switch back to original vehicle
+    if (targetVehicle && targetVehicle !== currentVehicle) {
+        QGroundControl.multiVehicleManager.activeVehicle = currentVehicle;
+    }
+}
+```
+
+## Signal Connections
+```qml
+Connections {
+    target: QGroundControl.missionService
+    function onAddTakeoffItemRequested(coordinate, altitude, targetVehicle) {
+        addTakeoffItem(coordinate, altitude, targetVehicle);
+    }
+    function onAddWaypointItemRequested(coordinate, altitude, targetVehicle) {
+        addWaypointItem(coordinate, altitude, targetVehicle);
+    }
+    function onAddLandItemRequested(coordinate, targetVehicle) {
+        addLandItem(coordinate, targetVehicle);
+    }
+}
+```
+
+## Debug Logging in QML
+```qml
+// Use console.log for QML debugging
+console.log("GenCall1: QML function entry");
+console.log("Parameters:", waypointCount, altitude);
+console.log("Vehicle ID:", targetVehicle ? targetVehicle.id : "unknown");
+console.log("Index:", nextIndex);
+```
+
+## Vehicle Switching Pattern
+```qml
+// Always store current vehicle before switching
+var currentVehicle = QGroundControl.multiVehicleManager.activeVehicle;
+
+// Switch to target vehicle
+if (targetVehicle && targetVehicle !== currentVehicle) {
+    QGroundControl.multiVehicleManager.activeVehicle = targetVehicle;
+}
+
+// Perform operation
+// ... mission item operations ...
+
+// Always switch back
+if (targetVehicle && targetVehicle !== currentVehicle) {
+    QGroundControl.multiVehicleManager.activeVehicle = currentVehicle;
+}
+```
+
+## Mission Controller Integration
+```qml
+// Access mission controller
+property var planMasterController
+
+// Insert mission items
+planMasterController.missionController.insertTakeoffItem(coordinate, index, true);
+planMasterController.missionController.insertSimpleMissionItem(coordinate, index, true);
+planMasterController.missionController.insertLandItem(coordinate, index, true);
+
+// Get current index
+var nextIndex = planMasterController.missionController.currentPlanViewVIIndex + 1;
+```
+
+## Error Handling
+```qml
+// Check for valid objects
+if (targetVehicle && targetVehicle !== currentVehicle) {
+    // Safe to switch vehicles
+}
+
+// Validate mission controller
+if (planMasterController && planMasterController.missionController) {
+    // Safe to use mission controller
+}
+```
+
+## UI State Management
+```qml
+// Mission generation status
+function onMissionGenerationStarted() {
+    console.log("Mission generation started");
+    // Update UI state
+}
+
+function onMissionGenerationCompleted(success, message) {
+    console.log("Mission generation completed:", success, message);
+    // Update UI state
+}
+```

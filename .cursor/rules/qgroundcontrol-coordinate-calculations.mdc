@@ -1,0 +1,316 @@
+---
+description: QGroundControl Coordinate Calculation Patterns and Geographic Operations
+---
+
+# QGroundControl Coordinate Calculation System
+
+## Core Coordinate Operations
+
+### New Coordinate Calculation
+```cpp
+// In PtahMissionGenerator::calculateNewCoordinates()
+QGeoCoordinate PtahMissionGenerator::calculateNewCoordinates(
+    const QGeoCoordinate& reference, 
+    double bearing, 
+    double distanceMeters)
+{
+    const double earthRadius = 6371000.0; // Earth radius in meters
+    
+    // Convert bearing to radians
+    double bearingRad = qDegreesToRadians(bearing);
+    
+    // Convert reference coordinates to radians
+    double lat1Rad = qDegreesToRadians(reference.latitude());
+    double lng1Rad = qDegreesToRadians(reference.longitude());
+    
+    // Calculate new latitude
+    double lat2Rad = asin(sin(lat1Rad) * cos(distanceMeters / earthRadius) + 
+                         cos(lat1Rad) * sin(distanceMeters / earthRadius) * cos(bearingRad));
+    
+    // Calculate new longitude
+    double lng2Rad = lng1Rad + atan2(sin(bearingRad) * sin(distanceMeters / earthRadius) * cos(lat1Rad),
+                                     cos(distanceMeters / earthRadius) - sin(lat1Rad) * sin(lat2Rad));
+    
+    // Convert back to degrees
+    double lat2Deg = qRadiansToDegrees(lat2Rad);
+    double lng2Deg = qRadiansToDegrees(lng2Rad);
+    
+    return QGeoCoordinate(lat2Deg, lng2Deg, reference.altitude());
+}
+```
+
+### Bearing Calculation
+```cpp
+// In PtahMissionGenerator::calculateBearing()
+double PtahMissionGenerator::calculateBearing(const QGeoCoordinate& from, const QGeoCoordinate& to)
+{
+    if (!from.isValid() || !to.isValid()) {
+        return 0.0;
+    }
+    
+    return from.azimuthTo(to);
+}
+```
+
+### Middle Point Calculation
+```cpp
+// In PtahMissionGenerator::calculateMiddlePoint()
+QGeoCoordinate PtahMissionGenerator::calculateMiddlePoint(const QList<QGeoCoordinate>& coordinates)
+{
+    if (coordinates.isEmpty()) {
+        return QGeoCoordinate();
+    }
+    
+    double totalLat = 0.0;
+    double totalLng = 0.0;
+    double totalAlt = 0.0;
+    
+    for (const QGeoCoordinate& coord : coordinates) {
+        totalLat += coord.latitude();
+        totalLng += coord.longitude();
+        totalAlt += coord.altitude();
+    }
+    
+    double avgLat = totalLat / coordinates.size();
+    double avgLng = totalLng / coordinates.size();
+    double avgAlt = totalAlt / coordinates.size();
+    
+    return QGeoCoordinate(avgLat, avgLng, avgAlt);
+}
+```
+
+## Waypoint Generation Patterns
+
+### Sequential Waypoint Generation
+```cpp
+// In PtahMissionGenerator::generateCoordinatesInBothDirections()
+QList<QGeoCoordinate> PtahMissionGenerator::generateCoordinatesInBothDirections(
+    const QGeoCoordinate& reference, 
+    double bearing, 
+    double gapMeters, 
+    double totalDistanceMeters)
+{
+    QList<QGeoCoordinate> coordinates;
+    
+    if (!reference.isValid() || gapMeters <= 0 || totalDistanceMeters <= 0) {
+        return coordinates;
+    }
+    
+    // Calculate number of points to generate
+    int pointsInEachDirection = static_cast<int>(totalDistanceMeters / gapMeters);
+    
+    // Add reference point as waypoint 1
+    coordinates.append(reference);
+    
+    // Generate waypoints in sequence: 1,2,3,4,5,6,7...
+    for (int i = 1; i <= pointsInEachDirection; i++) {
+        double distance = i * gapMeters;
+        QGeoCoordinate waypoint = calculateNewCoordinates(reference, bearing, distance);
+        if (waypoint.isValid()) {
+            coordinates.append(waypoint);
+        }
+    }
+    
+    return coordinates;
+}
+```
+
+### Fixed Bearing Pattern
+```cpp
+// Use fixed bearing for consistent waypoint generation
+double bearing = 90.0; // East-West pattern (90 degrees = East)
+qCDebug(MissionServiceLog) << "Using fixed bearing:" << bearing << "degrees (East-West pattern)";
+```
+
+## Safe Position Calculations
+
+### Mission Area Bounds Calculation
+```cpp
+// Calculate mission area bounds for safe positioning
+void calculateMissionBounds(const QList<QGeoCoordinate>& waypoints, 
+                           double& minLat, double& maxLat, 
+                           double& minLng, double& maxLng)
+{
+    if (waypoints.isEmpty()) return;
+    
+    minLat = maxLat = waypoints[0].latitude();
+    minLng = maxLng = waypoints[0].longitude();
+    
+    for (const QGeoCoordinate& coord : waypoints) {
+        minLat = qMin(minLat, coord.latitude());
+        maxLat = qMax(maxLat, coord.latitude());
+        minLng = qMin(minLng, coord.longitude());
+        maxLng = qMax(maxLng, coord.longitude());
+    }
+}
+```
+
+### Safe Observation Position
+```cpp
+// In PtahMissionGenerator::calculateSafeObservationPosition()
+QGeoCoordinate PtahMissionGenerator::calculateSafeObservationPosition(
+    const QGeoCoordinate& missionCenter, 
+    const QList<QGeoCoordinate>& waypoints, 
+    int altitude)
+{
+    if (waypoints.isEmpty()) {
+        return missionCenter;
+    }
+    
+    // Calculate mission area bounds
+    double minLat, maxLat, minLng, maxLng;
+    calculateMissionBounds(waypoints, minLat, maxLat, minLng, maxLng);
+    
+    // Calculate mission area span
+    double latSpan = maxLat - minLat;
+    double lngSpan = maxLng - minLng;
+    
+    // Determine mission orientation
+    bool isEastWestOriented = lngSpan > latSpan;
+    
+    // Calculate safe distance (50% safety margin)
+    double safeDistance = qMax(latSpan, lngSpan) * 1.5;
+    
+    // Position observer outside mission area
+    QGeoCoordinate safePosition = missionCenter;
+    if (isEastWestOriented) {
+        // Mission is east-west oriented, position observer SOUTH
+        safePosition.setLatitude(missionCenter.latitude() - safeDistance);
+    } else {
+        // Mission is north-south oriented, position observer WEST
+        safePosition.setLongitude(missionCenter.longitude() - safeDistance);
+    }
+    
+    safePosition.setAltitude(altitude);
+    
+    return safePosition;
+}
+```
+
+## Coordinate Validation Patterns
+
+### Always Validate Coordinates
+```cpp
+// Check coordinate validity before operations
+if (!coordinate.isValid()) {
+    qCWarning(MissionServiceLog) << "Invalid coordinate provided";
+    return QGeoCoordinate();
+}
+
+// Check for valid latitude/longitude ranges
+if (coordinate.latitude() < -90.0 || coordinate.latitude() > 90.0) {
+    qCWarning(MissionServiceLog) << "Invalid latitude:" << coordinate.latitude();
+    return QGeoCoordinate();
+}
+
+if (coordinate.longitude() < -180.0 || coordinate.longitude() > 180.0) {
+    qCWarning(MissionServiceLog) << "Invalid longitude:" << coordinate.longitude();
+    return QGeoCoordinate();
+}
+```
+
+### Logging Coordinate Operations
+```cpp
+// Log coordinate calculations for debugging
+qCDebug(MissionServiceLog) << "calculateNewCoordinates - Input: ref=" << reference.toString() 
+                          << "bearing=" << bearing << "distance=" << distanceMeters;
+
+qCDebug(MissionServiceLog) << "calculateNewCoordinates - Calculated: lat2Rad=" << lat2Rad 
+                          << "lng2Rad=" << lng2Rad;
+
+qCDebug(MissionServiceLog) << "calculateNewCoordinates - Final result:" << result.toString();
+```
+
+## Distance and Bearing Calculations
+
+### Distance Between Points
+```cpp
+// Calculate distance between two coordinates
+double calculateDistance(const QGeoCoordinate& from, const QGeoCoordinate& to)
+{
+    if (!from.isValid() || !to.isValid()) {
+        return 0.0;
+    }
+    
+    return from.distanceTo(to);
+}
+```
+
+### Bearing Between Points
+```cpp
+// Calculate bearing between two coordinates
+double calculateBearing(const QGeoCoordinate& from, const QGeoCoordinate& to)
+{
+    if (!from.isValid() || !to.isValid()) {
+        return 0.0;
+    }
+    
+    return from.azimuthTo(to);
+}
+```
+
+## Error Handling Patterns
+
+### Coordinate Calculation Errors
+```cpp
+// Handle calculation errors gracefully
+QGeoCoordinate calculateNewCoordinates(const QGeoCoordinate& reference, 
+                                     double bearing, 
+                                     double distanceMeters)
+{
+    try {
+        // Perform calculation
+        return performCalculation(reference, bearing, distanceMeters);
+    } catch (const std::exception& e) {
+        qCWarning(MissionServiceLog) << "Coordinate calculation failed:" << e.what();
+        return QGeoCoordinate();
+    }
+}
+```
+
+### Validation Error Handling
+```cpp
+// Validate input parameters
+if (gapMeters <= 0) {
+    qCWarning(MissionServiceLog) << "Invalid gap distance:" << gapMeters;
+    return QList<QGeoCoordinate>();
+}
+
+if (totalDistanceMeters <= 0) {
+    qCWarning(MissionServiceLog) << "Invalid total distance:" << totalDistanceMeters;
+    return QList<QGeoCoordinate>();
+}
+```
+
+## Performance Considerations
+
+### Efficient Coordinate Operations
+```cpp
+// Use const references to avoid copying
+QGeoCoordinate calculateNewCoordinates(const QGeoCoordinate& reference, 
+                                     double bearing, 
+                                     double distanceMeters);
+
+// Pre-calculate constants
+const double earthRadius = 6371000.0; // Earth radius in meters
+const double degreesToRadians = M_PI / 180.0;
+const double radiansToDegrees = 180.0 / M_PI;
+```
+
+### Batch Operations
+```cpp
+// Process multiple coordinates efficiently
+void processCoordinates(const QList<QGeoCoordinate>& coordinates)
+{
+    // Reserve space to avoid reallocations
+    QList<QGeoCoordinate> processed;
+    processed.reserve(coordinates.size());
+    
+    for (const QGeoCoordinate& coord : coordinates) {
+        QGeoCoordinate processedCoord = processCoordinate(coord);
+        if (processedCoord.isValid()) {
+            processed.append(processedCoord);
+        }
+    }
+}
+```

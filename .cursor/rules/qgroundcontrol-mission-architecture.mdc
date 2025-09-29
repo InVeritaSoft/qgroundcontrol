@@ -1,0 +1,335 @@
+---
+description: QGroundControl Mission Generation System Architecture and Component Patterns
+---
+
+# QGroundControl Mission Generation System Architecture
+
+## System Architecture Overview
+
+### Four-Layer Architecture
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    QML Layer (UI)                          │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │ PlanToolBarIndicators.qml                              ││
+│  │ MissionGeneratorDialogue.qml                           ││
+│  └─────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 Service Layer (Orchestration)              │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │ MissionService.h/.cc                                   ││
+│  │ VehicleService.h/.cc                                   ││
+│  │ MissionUploadService.h/.cc                             ││
+│  └─────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Generator Layer (Waypoint Logic)              │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │ PtahMissionGenerator.h/.cc                             ││
+│  └─────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                Upload Layer (Vehicle Operations)           │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │ MultiVehicleManager Integration                        ││
+│  │ MAVLink Mission Commands                               ││
+│  └─────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Component Responsibilities
+
+### QML Layer Components
+
+#### PlanToolBarIndicators.qml
+- **Purpose**: Main UI integration point for mission generation
+- **Responsibilities**:
+  - Display mission generation button
+  - Handle user interactions
+  - Connect to C++ services via signals/slots
+  - Manage dialog state and user feedback
+
+#### MissionGeneratorDialogue.qml
+- **Purpose**: Mission parameter input dialog
+- **Responsibilities**:
+  - Collect user input (mission type, area size, altitude, speed)
+  - Validate input parameters
+  - Emit signals to C++ services
+  - Provide user feedback and error handling
+
+### Service Layer Components
+
+#### MissionService
+- **Purpose**: Main orchestration service for mission generation
+- **Responsibilities**:
+  - Coordinate between QML and generator layers
+  - Manage mission generation workflow
+  - Handle multi-vehicle coordination
+  - Emit signals for UI updates
+  - Manage mission clearing and reloading
+
+#### VehicleService
+- **Purpose**: Vehicle data management and retrieval
+- **Responsibilities**:
+  - Access MultiVehicleManager
+  - Retrieve vehicle information and coordinates
+  - Provide vehicle data to other services
+  - Handle vehicle state changes
+
+#### MissionUploadService
+- **Purpose**: Mission upload and vehicle operations
+- **Responsibilities**:
+  - Upload missions to vehicles
+  - Create mission items (takeoff, waypoints, land)
+  - Handle MAVLink mission commands
+  - Manage mission upload progress and completion
+
+### Generator Layer Components
+
+#### PtahMissionGenerator
+- **Purpose**: Core waypoint generation and coordinate calculations
+- **Responsibilities**:
+  - Generate waypoints in sequential order
+  - Calculate new coordinates using bearing and distance
+  - Distribute waypoints among multiple vehicles
+  - Calculate safe observation positions
+  - Handle coordinate validation and error checking
+
+## Data Flow Patterns
+
+### Mission Generation Flow
+```
+1. User Input (QML) → MissionService.generateMission()
+2. MissionService → VehicleService.getAllVehicles()
+3. MissionService → PtahMissionGenerator.generateCoordinatesInBothDirections()
+4. PtahMissionGenerator → distributeWaypointsAmongDrones()
+5. MissionService → MissionUploadService.uploadMissionsToAllVehicles()
+6. MissionUploadService → MultiVehicleManager → MAVLink Commands
+7. Completion Signals → QML UI Updates
+```
+
+### Signal Flow Architecture
+```
+QML Layer:
+  ┌─────────────────┐    signals    ┌─────────────────┐
+  │ PlanToolBar     │ ────────────► │ MissionService  │
+  │ Indicators      │               │                 │
+  └─────────────────┘               └─────────────────┘
+                                              │
+                                              ▼
+  ┌─────────────────┐    signals    ┌─────────────────┐
+  │ MissionDialog   │ ◄──────────── │ VehicleService  │
+  │                 │               │                 │
+  └─────────────────┘               └─────────────────┘
+                                              │
+                                              ▼
+                                    ┌─────────────────┐
+                                    │ MissionUpload   │
+                                    │ Service         │
+                                    └─────────────────┘
+```
+
+## Integration Patterns
+
+### QML-C++ Integration
+```cpp
+// Service exposure in QGroundControlQmlGlobal.h
+Q_PROPERTY(MissionService* missionService READ missionService CONSTANT)
+
+// QML usage
+Connections {
+    target: QGroundControl.missionService
+    enabled: QGroundControl.missionService !== null
+    function onMissionGenerationStarted() { /* ... */ }
+}
+```
+
+### Service Dependencies
+```cpp
+// MissionService constructor
+MissionService::MissionService(QObject* parent) : QObject(parent)
+{
+    m_ptahMissionGenerator = new PtahMissionGenerator(this);
+    m_missionUploadService = new MissionUploadService(this);
+    m_vehicleService = new VehicleService(this);
+    
+    // Connect signals
+    connect(m_vehicleService, &VehicleService::vehiclesReady, 
+            this, &MissionService::onVehiclesReady);
+    connect(m_missionUploadService, &MissionUploadService::missionUploadCompleted,
+            this, &MissionService::onMissionUploadCompleted);
+}
+```
+
+## Error Handling Architecture
+
+### Error Propagation Pattern
+```
+QML Layer:
+  ┌─────────────────┐
+  │ Error Dialog    │ ◄─── Error Messages
+  └─────────────────┘
+              ▲
+              │
+Service Layer:
+  ┌─────────────────┐
+  │ Error Handling  │ ◄─── Validation & Recovery
+  │ & Logging       │
+  └─────────────────┘
+              ▲
+              │
+Generator Layer:
+  ┌─────────────────┐
+  │ Input Validation│ ◄─── Parameter Checking
+  │ & Error Returns │
+  └─────────────────┘
+```
+
+### Error Handling Strategies
+```cpp
+// Service layer error handling
+void MissionService::generateMission(const QString& missionType, 
+                                   int areaSize, 
+                                   int altitude, 
+                                   int speed, 
+                                   const QString& description)
+{
+    // Input validation
+    if (areaSize <= 0 || altitude <= 0) {
+        emit missionGenerationCompleted(false, "Invalid parameters");
+        return;
+    }
+    
+    // Vehicle validation
+    Vehicle* activeVehicle = MultiVehicleManager::instance()->activeVehicle();
+    if (!activeVehicle) {
+        emit missionGenerationCompleted(false, "No active vehicle");
+        return;
+    }
+    
+    // Proceed with generation
+    // ...
+}
+```
+
+## Memory Management Patterns
+
+### QObject Parent-Child Relationships
+```cpp
+// Automatic cleanup through parent-child relationships
+MissionService::MissionService(QObject* parent) : QObject(parent)
+{
+    // Children will be automatically deleted when parent is destroyed
+    m_ptahMissionGenerator = new PtahMissionGenerator(this);
+    m_missionUploadService = new MissionUploadService(this);
+    m_vehicleService = new VehicleService(this);
+}
+```
+
+### Smart Pointer Usage
+```cpp
+// Use QPointer for safe object access
+QPointer<Vehicle> m_activeVehicle;
+
+void MissionService::setActiveVehicle(Vehicle* vehicle)
+{
+    m_activeVehicle = vehicle;
+}
+
+void MissionService::useActiveVehicle()
+{
+    if (m_activeVehicle) {
+        // Safe to use - object still exists
+        QGeoCoordinate pos = m_activeVehicle->coordinate();
+    }
+}
+```
+
+## Testing Architecture
+
+### Unit Testing Structure
+```
+src/Custom/MissionGenerator/
+├── MissionService.h/.cc
+├── PtahMissionGenerator.h/.cc
+├── MissionUploadService.h/.cc
+├── VehicleService.h/.cc
+└── tests/
+    ├── MissionServiceTest.h/.cc
+    ├── PtahMissionGeneratorTest.h/.cc
+    └── MissionUploadServiceTest.h/.cc
+```
+
+### Test Patterns
+```cpp
+// Test coordinate calculations
+void PtahMissionGeneratorTest::testCalculateNewCoordinates()
+{
+    QGeoCoordinate reference(37.7749, -122.4194, 100.0);
+    double bearing = 90.0; // East
+    double distance = 100.0; // 100 meters
+    
+    QGeoCoordinate result = generator->calculateNewCoordinates(reference, bearing, distance);
+    
+    QVERIFY(result.isValid());
+    QVERIFY(qAbs(result.latitude() - reference.latitude()) < 0.001);
+    QVERIFY(result.longitude() > reference.longitude());
+}
+```
+
+## Build Configuration
+
+### CMakeLists.txt Structure
+```cmake
+# src/Custom/CMakeLists.txt
+set(CUSTOM_SOURCES
+    MissionGenerator/MissionService.cc
+    MissionGenerator/PtahMissionGenerator.cc
+    MissionGenerator/MissionUploadService.cc
+    MissionGenerator/VehicleService.cc
+)
+
+set(CUSTOM_HEADERS
+    MissionGenerator/MissionService.h
+    MissionGenerator/PtahMissionGenerator.h
+    MissionGenerator/MissionUploadService.h
+    MissionGenerator/VehicleService.h
+)
+
+# Link required Qt modules
+target_link_libraries(QGroundControl
+    Qt6::Positioning
+    Qt6::Core
+    Qt6::Qml
+)
+```
+
+## Performance Considerations
+
+### Efficient Data Structures
+```cpp
+// Use QList for waypoint storage (efficient for sequential access)
+QList<QGeoCoordinate> waypoints;
+
+// Reserve space to avoid reallocations
+waypoints.reserve(expectedCount);
+
+// Use const references to avoid copying
+void processWaypoints(const QList<QGeoCoordinate>& waypoints);
+```
+
+### Asynchronous Operations
+```cpp
+// Use QTimer for delayed operations
+QTimer::singleShot(100, this, [this]() {
+    // Perform mission generation after UI updates
+    generateWaypointsFromPosition(vehiclePosition, areaSize, altitude, frontDistance);
+});
+```

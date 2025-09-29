@@ -113,40 +113,69 @@ void MissionUploadService::uploadMissionToVehicle(Vehicle* vehicle, const QList<
     QList<MissionItem*> missionItems;
     QObject* missionItemParent = vehicle; // Vehicle will manage the mission items
     
-    // GenCall43: Add takeoff item at drone's current position
+    // GenCall43: Add home position item first (required by QGroundControl, will be skipped by vehicle)
+    QGeoCoordinate homeCoord = droneCurrentPosition;
+    homeCoord.setAltitude(0); // Home at ground level
+    MissionItem* homeItem = new MissionItem(0, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT, 
+                                           0, 0, 0, 0, homeCoord.latitude(), homeCoord.longitude(), homeCoord.altitude(), 
+                                           false, false, missionItemParent);
+    missionItems.append(homeItem);
+    qCDebug(MissionUploadServiceLog) << "Added home position item (will be skipped by vehicle):" << homeCoord.toString();
+    
+    // GenCall44: Add takeoff item as second item (first real mission item)
     QGeoCoordinate takeoffCoord = droneCurrentPosition;
     takeoffCoord.setAltitude(altitude);
-    MissionItem* takeoffItem = new MissionItem(0, MAV_CMD_NAV_TAKEOFF, MAV_FRAME_GLOBAL_RELATIVE_ALT, 
+    qCDebug(MissionUploadServiceLog) << "Creating takeoff item with coordinates:" << takeoffCoord.toString();
+    
+    MissionItem* takeoffItem = new MissionItem(1, MAV_CMD_NAV_TAKEOFF, MAV_FRAME_GLOBAL_RELATIVE_ALT, 
                                                0, 0, 0, 0, takeoffCoord.latitude(), takeoffCoord.longitude(), takeoffCoord.altitude(), 
                                                false, false, missionItemParent);
     missionItems.append(takeoffItem);
-    qCDebug(MissionUploadServiceLog) << "Added takeoff at vehicle position:" << takeoffCoord.toString();
+    qCDebug(MissionUploadServiceLog) << "Successfully created takeoff item - Command:" << takeoffItem->command() << "Frame:" << takeoffItem->frame();
     
-    // GenCall44: Add waypoint items
+    // GenCall45: Add waypoint items
     for (int i = 0; i < waypoints.size(); i++) {
         QGeoCoordinate coord = waypoints[i];
         coord.setAltitude(altitude);
-        MissionItem* waypointItem = new MissionItem(i + 1, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT,
+        MissionItem* waypointItem = new MissionItem(i + 2, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT,
                                                    0, 0, 0, 0, coord.latitude(), coord.longitude(), coord.altitude(), 
                                                    false, false, missionItemParent);
         missionItems.append(waypointItem);
     }
     
-    // GenCall45: Add land item at drone's current position (return to start)
+    // GenCall46: Add land item at drone's current position (return to start)
     QGeoCoordinate landCoord = droneCurrentPosition;
     landCoord.setAltitude(0); // Land at ground level
-    MissionItem* landItem = new MissionItem(waypoints.size() + 1, MAV_CMD_NAV_LAND, MAV_FRAME_GLOBAL_RELATIVE_ALT,
+    MissionItem* landItem = new MissionItem(waypoints.size() + 2, MAV_CMD_NAV_LAND, MAV_FRAME_GLOBAL_RELATIVE_ALT,
                                            0, 0, 0, 0, landCoord.latitude(), landCoord.longitude(), landCoord.altitude(), 
                                            false, false, missionItemParent);
     missionItems.append(landItem);
     qCDebug(MissionUploadServiceLog) << "Added land at vehicle position:" << landCoord.toString();
     
-    // GenCall46: Upload mission to vehicle via MissionManager
-    if (vehicle->missionManager()) {
-        vehicle->missionManager()->writeMissionItems(missionItems);
+    // GenCall46: Log complete mission before upload
+    qCDebug(MissionUploadServiceLog) << "Complete mission for vehicle" << vehicle->id() << "contains" << missionItems.size() << "items:";
+    for (int i = 0; i < missionItems.size(); i++) {
+        MissionItem* item = missionItems[i];
+        qCDebug(MissionUploadServiceLog) << "Item" << i << "- Seq:" << item->sequenceNumber() 
+                                        << "Cmd:" << item->command() 
+                                        << "Frame:" << item->frame()
+                                        << "Lat:" << item->param5() 
+                                        << "Lng:" << item->param6() 
+                                        << "Alt:" << item->param7();
     }
     
-    qCDebug(MissionUploadServiceLog) << "Uploaded mission with" << missionItems.size() << "items to vehicle" << vehicle->id();
+    // GenCall47: Upload mission to vehicle via MissionManager
+    if (vehicle->missionManager()) {
+        qCDebug(MissionUploadServiceLog) << "Uploading mission to vehicle" << vehicle->id() << "via MissionManager";
+        vehicle->missionManager()->writeMissionItems(missionItems);
+        qCDebug(MissionUploadServiceLog) << "Successfully uploaded mission with" << missionItems.size() << "items to vehicle" << vehicle->id();
+        
+        // Emit success signal for this vehicle
+        emit missionUploadCompleted(true, QString("Mission uploaded to vehicle %1").arg(vehicle->id()));
+    } else {
+        qCWarning(MissionUploadServiceLog) << "Failed to upload mission - no mission manager for vehicle" << vehicle->id();
+        emit missionUploadCompleted(false, QString("No mission manager for vehicle %1").arg(vehicle->id()));
+    }
 }
 
 bool MissionUploadService::createMissionForVehicle(Vehicle* vehicle, const QList<QGeoCoordinate>& waypoints, int altitude)
@@ -185,29 +214,41 @@ void MissionUploadService::uploadLoiterMissionToVehicle(Vehicle* vehicle, const 
     QList<MissionItem*> missionItems;
     QObject* missionItemParent = vehicle;
     
-    // GenCall52: Add takeoff item at drone's current position
+    // GenCall52: Add home position item first (required by QGroundControl, will be skipped by vehicle)
+    QGeoCoordinate homeCoord = droneCurrentPosition;
+    homeCoord.setAltitude(0); // Home at ground level
+    MissionItem* homeItem = new MissionItem(0, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT, 
+                                           0, 0, 0, 0, homeCoord.latitude(), homeCoord.longitude(), homeCoord.altitude(), 
+                                           false, false, missionItemParent);
+    missionItems.append(homeItem);
+    qCDebug(MissionUploadServiceLog) << "Added home position item (will be skipped by vehicle):" << homeCoord.toString();
+    
+    // GenCall53: Add takeoff item as second item (first real mission item)
     QGeoCoordinate takeoffCoord = droneCurrentPosition;
     takeoffCoord.setAltitude(altitude);
-    MissionItem* takeoffItem = new MissionItem(0, MAV_CMD_NAV_TAKEOFF, MAV_FRAME_GLOBAL_RELATIVE_ALT,
+    qCDebug(MissionUploadServiceLog) << "Creating loiter mission takeoff item with coordinates:" << takeoffCoord.toString();
+    
+    MissionItem* takeoffItem = new MissionItem(1, MAV_CMD_NAV_TAKEOFF, MAV_FRAME_GLOBAL_RELATIVE_ALT,
                                               0, 0, 0, 0, takeoffCoord.latitude(), takeoffCoord.longitude(), takeoffCoord.altitude(),
                                               false, false, missionItemParent);
     missionItems.append(takeoffItem);
     qCDebug(MissionUploadServiceLog) << "Added takeoff at vehicle position:" << takeoffCoord.toString();
+    qCDebug(MissionUploadServiceLog) << "Loiter takeoff item - Command:" << takeoffItem->command() << "Frame:" << takeoffItem->frame();
     
-    // GenCall53: Add loiter item at observation position
+    // GenCall54: Add loiter item at observation position
     QGeoCoordinate loiterCoord = loiterPosition;
     loiterCoord.setAltitude(altitude);
-    MissionItem* loiterItem = new MissionItem(1, MAV_CMD_NAV_LOITER_TIME, MAV_FRAME_GLOBAL_RELATIVE_ALT,
+    MissionItem* loiterItem = new MissionItem(2, MAV_CMD_NAV_LOITER_TIME, MAV_FRAME_GLOBAL_RELATIVE_ALT,
                                             300, // Loiter for 5 minutes (300 seconds)
                                             0, 0, 0, loiterCoord.latitude(), loiterCoord.longitude(), loiterCoord.altitude(),
                                             false, false, missionItemParent);
     missionItems.append(loiterItem);
     qCDebug(MissionUploadServiceLog) << "Added loiter at observation position:" << loiterCoord.toString();
     
-    // GenCall54: Add land item at drone's current position (return to start)
+    // GenCall55: Add land item at drone's current position (return to start)
     QGeoCoordinate landCoord = droneCurrentPosition;
     landCoord.setAltitude(0); // Land at ground level
-    MissionItem* landItem = new MissionItem(2, MAV_CMD_NAV_LAND, MAV_FRAME_GLOBAL_RELATIVE_ALT,
+    MissionItem* landItem = new MissionItem(3, MAV_CMD_NAV_LAND, MAV_FRAME_GLOBAL_RELATIVE_ALT,
                                           0, 0, 0, 0, landCoord.latitude(), landCoord.longitude(), landCoord.altitude(),
                                           false, false, missionItemParent);
     missionItems.append(landItem);
@@ -216,7 +257,12 @@ void MissionUploadService::uploadLoiterMissionToVehicle(Vehicle* vehicle, const 
     // GenCall55: Upload loiter mission to vehicle
     if (vehicle->missionManager()) {
         vehicle->missionManager()->writeMissionItems(missionItems);
+        qCDebug(MissionUploadServiceLog) << "Successfully uploaded loiter mission with" << missionItems.size() << "items to vehicle" << vehicle->id();
+        
+        // Emit success signal for this vehicle
+        emit missionUploadCompleted(true, QString("Loiter mission uploaded to vehicle %1").arg(vehicle->id()));
+    } else {
+        qCWarning(MissionUploadServiceLog) << "Failed to upload loiter mission - no mission manager for vehicle" << vehicle->id();
+        emit missionUploadCompleted(false, QString("No mission manager for vehicle %1").arg(vehicle->id()));
     }
-    
-    qCDebug(MissionUploadServiceLog) << "Uploaded loiter mission with" << missionItems.size() << "items to vehicle" << vehicle->id();
 }

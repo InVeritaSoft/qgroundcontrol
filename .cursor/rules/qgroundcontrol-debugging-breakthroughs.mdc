@@ -1,0 +1,78 @@
+---
+description: QGroundControl Debugging Breakthroughs and Common Issues
+---
+
+# QGroundControl Debugging Breakthroughs
+
+## Mission Upload Issues
+
+### Problem: Takeoff Commands Disappear
+**Symptoms**: Takeoff commands are created but don't appear in vehicle mission
+**Root Cause**: QGroundControl deletes first mission item in certain conditions
+**Solution**: Put takeoff as second item, home position as first item
+
+### Problem: Mission Items Not Uploading
+**Check**: Verify `vehicle->missionManager()->writeMissionItems()` is called
+**Check**: Ensure proper MissionItem constructor parameters
+**Check**: Verify sequence numbers are sequential starting from 0
+
+### Problem: Coordinates Not Set Correctly
+**Check**: Use param5, param6, param7 for lat/lng/alt (not setCoordinate)
+**Check**: MissionItem constructor takes coordinates as parameters, not separate method
+
+## Debugging Strategy
+
+### 1. Add Comprehensive Logging
+```cpp
+// Log before creating items
+qCDebug() << "Creating mission item with coordinates:" << coord.toString();
+
+// Log after creating items  
+qCDebug() << "Item created - Command:" << item->command() << "Frame:" << item->frame();
+
+// Log complete mission before upload
+qCDebug() << "Complete mission contains" << missionItems.size() << "items:";
+for (int i = 0; i < missionItems.size(); i++) {
+    MissionItem* item = missionItems[i];
+    qCDebug() << "Item" << i << "- Seq:" << item->sequenceNumber() 
+              << "Cmd:" << item->command() 
+              << "Lat:" << item->param5() 
+              << "Lng:" << item->param6() 
+              << "Alt:" << item->param7();
+}
+```
+
+### 2. Check System Behavior
+- Examine `PlanManager::writeMissionItems()` logic
+- Look for item deletion conditions
+- Verify firmware-specific behavior
+
+### 3. Test Incrementally
+- Start with simple waypoint-only mission
+- Add takeoff as second item
+- Verify each component works
+
+## Common QGroundControl Patterns
+
+### Mission Creation Flow
+1. Generate waypoints using coordinate calculations
+2. Create MissionItem objects with proper sequence
+3. Structure as: Home → Takeoff → Waypoints → Land
+4. Upload via `writeMissionItems()`
+
+### Signal Handling
+- Use `Q_INVOKABLE` for QML-callable methods
+- Emit signals for async operations
+- Connect to MissionController signals when possible
+
+### Error Handling
+- Always check for valid coordinates using `isValid()`
+- Verify vehicle and mission manager availability
+- Provide meaningful error messages in signals
+
+## Key Files to Examine
+
+- [src/MissionManager/PlanManager.cc](mdc:src/MissionManager/PlanManager.cc) - Mission upload logic
+- [src/MissionManager/MissionItem.cc](mdc:src/MissionManager/MissionItem.cc) - Mission item implementation
+- [src/MissionManager/MissionController.cc](mdc:src/MissionManager/MissionController.cc) - Mission management
+- [src/Custom/MissionGenerator/MissionUploadService.cc](mdc:src/Custom/MissionGenerator/MissionUploadService.cc) - Custom upload implementation

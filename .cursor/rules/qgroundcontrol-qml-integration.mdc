@@ -1,0 +1,270 @@
+---
+description: QGroundControl QML Integration Patterns and Best Practices
+---
+
+# QGroundControl QML Integration Patterns
+
+## QML-C++ Integration Architecture
+
+### Service Exposure Pattern
+```cpp
+// In QGroundControlQmlGlobal.h
+Q_PROPERTY(MissionService* missionService READ missionService CONSTANT)
+
+// In QGroundControlQmlGlobal.cc
+MissionService* missionService() { return _missionService; }
+```
+
+### QML Usage Pattern
+```qml
+// In PlanToolBarIndicators.qml
+Connections {
+    target: QGroundControl.missionService
+    enabled: QGroundControl.missionService !== null
+    function onMissionGenerationStarted() {
+        console.log("Mission generation started");
+    }
+}
+```
+
+## Signal/Slot Patterns
+
+### C++ Signal Declaration
+```cpp
+// In MissionService.h
+signals:
+    void missionGenerationStarted();
+    void missionGenerationCompleted(bool success, const QString& message);
+    void addTakeoffItemRequested(const QGeoCoordinate& coordinate, int altitude, int targetVehicle);
+    void addWaypointItemRequested(const QGeoCoordinate& coordinate, int altitude, int targetVehicle);
+    void addLandItemRequested(const QGeoCoordinate& coordinate, int targetVehicle);
+```
+
+### QML Signal Handling
+```qml
+// In PlanToolBarIndicators.qml
+Connections {
+    target: QGroundControl.missionService
+    enabled: QGroundControl.missionService !== null
+    
+    function onMissionGenerationStarted() {
+        ptahDialog.text = qsTr("Generating mission...");
+        ptahDialog.visible = true;
+    }
+    
+    function onMissionGenerationCompleted(success, message) {
+        ptahDialog.text = success ? 
+            qsTr("Mission generated successfully!\n") + message :
+            qsTr("Mission generation failed!\n") + message;
+        ptahDialog.visible = true;
+    }
+}
+```
+
+## QML Dialog Patterns
+
+### Modal Dialog Structure
+```qml
+// In MissionGeneratorDialogue.qml
+Dialog {
+    id: missionDialog
+    title: qsTr("Mission Generator")
+    modal: true
+    anchors.centerIn: parent
+    
+    // Dialog content
+    Column {
+        spacing: 10
+        
+        // Mission type selection
+        ComboBox {
+            id: missionTypeCombo
+            model: ["Survey", "Waypoint", "Orbit", "Custom"]
+        }
+        
+        // Parameter inputs
+        SpinBox {
+            id: areaSizeSpinBox
+            from: 10
+            to: 1000
+            value: 20
+        }
+    }
+    
+    // Action buttons
+    Row {
+        Button {
+            text: qsTr("Cancel")
+            onClicked: missionDialog.close()
+        }
+        Button {
+            text: qsTr("Generate Mission")
+            onClicked: {
+                // Extract parameters and emit signal
+                missionGenerated(missionTypeCombo.currentText, 
+                               areaSizeSpinBox.value, 
+                               altitudeSpinBox.value, 
+                               speedSpinBox.value)
+                missionDialog.close()
+            }
+        }
+    }
+}
+```
+
+## Null Safety Patterns
+
+### Always Check for Null
+```qml
+// Check if service is available before connecting
+Connections {
+    target: QGroundControl.missionService
+    enabled: QGroundControl.missionService !== null
+    // ... signal handlers
+}
+
+// Check for null in functions
+function addTakeoffItem(coordinate, altitude, targetVehicle) {
+    if (!coordinate || !coordinate.isValid) {
+        console.warn("Invalid coordinate provided");
+        return;
+    }
+    // ... rest of function
+}
+```
+
+### Safe Property Access
+```qml
+// Use optional chaining or null checks
+property bool hasMissionService: QGroundControl.missionService !== null
+
+// Conditional UI elements
+Button {
+    text: qsTr("Generate Mission")
+    enabled: hasMissionService
+    onClicked: {
+        if (hasMissionService) {
+            QGroundControl.missionService.generateMission(/* parameters */);
+        }
+    }
+}
+```
+
+## Debugging Patterns
+
+### QML Debug Logging
+```qml
+// Function entry logging
+function onMissionGenerationStarted() {
+    console.log("GenCall7: Mission generation started signal received");
+    // ... rest of function
+}
+
+// Parameter logging
+function addWaypointItem(coordinate, altitude, targetVehicle) {
+    console.log("GenCall66: Adding waypoint item at", coordinate.toString(), 
+                "altitude", altitude, "to vehicle", targetVehicle);
+    // ... rest of function
+}
+
+// Error logging
+function onMissionGenerationCompleted(success, message) {
+    if (!success) {
+        console.warn("Mission generation failed:", message);
+    } else {
+        console.log("Mission generation completed successfully:", message);
+    }
+}
+```
+
+## UI State Management
+
+### Dialog State Management
+```qml
+// Dialog visibility control
+property bool isDialogOpen: false
+
+function openDialog() {
+    isDialogOpen = true;
+    missionDialog.open();
+}
+
+function closeDialog() {
+    isDialogOpen = false;
+    missionDialog.close();
+}
+
+// Prevent multiple dialogs
+Button {
+    text: qsTr("Generate Mission")
+    enabled: !isDialogOpen
+    onClicked: openDialog()
+}
+```
+
+### Progress Indication
+```qml
+// Progress bar for long operations
+ProgressBar {
+    id: progressBar
+    visible: missionGenerationInProgress
+    indeterminate: true
+}
+
+// Status text updates
+Text {
+    text: missionGenerationInProgress ? 
+          qsTr("Generating mission...") : 
+          qsTr("Ready")
+}
+```
+
+## Error Handling Patterns
+
+### User-Friendly Error Messages
+```qml
+// Error dialog
+Dialog {
+    id: errorDialog
+    title: qsTr("Error")
+    Text {
+        text: errorMessage
+        wrapMode: Text.WordWrap
+    }
+    standardButtons: Dialog.Ok
+}
+
+// Error handling function
+function handleError(errorMessage) {
+    console.error("Error occurred:", errorMessage);
+    errorDialog.text = errorMessage;
+    errorDialog.open();
+}
+```
+
+### Validation Patterns
+```qml
+// Input validation
+function validateInputs() {
+    if (areaSizeSpinBox.value < 10) {
+        return qsTr("Area size must be at least 10 meters");
+    }
+    if (altitudeSpinBox.value < 5) {
+        return qsTr("Altitude must be at least 5 meters");
+    }
+    return "";
+}
+
+// Use validation before action
+Button {
+    text: qsTr("Generate Mission")
+    onClicked: {
+        var validationError = validateInputs();
+        if (validationError) {
+            handleError(validationError);
+            return;
+        }
+        // Proceed with mission generation
+    }
+}
+```

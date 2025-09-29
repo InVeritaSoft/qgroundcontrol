@@ -1,0 +1,117 @@
+---
+description: QGroundControl Waypoint Generation Patterns and Coordinate Calculations
+---
+
+# QGroundControl Waypoint Generation System
+
+## Waypoint Generation Flow
+
+### 1. Sequential Generation Pattern
+```cpp
+// In PtahMissionGenerator::generateCoordinatesInBothDirections()
+// Generates waypoints in order: 1, 2, 3, 4, 5, 6, 7, 8...
+for (int i = 1; i <= pointsInEachDirection; i++) {
+    double distance = i * gapMeters;
+    QGeoCoordinate waypoint = calculateNewCoordinates(reference, bearing, distance);
+    coordinates.append(waypoint);
+}
+```
+
+### 2. Coordinate Calculation
+```cpp
+// In PtahMissionGenerator::calculateNewCoordinates()
+QGeoCoordinate PtahMissionGenerator::calculateNewCoordinates(
+    const QGeoCoordinate& reference, 
+    double bearing, 
+    double distanceMeters)
+{
+    // Convert bearing to radians
+    double bearingRad = qDegreesToRadians(bearing);
+    
+    // Calculate new coordinates using haversine formula
+    double lat1Rad = qDegreesToRadians(reference.latitude());
+    double lng1Rad = qDegreesToRadians(reference.longitude());
+    
+    double lat2Rad = asin(sin(lat1Rad) * cos(distanceMeters / earthRadius) + 
+                         cos(lat1Rad) * sin(distanceMeters / earthRadius) * cos(bearingRad));
+    
+    double lng2Rad = lng1Rad + atan2(sin(bearingRad) * sin(distanceMeters / earthRadius) * cos(lat1Rad),
+                                     cos(distanceMeters / earthRadius) - sin(lat1Rad) * sin(lat2Rad));
+    
+    return QGeoCoordinate(qRadiansToDegrees(lat2Rad), qRadiansToDegrees(lng2Rad), reference.altitude());
+}
+```
+
+## Generation Parameters
+
+### Fixed Parameters
+- **Bearing**: 90° (East-West pattern)
+- **Gap**: 3 meters between waypoints
+- **Pattern**: Linear sequential (not zigzag)
+
+### User Parameters
+- **Area Size**: Total distance for waypoint generation
+- **Altitude**: Base altitude for all waypoints
+- **Reference Point**: Calculated from vehicle position + front distance
+
+## Waypoint Distribution Logic
+
+### Vehicle Filtering
+```cpp
+// Filter out vehicle ID 1 (for special mission later)
+QList<Vehicle*> nonId1Vehicles;
+for (int i = 0; i < vehiclesModel->count(); i++) {
+    Vehicle* vehicle = qobject_cast<Vehicle*>(vehiclesModel->get(i));
+    if (vehicle && vehicle->id() != 1) {
+        nonId1Vehicles.append(vehicle);
+    }
+}
+```
+
+### Altitude Assignment
+```cpp
+// Set different altitude for each drone to avoid collisions
+int vehicleAltitude = altitude + (i * 10); // 10m altitude difference per drone
+```
+
+## Mission Structure
+
+### Standard Mission Pattern
+1. **Takeoff**: At vehicle's current position
+2. **Waypoints**: Generated waypoints in sequence
+3. **Land**: Return to starting position
+
+### Special Mission (Vehicle ID 1)
+1. **Takeoff**: At vehicle's current position
+2. **Loiter**: Safe observation position
+3. **Land**: Return to starting position
+
+## Coordinate Validation
+
+### Always Check Validity
+```cpp
+if (!reference.isValid() || !waypoint.isValid()) {
+    qCWarning(MissionServiceLog) << "Invalid coordinate provided";
+    return;
+}
+```
+
+### Logging Coordinates
+```cpp
+qCDebug(MissionServiceLog) << "Reference point:" << reference.toString();
+qCDebug(MissionServiceLog) << "Generated waypoint:" << waypoint.toString();
+```
+
+## Error Handling
+
+### Common Error Cases
+- Invalid reference coordinates
+- Invalid bearing or distance values
+- No vehicles available for distribution
+- Mission generation failures
+
+### Recovery Strategies
+- Use default values for invalid parameters
+- Skip invalid waypoints and continue
+- Emit error signals for UI feedback
+- Log detailed error information

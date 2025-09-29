@@ -1,0 +1,52 @@
+---
+alwaysApply: true
+description: QGroundControl Mission Generation System Architecture and Patterns
+---
+
+# QGroundControl Mission Generation System
+
+## Architecture Overview
+
+The mission generation system is built with a modular architecture:
+
+- **QML Layer**: [src/QmlControls/PlanToolBarIndicators.qml](mdc:src/QmlControls/PlanToolBarIndicators.qml) - UI for mission generation
+- **Service Layer**: [src/Custom/MissionGenerator/MissionService.h](mdc:src/Custom/MissionGenerator/MissionService.h) - Main orchestration service
+- **Generator Layer**: [src/Custom/MissionGenerator/PtahMissionGenerator.h](mdc:src/Custom/MissionGenerator/PtahMissionGenerator.h) - Core waypoint generation logic
+- **Upload Layer**: [src/Custom/MissionGenerator/MissionUploadService.h](mdc:src/Custom/MissionGenerator/MissionUploadService.h) - Mission upload to vehicles
+
+## Key Patterns
+
+### QML-C++ Integration
+- Always use `Q_INVOKABLE` for methods called from QML
+- Expose services through [src/QmlControls/QGroundControlQmlGlobal.h](mdc:src/QmlControls/QGroundControlQmlGlobal.h)
+- Use signals/slots for asynchronous communication
+- Connect to `MissionService` signals: `missionGenerationStarted`, `missionGenerationCompleted`
+
+### Mission Generation Flow
+1. **Sequential Waypoints**: Generate waypoints in order 1,2,3,4,5,6,7,8... (not zigzag)
+2. **Multi-Drone Distribution**: Distribute among NON ID 1 drones with alternating pattern
+3. **Altitude Separation**: 10m difference per drone to avoid collisions
+4. **Special Mission for ID 1**: Safe observation position with loiter mission
+
+### Debugging and Logging
+- Use `qCDebug` with category names (e.g., `MissionServiceLog`, `MissionUploadServiceLog`)
+- Include GenCall numbers for tracing execution flow
+- Log all waypoint coordinates and vehicle assignments
+
+### Error Handling
+- Always check for valid coordinates using `isValid()`
+- Verify vehicle availability before operations
+- Provide meaningful error messages in signals
+
+## File Structure
+```
+src/Custom/MissionGenerator/
+├── MissionService.h/.cc          # Main orchestration
+├── PtahMissionGenerator.h/.cc    # Waypoint generation logic
+├── MissionUploadService.h/.cc    # Vehicle upload operations
+└── MissionGeneratorDialogue.qml  # UI dialogue
+```
+
+## Build Configuration
+- CMakeLists.txt in [src/Custom/CMakeLists.txt](mdc:src/Custom/CMakeLists.txt) links Qt6::Positioning and Qt6::Core
+- All custom files are included in the main CMakeLists.txt

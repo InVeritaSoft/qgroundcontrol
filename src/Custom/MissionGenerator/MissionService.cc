@@ -207,6 +207,7 @@ void MissionService::generateWaypointsFromPosition(const QGeoCoordinate& vehicle
     QList<QList<QGeoCoordinate>> distributedWaypoints = m_ptahMissionGenerator->distributeWaypointsAmongDrones(waypoints, nonId1Vehicles.size());
     
     // Upload missions with different altitudes for each drone
+    // Each mission will include: TAKEOFF -> WAYPOINTS -> LAND
     for (int i = 0; i < nonId1Vehicles.size() && i < distributedWaypoints.size(); i++) {
         Vehicle* vehicle = nonId1Vehicles[i];
         QList<QGeoCoordinate> vehicleWaypoints = distributedWaypoints[i];
@@ -214,14 +215,16 @@ void MissionService::generateWaypointsFromPosition(const QGeoCoordinate& vehicle
         // Set different altitude for each drone to avoid collisions
         int vehicleAltitude = altitude + (i * 10); // 10m altitude difference per drone
         
-        qCDebug(MissionServiceLog) << "Uploading" << vehicleWaypoints.size() << "waypoints to vehicle ID" << vehicle->id() << "at altitude" << vehicleAltitude;
+        qCDebug(MissionServiceLog) << "Uploading mission to vehicle ID" << vehicle->id() << "at altitude" << vehicleAltitude;
+        qCDebug(MissionServiceLog) << "Mission sequence: TAKEOFF ->" << vehicleWaypoints.size() << "WAYPOINTS -> LAND";
         
         // Set altitude for all waypoints
         for (QGeoCoordinate& coord : vehicleWaypoints) {
             coord.setAltitude(vehicleAltitude);
         }
         
-        // Upload to this specific vehicle
+        // Upload complete mission (takeoff + waypoints + land) to this specific vehicle
+        qCDebug(MissionServiceLog) << "Calling uploadMissionToVehicle for vehicle ID" << vehicle->id() << "with" << vehicleWaypoints.size() << "waypoints at altitude" << vehicleAltitude;
         m_uploadService->uploadMissionToVehicle(vehicle, vehicleWaypoints, vehicleAltitude);
     }
     
@@ -245,8 +248,10 @@ void MissionService::generateWaypointsFromPosition(const QGeoCoordinate& vehicle
         
         if (observationPosition.isValid()) {
             qCDebug(MissionServiceLog) << "Drone ID 1 observation position:" << observationPosition.toString();
+            qCDebug(MissionServiceLog) << "Drone ID 1 mission sequence: TAKEOFF -> LOITER -> LAND";
             
-            // Upload loiter mission to drone ID 1
+            // Upload loiter mission to drone ID 1 (includes takeoff and land)
+            qCDebug(MissionServiceLog) << "Calling uploadLoiterMissionToVehicle for drone ID 1 at position:" << observationPosition.toString() << "altitude:" << (altitude + 20);
             m_uploadService->uploadLoiterMissionToVehicle(droneId1, observationPosition, altitude + 20); // 20m higher than mission altitude
         } else {
             qCWarning(MissionServiceLog) << "Could not calculate safe observation position for drone ID 1";

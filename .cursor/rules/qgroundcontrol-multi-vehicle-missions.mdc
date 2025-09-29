@@ -1,0 +1,82 @@
+---
+globs: *.cc,*.h,*.qml
+description: Multi-Vehicle Mission Management Patterns
+---
+
+# Multi-Vehicle Mission Management
+
+## Vehicle Mission Distribution
+
+### Mission Types
+- **NON ID 1 Vehicles**: Sequential waypoint missions with altitude separation
+- **Drone ID 1**: Special observation/loiter mission at safe position
+
+### Altitude Separation Strategy
+```cpp
+// 10m altitude difference per drone to avoid collisions
+int vehicleAltitude = altitude + (i * 10);
+```
+
+### Mission Indexing
+- **Takeoff**: Always index 1 for each vehicle
+- **Waypoints**: Sequential indices 2, 3, 4, 5... within each vehicle
+- **Land**: Final index for each vehicle
+
+## Vehicle Switching in QML
+```qml
+// Store current active vehicle
+var currentVehicle = QGroundControl.multiVehicleManager.activeVehicle;
+
+// Switch to target vehicle if different
+if (targetVehicle && targetVehicle !== currentVehicle) {
+    QGroundControl.multiVehicleManager.activeVehicle = targetVehicle;
+}
+
+// Perform operation
+// ... add mission items ...
+
+// Switch back to original vehicle
+if (targetVehicle && targetVehicle !== currentVehicle) {
+    QGroundControl.multiVehicleManager.activeVehicle = currentVehicle;
+}
+```
+
+## Mission Clearing Strategy
+- **Global Clear**: Clear all vehicles at mission generation start
+- **No Individual Clearing**: Avoid clearing individual vehicles during generation
+- **Sequential Processing**: Process vehicles one at a time
+
+## Coordinate Management
+```cpp
+// Set altitude for all waypoints
+for (QGeoCoordinate& coord : vehicleWaypoints) {
+    coord.setAltitude(vehicleAltitude);
+}
+
+// Validate coordinates
+if (!coordinate.isValid()) {
+    qCWarning(MissionServiceLog) << "Invalid coordinate provided";
+    return;
+}
+```
+
+## Signal Emission Patterns
+```cpp
+// Emit signals with target vehicle
+emit addTakeoffItemRequested(takeoffCoord, vehicleAltitude, vehicle);
+emit addWaypointItemRequested(waypoint, vehicleAltitude, vehicle);
+emit addLandItemRequested(landCoord, vehicle);
+```
+
+## Error Handling
+- Check vehicle availability before operations
+- Validate mission manager exists
+- Handle altitude limits and safety margins
+- Provide meaningful error messages
+
+## Testing Multi-Vehicle Scenarios
+- Test with 2, 3, 4+ vehicles
+- Verify altitude separation (10m intervals)
+- Check mission item distribution
+- Validate special mission for drone ID 1
+- Test vehicle switching logic
