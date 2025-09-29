@@ -319,13 +319,13 @@ Item {
             // QML Mission Generator Dialogue
             MissionGeneratorDialogue {
                 id: missionGeneratorDialogue
-                onMissionGenerated: function (missionType, areaSize, altitude, speed) {
+                onMissionGenerated: function (missionType, areaSize, altitude, speed, frontDistance) {
                     // GenCall5: Signal handler receives mission parameters
-                    console.log("GenCall5: Signal handler receives mission parameters:", missionType, areaSize, altitude, speed);
+                    console.log("GenCall5: Signal handler receives mission parameters:", missionType, areaSize, altitude, speed, "front distance:", frontDistance);
                     
                     // GenCall6: Call C++ MissionService to actually generate mission
                     console.log("GenCall6: Calling C++ MissionService to generate mission");
-                    QGroundControl.missionService.generateMission(missionType, areaSize, altitude, speed, "Generated from UI");
+                    QGroundControl.missionService.generateMission(missionType, areaSize, altitude, speed, "Generated from UI", frontDistance);
                 }
             }
 

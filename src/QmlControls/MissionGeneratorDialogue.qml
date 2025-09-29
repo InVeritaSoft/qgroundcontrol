@@ -124,21 +124,20 @@ Popup {
                             top: 50.0
                         }
                     }
-                }
-            }
-        }
 
-        // Test Button
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.topMargin: ScreenTools.defaultFontPixelHeight
+                    QGCLabel {
+                        text: qsTr("Front Distance (m):")
+                    }
 
-            QGCButton {
-                text: qsTr("Test")
-                Layout.fillWidth: true
-                onClicked: {
-                    console.log("Test button clicked");
-                    getAllVehicles();
+                    QGCTextField {
+                        id: frontDistanceField
+                        text: "10"
+                        Layout.fillWidth: true
+                        validator: DoubleValidator {
+                            bottom: 1.0
+                            top: 1000.0
+                        }
+                    }
                 }
             }
         }
@@ -165,13 +164,14 @@ Popup {
                     var areaSize = parseInt(areaSizeField.text);
                     var altitude = parseInt(altitudeField.text);
                     var speed = parseFloat(speedField.text);
+                    var frontDistance = parseFloat(frontDistanceField.text);
                     
                     // GenCall2: Log mission parameters
-                    console.log("GenCall2: Logging mission parameters:", missionType, areaSize, altitude, speed);
+                    console.log("GenCall2: Logging mission parameters:", missionType, areaSize, altitude, speed, "front distance:", frontDistance);
                     
                     // GenCall3: Emit signal to parent (PlanToolBarIndicators.qml)
                     console.log("GenCall3: Emitting signal to parent");
-                    root.missionGenerated(missionType, areaSize, altitude, speed);
+                    root.missionGenerated(missionType, areaSize, altitude, speed, frontDistance);
                     
                     // GenCall4: Close the dialogue
                     console.log("GenCall4: Closing dialogue");
@@ -192,7 +192,7 @@ Popup {
     }
 
     // Signal for mission generation
-    signal missionGenerated(string missionType, int areaSize, int altitude, real speed)
+    signal missionGenerated(string missionType, int areaSize, int altitude, real speed, real frontDistance)
 
     // Get All Vehicles function
     function getAllVehicles() {

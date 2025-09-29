@@ -39,7 +39,8 @@ void MissionService::generateMission(const QString& missionType,
                                    int areaSize, 
                                    int altitude, 
                                    double speed, 
-                                   const QString& description)
+                                   const QString& description,
+                                   double frontDistance)
 {
     // GenCall8: MissionService::generateMission() - Start mission generation
     qCDebug(MissionServiceLog) << "GenCall8: MissionService::generateMission() - Starting mission generation";
@@ -48,7 +49,8 @@ void MissionService::generateMission(const QString& missionType,
                               << "Area Size:" << areaSize
                               << "Altitude:" << altitude
                               << "Speed:" << speed
-                              << "Description:" << description;
+                              << "Description:" << description
+                              << "Front Distance:" << frontDistance;
 
     // GenCall9: Store current mission parameters
     qCDebug(MissionServiceLog) << "GenCall9: Storing current mission parameters";
@@ -87,8 +89,8 @@ void MissionService::generateMission(const QString& missionType,
     
     qCDebug(MissionServiceLog) << "Active vehicle coordinates:" << vehicleCoord.toString();
     
-    // Generate waypoints directly for active vehicle (10 meters in front)
-    generateWaypointsForActiveVehicle(activeVehicle, vehicleCoord, 10.0);
+    // Generate waypoints directly for active vehicle (user-specified distance in front)
+    generateWaypointsForActiveVehicle(activeVehicle, vehicleCoord, frontDistance);
 }
 
 void MissionService::generateWaypointsForActiveVehicle(Vehicle* vehicle, const QGeoCoordinate& vehicleCoord, double frontDistanceMeters)
@@ -274,8 +276,9 @@ void MissionService::processMissionGeneration(const QString& missionType,
                                             int areaSize, 
                                             int altitude, 
                                             double speed, 
-                                            const QString& description)
+                                            const QString& description,
+                                            double frontDistance)
 {
     // This method is kept for compatibility but delegates to generateMission
-    generateMission(missionType, areaSize, altitude, speed, description);
+    generateMission(missionType, areaSize, altitude, speed, description, frontDistance);
 }

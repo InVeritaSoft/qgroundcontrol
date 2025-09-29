@@ -23,7 +23,8 @@ public:
                                     int areaSize, 
                                     int altitude, 
                                     double speed, 
-                                    const QString& description);
+                                    const QString& description,
+                                    double frontDistance = 10.0);
 
 private:
     void generateWaypointsForActiveVehicle(Vehicle* vehicle, const QGeoCoordinate& vehicleCoord, double frontDistanceMeters);
@@ -43,7 +44,8 @@ private:
                                 int areaSize, 
                                 int altitude, 
                                 double speed, 
-                                const QString& description);
+                                const QString& description,
+                                double frontDistance = 10.0);
     
     void generateWaypointsFromPosition(const QGeoCoordinate& vehiclePosition,
                                       int areaSize, 
