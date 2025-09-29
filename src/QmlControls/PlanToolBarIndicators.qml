@@ -48,10 +48,49 @@ Item {
     property real _missionPlannedDistance: _missionValid ? missionPlannedDistance : NaN
     property real _missionMaxTelemetry: _missionValid ? missionMaxTelemetry : NaN
     property real _missionTime: _missionValid ? missionTime : 0
+    
+    // Servo 10 PWM Toggler properties
+    property int _servo10PWM: 900  // Current PWM value (MIN: 900, MAX: 2500)
+    property bool _servo10Enabled: false  // Current state
     property int _batteryChangePoint: _controllerValid ? _planMasterController.missionController.batteryChangePoint : -1
     property int _batteriesRequired: _controllerValid ? _planMasterController.missionController.batteriesRequired : -1
     property bool _batteryInfoAvailable: _batteryChangePoint >= 0 || _batteriesRequired >= 0
     property real _gradient: _currentMissionItemValid && _currentMissionItem.distance > 0 ? (_currentItemIsVTOLTakeoff ? 0 : (Math.atan(_currentMissionItem.altDifference / _currentMissionItem.distance) * (180.0 / Math.PI))) : NaN
+
+    // Servo 10 PWM Toggle function
+    function toggleServo10PWM() {
+        console.log("GenCall1: toggleServo10PWM() - Toggling servo 10 PWM");
+        
+        if (!_controllerValid || !_planMasterController.controllerVehicle) {
+            console.log("GenCall2: No valid vehicle - cannot send servo command");
+            return;
+        }
+        
+        // Toggle between MIN (900) and MAX (2500)
+        if (_servo10Enabled) {
+            _servo10PWM = 900;  // MIN value
+            _servo10Enabled = false;
+            console.log("GenCall3: Setting servo 10 to MIN PWM:", _servo10PWM);
+        } else {
+            _servo10PWM = 2500; // MAX value
+            _servo10Enabled = true;
+            console.log("GenCall4: Setting servo 10 to MAX PWM:", _servo10PWM);
+        }
+        
+        // Send MAV_CMD_DO_SET_SERVO command to vehicle
+        // param1: Servo number (10)
+        // param2: PWM value (900 or 2500)
+        _planMasterController.controllerVehicle.sendMavCommand(
+            _planMasterController.controllerVehicle.defaultComponentId(),
+            183,  // MAV_CMD_DO_SET_SERVO
+            true, // showError
+            10,   // param1: Servo number
+            _servo10PWM, // param2: PWM value
+            0, 0, 0, 0, 0, 0  // param3-7: unused
+        );
+        
+        console.log("GenCall5: Servo 10 PWM command sent - Servo: 10, PWM:", _servo10PWM);
+    }
 
     property string _distanceText: isNaN(_distance) ? "-.-" : QGroundControl.unitsConversion.metersToAppSettingsHorizontalDistanceUnits(_distance).toFixed(1) + " " + QGroundControl.unitsConversion.appSettingsHorizontalDistanceUnitsString
     property string _altDifferenceText: isNaN(_altDifference) ? "-.-" : QGroundControl.unitsConversion.metersToAppSettingsVerticalDistanceUnits(_altDifference).toFixed(1) + " " + QGroundControl.unitsConversion.appSettingsVerticalDistanceUnitsString
@@ -314,6 +353,16 @@ Item {
                 buttons: Dialog.Ok
                 visible: false
                 onAccepted: visible = false
+            }
+        }
+
+        // Servo 10 PWM Toggler
+        QGCButton {
+            text: _servo10Enabled ? "Servo 10: " + _servo10PWM + " (MAX)" : "Servo 10: " + _servo10PWM + " (MIN)"
+            enabled: _controllerValid && _planMasterController.controllerVehicle
+            onClicked: {
+                console.log("GenCall6: Servo 10 PWM button clicked");
+                toggleServo10PWM();
             }
         }
     }
