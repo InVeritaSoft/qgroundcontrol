@@ -11,6 +11,14 @@ target_sources(${CMAKE_PROJECT_NAME}
         MissionGenerator/MissionUploadService.h
         MissionGenerator/PtahMissionGenerator.cc
         MissionGenerator/PtahMissionGenerator.h
+        MissionGenerator/CollisionDetectionService.cc
+        MissionGenerator/CollisionDetectionService.h
+        MissionGenerator/ShortcutManager.cc
+        MissionGenerator/ShortcutManager.h
+        MissionGenerator/CustomFirmwarePlugin.cc
+        MissionGenerator/CustomFirmwarePlugin.h
+        MissionGenerator/CustomFirmwarePluginFactory.cc
+        MissionGenerator/CustomFirmwarePluginFactory.h
 )
 
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE 

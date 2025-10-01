@@ -16,6 +16,7 @@
 #include <QtQmlIntegration/QtQmlIntegration>
 
 #include "QmlUnitsConversion.h"
+#include "Custom/MissionGenerator/ShortcutManager.h"
 
 Q_DECLARE_LOGGING_CATEGORY(GuidedActionsControllerLog)
 
@@ -24,6 +25,7 @@ class FactGroup;
 class LinkManager;
 class MissionCommandTree;
 class MissionService;
+class CollisionDetectionService;
 class MultiVehicleManager;
 class QGCCorePlugin;
 class QGCMapEngineManager;
@@ -38,6 +40,8 @@ Q_MOC_INCLUDE("ADSBVehicleManager.h")
 Q_MOC_INCLUDE("FactGroup.h")
 Q_MOC_INCLUDE("LinkManager.h")
 Q_MOC_INCLUDE("MissionCommandTree.h")
+Q_MOC_INCLUDE("Custom/MissionGenerator/CollisionDetectionService.h")
+Q_MOC_INCLUDE("Custom/MissionGenerator/ShortcutManager.h")
 Q_MOC_INCLUDE("MultiVehicleManager.h")
 Q_MOC_INCLUDE("QGCCorePlugin.h")
 Q_MOC_INCLUDE("QGCMapEngineManager.h")
@@ -75,6 +79,8 @@ public:
     Q_PROPERTY(QString              appName                 READ    appName                 CONSTANT)
     Q_PROPERTY(LinkManager*         linkManager             READ    linkManager             CONSTANT)
     Q_PROPERTY(MissionService*      missionService          READ    missionService          CONSTANT)
+    Q_PROPERTY(CollisionDetectionService* collisionDetectionService READ collisionDetectionService CONSTANT)
+    Q_PROPERTY(ShortcutManager* shortcutManager READ shortcutManager CONSTANT)
     Q_PROPERTY(MultiVehicleManager* multiVehicleManager     READ    multiVehicleManager     CONSTANT)
     Q_PROPERTY(QGCMapEngineManager* mapEngineManager        READ    mapEngineManager        CONSTANT)
     Q_PROPERTY(QGCPositionManager*  qgcPositionManger       READ    qgcPositionManger       CONSTANT)
@@ -168,6 +174,8 @@ public:
     static QString appName();
     LinkManager*            linkManager         ()  { return _linkManager; }
     MissionService*         missionService      ()  { return _missionService; }
+    CollisionDetectionService* collisionDetectionService() { return _collisionDetectionService; }
+    ShortcutManager* shortcutManager() { return _shortcutManager; }
     MultiVehicleManager*    multiVehicleManager ()  { return _multiVehicleManager; }
     QGCMapEngineManager*    mapEngineManager    ()  { return _mapEngineManager; }
     QGCPositionManager*     qgcPositionManger   ()  { return _qgcPositionManager; }
@@ -254,6 +262,8 @@ private:
     VideoManager*           _videoManager           = nullptr;
     LinkManager*            _linkManager            = nullptr;
     MissionService*         _missionService         = nullptr;
+    CollisionDetectionService* _collisionDetectionService = nullptr;
+    ShortcutManager* _shortcutManager = nullptr;
     MultiVehicleManager*    _multiVehicleManager    = nullptr;
     SettingsManager*        _settingsManager        = nullptr;
     QGCCorePlugin*          _corePlugin             = nullptr;

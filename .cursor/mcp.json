@@ -1,0 +1,13 @@
+{
+    "mcpServers": {
+        "qdrant": {
+            "command": "uvx",
+            "args": ["mcp-server-qdrant"],
+            "env": {
+              "QDRANT_LOCAL_PATH": "./qdrant",
+              "COLLECTION_NAME": "qgc",
+              "EMBEDDING_MODEL": "sentence-transformers/all-MiniLM-L6-v2"
+            }
+          }
+    }
+}

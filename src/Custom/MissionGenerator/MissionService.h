@@ -24,10 +24,16 @@ public:
                                     int altitude, 
                                     double speed, 
                                     const QString& description,
-                                    double frontDistance = 10.0);
+                                    double frontDistance = 10.0,
+                                    bool payloadDropMode = false,
+                                    int loiterTimeSeconds = 50,
+                                    int bendHeight = 10,
+                                    double payloadDropHeight = 1.5,
+                                    int servoDelaySeconds = 3,
+                                    double observationDistance = 100.0);
 
 private:
-    void generateWaypointsForActiveVehicle(Vehicle* vehicle, const QGeoCoordinate& vehicleCoord, double frontDistanceMeters);
+    void generateWaypointsForActiveVehicle(Vehicle* vehicle, const QGeoCoordinate& vehicleCoord, double frontDistanceMeters, bool payloadDropMode = false, int loiterTimeSeconds = 50, int bendHeight = 10, double payloadDropHeight = 1.5, int servoDelaySeconds = 3, double observationDistance = 100.0);
 
 signals:
     void missionGenerationStarted();
@@ -50,7 +56,13 @@ private:
     void generateWaypointsFromPosition(const QGeoCoordinate& vehiclePosition,
                                       int areaSize, 
                                       int altitude,
-                                      double frontDistanceMeters);
+                                      double frontDistanceMeters,
+                                      bool payloadDropMode = false,
+                                      int loiterTimeSeconds = 50,
+                                      int bendHeight = 10,
+                                      double payloadDropHeight = 1.5,
+                                      int servoDelaySeconds = 3,
+                                      double observationDistance = 100.0);
     
     PtahMissionGenerator* m_ptahMissionGenerator;
     MissionUploadService* m_uploadService;

@@ -25,6 +25,8 @@
 #include "MultiVehicleManager.h"
 #include "QGCLoggingCategory.h"
 #include "Custom/MissionGenerator/MissionService.h"
+#include "Custom/MissionGenerator/CollisionDetectionService.h"
+#include "Custom/MissionGenerator/ShortcutManager.h"
 #ifndef QGC_NO_SERIAL_LINK
 #include "GPSManager.h"
 #include "GPSRtk.h"
@@ -56,6 +58,8 @@ QGroundControlQmlGlobal::QGroundControlQmlGlobal(QObject *parent)
     , _videoManager(VideoManager::instance())
     , _linkManager(LinkManager::instance())
     , _missionService(new MissionService(this))
+    , _collisionDetectionService(new CollisionDetectionService(this))
+    , _shortcutManager(new ShortcutManager(this))
     , _multiVehicleManager(MultiVehicleManager::instance())
     , _settingsManager(SettingsManager::instance())
     , _corePlugin(QGCCorePlugin::instance())

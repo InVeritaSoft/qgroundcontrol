@@ -29,4 +29,19 @@ public:
     
     // Calculate safe observation position for drone ID 1
     Q_INVOKABLE QGeoCoordinate calculateSafeObservationPosition(const QGeoCoordinate& missionCenter, const QList<QGeoCoordinate>& waypoints, int altitude);
+    
+    // Calculate observation position with configurable distance from mission center
+    Q_INVOKABLE QGeoCoordinate calculateObservationPosition(const QGeoCoordinate& missionCenter, double observationDistanceMeters, int altitude);
+    
+    // Calculate bearing from observer position to mission center
+    Q_INVOKABLE double calculateBearingToMissionCenter(const QGeoCoordinate& observerPosition, const QGeoCoordinate& missionCenter);
+    
+    // Generate enhanced waypoints with payload drop pattern
+    Q_INVOKABLE QList<QGeoCoordinate> generatePayloadDropWaypoints(const QGeoCoordinate& reference, double bearing, double gapMeters, double totalDistanceMeters, int loiterTimeSeconds = 50);
+    
+    // Create mission items for payload drop pattern
+    Q_INVOKABLE QList<QObject*> createPayloadDropMissionItems(const QList<QGeoCoordinate>& waypoints, int altitude, int loiterTimeSeconds = 50);
+    
+    // Validate coordinates to prevent waypoints in oceans or invalid locations
+    Q_INVOKABLE bool isValidLandCoordinate(const QGeoCoordinate& coordinate);
 };

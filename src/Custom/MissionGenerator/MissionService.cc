@@ -40,7 +40,13 @@ void MissionService::generateMission(const QString& missionType,
                                    int altitude, 
                                    double speed, 
                                    const QString& description,
-                                   double frontDistance)
+                                   double frontDistance,
+                                   bool payloadDropMode,
+                                   int loiterTimeSeconds,
+                                   int bendHeight,
+                                   double payloadDropHeight,
+                                   int servoDelaySeconds,
+                                   double observationDistance)
 {
     // GenCall8: MissionService::generateMission() - Start mission generation
     qCDebug(MissionServiceLog) << "GenCall8: MissionService::generateMission() - Starting mission generation";
@@ -50,7 +56,12 @@ void MissionService::generateMission(const QString& missionType,
                               << "Altitude:" << altitude
                               << "Speed:" << speed
                               << "Description:" << description
-                              << "Front Distance:" << frontDistance;
+                              << "Front Distance:" << frontDistance
+                              << "Payload Drop Mode:" << payloadDropMode
+                              << "Loiter Time:" << loiterTimeSeconds << "seconds"
+                              << "Bend Height:" << bendHeight << "m"
+                              << "Payload Drop Height:" << payloadDropHeight << "m"
+                              << "Servo Delay:" << servoDelaySeconds << "seconds";
 
     // GenCall9: Store current mission parameters
     qCDebug(MissionServiceLog) << "GenCall9: Storing current mission parameters";
@@ -90,17 +101,17 @@ void MissionService::generateMission(const QString& missionType,
     qCDebug(MissionServiceLog) << "Active vehicle coordinates:" << vehicleCoord.toString();
     
     // Generate waypoints directly for active vehicle (user-specified distance in front)
-    generateWaypointsForActiveVehicle(activeVehicle, vehicleCoord, frontDistance);
+    generateWaypointsForActiveVehicle(activeVehicle, vehicleCoord, frontDistance, payloadDropMode, loiterTimeSeconds, bendHeight, payloadDropHeight, servoDelaySeconds, observationDistance);
 }
 
-void MissionService::generateWaypointsForActiveVehicle(Vehicle* vehicle, const QGeoCoordinate& vehicleCoord, double frontDistanceMeters)
+void MissionService::generateWaypointsForActiveVehicle(Vehicle* vehicle, const QGeoCoordinate& vehicleCoord, double frontDistanceMeters, bool payloadDropMode, int loiterTimeSeconds, int bendHeight, double payloadDropHeight, int servoDelaySeconds, double observationDistance)
 {
     // GenCall12: MissionService::generateWaypointsForActiveVehicle() - Generate waypoints for active vehicle only
     qCDebug(MissionServiceLog) << "GenCall12: MissionService::generateWaypointsForActiveVehicle() - Generating waypoints for active vehicle only";
     qCDebug(MissionServiceLog) << "Vehicle ID:" << vehicle->id() << "Coordinates:" << vehicleCoord.toString() << "Front distance:" << frontDistanceMeters << "m";
     
     // Generate waypoints from the vehicle's position with front offset
-    generateWaypointsFromPosition(vehicleCoord, m_currentAreaSize, m_currentAltitude, frontDistanceMeters);
+    generateWaypointsFromPosition(vehicleCoord, m_currentAreaSize, m_currentAltitude, frontDistanceMeters, payloadDropMode, loiterTimeSeconds, bendHeight, payloadDropHeight, servoDelaySeconds, observationDistance);
 }
 
 void MissionService::onVehicleDataReady(const QList<QGeoCoordinate>& vehicleCoordinates)
@@ -124,7 +135,13 @@ void MissionService::onVehicleDataReady(const QList<QGeoCoordinate>& vehicleCoor
 void MissionService::generateWaypointsFromPosition(const QGeoCoordinate& vehiclePosition,
                                                    int areaSize, 
                                                    int altitude,
-                                                   double frontDistanceMeters)
+                                                   double frontDistanceMeters,
+                                                   bool payloadDropMode,
+                                                   int loiterTimeSeconds,
+                                                   int bendHeight,
+                                                   double payloadDropHeight,
+                                                   int servoDelaySeconds,
+                                                   double observationDistance)
 {
     // GenCall19: MissionService::generateWaypointsFromPosition() - Generate waypoints for single vehicle
     qCDebug(MissionServiceLog) << "GenCall19: MissionService::generateWaypointsFromPosition() - Generating waypoints for single vehicle";
@@ -145,6 +162,54 @@ void MissionService::generateWaypointsFromPosition(const QGeoCoordinate& vehicle
     qCDebug(MissionServiceLog) << "Front reference point:" << referencePoint.toString();
     qCDebug(MissionServiceLog) << "Reference point values - Lat:" << referencePoint.latitude() << "Lng:" << referencePoint.longitude() << "Alt:" << referencePoint.altitude();
     
+    // Validate reference point - if it's in ocean, try alternative positions
+    if (!m_ptahMissionGenerator->isValidLandCoordinate(referencePoint)) {
+        qCWarning(MissionServiceLog) << "Reference point is in ocean, trying alternative positions";
+        qCDebug(MissionServiceLog) << "Reference point coordinates:" << referencePoint.latitude() << "," << referencePoint.longitude();
+        
+        // Try different directions to find a land-based reference point
+        bool foundLandReference = false;
+        for (int dir = 0; dir < 8 && !foundLandReference; dir++) {
+            double alternativeBearing = dir * 45.0; // Try every 45 degrees
+            QGeoCoordinate alternativeRef = m_ptahMissionGenerator->calculateNewCoordinates(vehiclePosition, alternativeBearing, frontDistanceMeters);
+            
+            qDebug() << "Trying reference point at bearing" << alternativeBearing << ":" << alternativeRef.toString();
+            
+            if (alternativeRef.isValid() && m_ptahMissionGenerator->isValidLandCoordinate(alternativeRef)) {
+                referencePoint = alternativeRef;
+                foundLandReference = true;
+                qCDebug(MissionServiceLog) << "Found land-based reference point at bearing" << alternativeBearing << ":" << referencePoint.toString();
+            } else {
+                qDebug() << "Reference point at bearing" << alternativeBearing << "failed validation";
+            }
+        }
+        
+        // If still no land reference found, try different distances
+        if (!foundLandReference) {
+            qCWarning(MissionServiceLog) << "No land reference found at 10m, trying different distances";
+            for (double distance = 5.0; distance <= 50.0 && !foundLandReference; distance += 5.0) {
+                for (int dir = 0; dir < 8 && !foundLandReference; dir++) {
+                    double alternativeBearing = dir * 45.0;
+                    QGeoCoordinate alternativeRef = m_ptahMissionGenerator->calculateNewCoordinates(vehiclePosition, alternativeBearing, distance);
+                    
+                    if (alternativeRef.isValid() && m_ptahMissionGenerator->isValidLandCoordinate(alternativeRef)) {
+                        referencePoint = alternativeRef;
+                        foundLandReference = true;
+                        qCDebug(MissionServiceLog) << "Found land-based reference point at bearing" << alternativeBearing << "distance" << distance << "m:" << referencePoint.toString();
+                    }
+                }
+            }
+        }
+        
+        // If still no land reference found, use the vehicle position itself
+        if (!foundLandReference) {
+            qCWarning(MissionServiceLog) << "Could not find land-based reference point, using vehicle position";
+            referencePoint = vehiclePosition;
+        }
+    }
+    
+    qCDebug(MissionServiceLog) << "Final reference point:" << referencePoint.toString();
+    
     // GenCall21: Use a fixed bearing for waypoint generation (East-West pattern)
     qCDebug(MissionServiceLog) << "GenCall21: Using fixed bearing for waypoint generation";
     double bearing = 90.0; // East-West pattern (90 degrees = East)
@@ -153,18 +218,31 @@ void MissionService::generateWaypointsFromPosition(const QGeoCoordinate& vehicle
     
     // GenCall22: Generate waypoints using PtahMissionGenerator
     qCDebug(MissionServiceLog) << "GenCall22: Generating waypoints using PtahMissionGenerator";
-    QList<QGeoCoordinate> waypoints = m_ptahMissionGenerator->generateCoordinatesInBothDirections(
-        referencePoint, bearing, 3.0, static_cast<double>(areaSize));
+    QList<QGeoCoordinate> waypoints;
+    
+    if (payloadDropMode) {
+        // Use payload drop waypoint generation
+        qCDebug(MissionServiceLog) << "Using payload drop waypoint generation";
+        waypoints = m_ptahMissionGenerator->generatePayloadDropWaypoints(
+            referencePoint, bearing, 3.0, static_cast<double>(areaSize), loiterTimeSeconds);
+    } else {
+        // Use standard waypoint generation
+        qCDebug(MissionServiceLog) << "Using standard waypoint generation";
+        waypoints = m_ptahMissionGenerator->generateCoordinatesInBothDirections(
+            referencePoint, bearing, 3.0, static_cast<double>(areaSize));
+    }
     
     qCDebug(MissionServiceLog) << "Generated" << waypoints.size() << "waypoints";
     
-    // Log first few waypoints for debugging
-    int logCount = waypoints.size() < 3 ? waypoints.size() : 3;
-    for (int i = 0; i < logCount; i++) {
+    // Log ALL waypoints for debugging
+    for (int i = 0; i < waypoints.size(); i++) {
         qCDebug(MissionServiceLog) << "Waypoint" << i << ":" << waypoints[i].toString();
     }
-    if (waypoints.size() > 3) {
-        qCDebug(MissionServiceLog) << "... and" << (waypoints.size() - 3) << "more waypoints";
+    
+    if (waypoints.isEmpty()) {
+        qCWarning(MissionServiceLog) << "No waypoints generated! This will cause empty missions.";
+        emit missionGenerationCompleted(false, "No waypoints generated");
+        return;
     }
     
     // GenCall23: Set altitude for all waypoints
@@ -217,8 +295,19 @@ void MissionService::generateWaypointsFromPosition(const QGeoCoordinate& vehicle
         // Set different altitude for each drone to avoid collisions
         int vehicleAltitude = altitude + (i * 10); // 10m altitude difference per drone
         
-        qCDebug(MissionServiceLog) << "Uploading mission to vehicle ID" << vehicle->id() << "at altitude" << vehicleAltitude;
+        qCDebug(MissionServiceLog) << "=== DRONE DISTRIBUTION ===";
+        qCDebug(MissionServiceLog) << "Drone index:" << i << "Vehicle ID:" << vehicle->id() << "at altitude" << vehicleAltitude;
+        qCDebug(MissionServiceLog) << "Waypoints assigned:" << vehicleWaypoints.size();
         qCDebug(MissionServiceLog) << "Mission sequence: TAKEOFF ->" << vehicleWaypoints.size() << "WAYPOINTS -> LAND";
+        
+        // Log first few waypoints for this drone
+        int logCount = vehicleWaypoints.size() < 3 ? vehicleWaypoints.size() : 3;
+        for (int j = 0; j < logCount; j++) {
+            qCDebug(MissionServiceLog) << "  Waypoint" << j << "for Vehicle ID" << vehicle->id() << ":" << vehicleWaypoints[j].toString();
+        }
+        if (vehicleWaypoints.size() > 3) {
+            qCDebug(MissionServiceLog) << "  ... and" << (vehicleWaypoints.size() - 3) << "more waypoints";
+        }
         
         // Set altitude for all waypoints
         for (QGeoCoordinate& coord : vehicleWaypoints) {
@@ -227,7 +316,16 @@ void MissionService::generateWaypointsFromPosition(const QGeoCoordinate& vehicle
         
         // Upload complete mission (takeoff + waypoints + land) to this specific vehicle
         qCDebug(MissionServiceLog) << "Calling uploadMissionToVehicle for vehicle ID" << vehicle->id() << "with" << vehicleWaypoints.size() << "waypoints at altitude" << vehicleAltitude;
-        m_uploadService->uploadMissionToVehicle(vehicle, vehicleWaypoints, vehicleAltitude);
+        
+        if (payloadDropMode) {
+            // Upload payload drop mission with servo commands and loiter
+            qCDebug(MissionServiceLog) << "Uploading payload drop mission for vehicle ID" << vehicle->id();
+            m_uploadService->uploadPayloadDropMissionToVehicle(vehicle, vehicleWaypoints, vehicleAltitude, loiterTimeSeconds, bendHeight, payloadDropHeight, servoDelaySeconds);
+        } else {
+            // Upload standard mission
+            qCDebug(MissionServiceLog) << "Uploading standard mission for vehicle ID" << vehicle->id();
+            m_uploadService->uploadMissionToVehicle(vehicle, vehicleWaypoints, vehicleAltitude);
+        }
     }
     
     // GenCall26: Create special observation mission for drone ID 1
@@ -244,19 +342,26 @@ void MissionService::generateWaypointsFromPosition(const QGeoCoordinate& vehicle
     }
     
     if (droneId1) {
-        // Calculate safe observation position
+        // Calculate mission center for yaw control
         QGeoCoordinate missionCenter = m_ptahMissionGenerator->calculateMiddlePoint(waypoints);
-        QGeoCoordinate observationPosition = m_ptahMissionGenerator->calculateSafeObservationPosition(missionCenter, waypoints, altitude);
         
-        if (observationPosition.isValid()) {
-            qCDebug(MissionServiceLog) << "Drone ID 1 observation position:" << observationPosition.toString();
-            qCDebug(MissionServiceLog) << "Drone ID 1 mission sequence: TAKEOFF -> LOITER -> LAND";
+        if (missionCenter.isValid() && !waypoints.isEmpty()) {
+            qCDebug(MissionServiceLog) << "Drone ID 1 mission center:" << missionCenter.toString();
+            qCDebug(MissionServiceLog) << "Drone ID 1 observation distance:" << observationDistance << "meters";
+            qCDebug(MissionServiceLog) << "Drone ID 1 mission sequence: TAKEOFF -> YAW CONTROL -> LOITER AT OBSERVATION POSITION -> LAND";
             
-            // Upload loiter mission to drone ID 1 (includes takeoff and land)
-            qCDebug(MissionServiceLog) << "Calling uploadLoiterMissionToVehicle for drone ID 1 at position:" << observationPosition.toString() << "altitude:" << (altitude + 20);
-            m_uploadService->uploadLoiterMissionToVehicle(droneId1, observationPosition, altitude + 20); // 20m higher than mission altitude
+            // Calculate observation position at configurable distance from mission center
+            QGeoCoordinate observationPosition = m_ptahMissionGenerator->calculateObservationPosition(missionCenter, observationDistance, altitude);
+            
+            if (observationPosition.isValid()) {
+                qCDebug(MissionServiceLog) << "Drone ID 1 observation position:" << observationPosition.toString();
+                qCDebug(MissionServiceLog) << "Distance from mission center:" << missionCenter.distanceTo(observationPosition) << "meters";
+                m_uploadService->uploadLoiterMissionToVehicle(droneId1, observationPosition, altitude + 20, missionCenter);
+            } else {
+                qCWarning(MissionServiceLog) << "Could not calculate valid observation position for drone ID 1";
+            }
         } else {
-            qCWarning(MissionServiceLog) << "Could not calculate safe observation position for drone ID 1";
+            qCWarning(MissionServiceLog) << "Could not calculate mission center or no waypoints available";
         }
     } else {
         qCDebug(MissionServiceLog) << "Drone ID 1 not found - skipping observation mission";
