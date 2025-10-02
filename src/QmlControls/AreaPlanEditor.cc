@@ -65,13 +65,20 @@
 #include "MissionManager.h"
 #include "MissionItem.h"
 #include "QGCCorePlugin.h"
-#include "QGCOptions.h"
+// #include "QGCOptions.h"  // Not used directly
 #include "QGroundControlQmlGlobal.h"
-#include "QGCMAVLink.h"
+// #include "QGCMAVLink.h"  // Not used directly
 #include "MissionController.h"
 #include "SimpleMissionItem.h"
 #include "MissionManager/AreaPartition.h"
 #include "QmlObjectListModel.h"
+
+// Custom Mission Generator includes
+#include "Custom/MissionGenerator/MissionService.h"
+#include "Custom/MissionGenerator/PtahMissionGenerator.h"
+#include "Custom/MissionGenerator/MissionUploadService.h"
+#include "Custom/MissionGenerator/VehicleService.h"
+#include "Custom/MissionGenerator/CollisionDetectionService.h"
 
 /**
  * @brief Constructor for AreaPlanEditor
@@ -126,8 +133,14 @@ AreaPlanEditor::AreaPlanEditor(QObject* parent)
     , _formationSpacing(5.0)
     , _isFormationTransitioning(false)
     , _leaderVehicle(nullptr)
+    , _missionService(nullptr)
+    , _ptahMissionGenerator(nullptr)
+    , _missionUploadService(nullptr)
+    , _vehicleService(nullptr)
+    , _collisionDetectionService(nullptr)
 {
-    // Initialize any additional members if needed
+    // Initialize custom mission generator services
+    initializeMissionGeneratorServices();
 }
 
 /**
@@ -3622,6 +3635,98 @@ QList<QVariant> AreaPlanEditor::generatePerDroneWaypoints(int droneIndex) const
 }
 
 /**
+ * @brief Generate all waypoints without drone distribution for New Mission Generator
+ * 
+ * This method generates all waypoints in the area without considering drone distribution.
+ * The New Mission Generator handles its own distribution system, so this method only
+ * provides the raw coordinates for all waypoints in the area.
+ * 
+ * @return QVariantList of QGeoCoordinate waypoints for the entire area
+ * 
+ * @section New Mission Generator Integration
+ * This method is specifically designed for the New Mission Generator which:
+ * - Ignores drone count input from AreaPlanEditor
+ * - Uses its own distribution algorithm
+ * - Only needs raw coordinates for processing
+ * 
+ * @section Waypoint Generation
+ * Waypoint generation includes:
+ * - All lines in the area (not distributed by drone)
+ * - All points per line
+ * - Proper coordinate calculation with rotation
+ * - Altitude setting from mission altitude
+ * 
+ * @section Coordinate Processing
+ * Coordinate processing:
+ * - Area center and dimensions
+ * - Line spacing and point distribution
+ * - Rotation angle application
+ * - Altitude band application
+ * 
+ * @note This method bypasses drone distribution logic
+ *       and provides all waypoints for external distribution.
+ * 
+ * @see generatePerDroneWaypoints()
+ * @see New Mission Generator distribution system
+ * @see AreaPlanEditor mission generation
+ */
+QList<QVariant> AreaPlanEditor::generateAllWaypointsForNewMissionGenerator() const
+{
+    QList<QVariant> waypoints;
+    
+    // Validate area parameters
+    if (_areaWidth <= 0 || _areaHeight <= 0 || _lineSpacing <= 0 || _numPoints <= 0) {
+        qDebug() << "AreaPlanEditor::generateAllWaypointsForNewMissionGenerator: Invalid area parameters";
+        return waypoints;
+    }
+    
+    qDebug() << "AreaPlanEditor::generateAllWaypointsForNewMissionGenerator: Generating all waypoints for New Mission Generator";
+    qDebug() << "  Area Width:" << _areaWidth << "m";
+    qDebug() << "  Area Height:" << _areaHeight << "m";
+    qDebug() << "  Line Spacing:" << _lineSpacing << "m";
+    qDebug() << "  Number of Points:" << _numPoints;
+    qDebug() << "  Area Rotation:" << _areaRotation << "degrees";
+    
+    // Calculate all lines in the area (not distributed by drone)
+    const int lineCount = qMax(1, static_cast<int>(qFloor(_areaHeight / _lineSpacing)));
+    
+    const qreal halfW = _areaWidth * 0.5;
+    const qreal halfH = _areaHeight * 0.5;
+    const qreal theta = qDegreesToRadians(-_areaRotation);
+    const qreal cosT = qCos(theta);
+    const qreal sinT = qSin(theta);
+    
+    auto rotateXY = [&](qreal x, qreal y) { return QPointF(x * cosT - y * sinT, x * sinT + y * cosT); };
+    auto offsetByXY = [&](const QGeoCoordinate& c, qreal dx_m, qreal dy_m) {
+        QGeoCoordinate tmp = calculateOffsetCoordinate(c, qAbs(dy_m), dy_m >= 0 ? 0.0 : 180.0);
+        return calculateOffsetCoordinate(tmp, qAbs(dx_m), dx_m >= 0 ? 90.0 : 270.0);
+    };
+    auto lineYAt = [&](int li) {
+        if (lineCount == 1) return 0.0;
+        return -halfH + (static_cast<qreal>(li) * (_areaHeight / (lineCount - 1)));
+    };
+    auto pointXAt = [&](int pi) {
+        if (_numPoints == 1) return 0.0;
+        return -halfW + (static_cast<qreal>(pi) * (_areaWidth / (_numPoints - 1)));
+    };
+    
+    // Generate waypoints for ALL lines (not distributed by drone)
+    for (int li = 0; li < lineCount; li++) {
+        const qreal y = (lineCount == 1) ? 0.0 : qBound(-halfH, lineYAt(li), halfH);
+        for (int pi = 0; pi < _numPoints; pi++) {
+            const qreal x = (_numPoints == 1) ? 0.0 : qBound(-halfW, pointXAt(pi), halfW);
+            const QPointF r = rotateXY(x, y);
+            QGeoCoordinate wp = offsetByXY(_areaCenter, r.x(), r.y());
+            wp.setAltitude(_missionAltitude); // Use base mission altitude
+            waypoints.append(QVariant::fromValue(wp));
+        }
+    }
+    
+    qDebug() << "AreaPlanEditor::generateAllWaypointsForNewMissionGenerator: Generated" << waypoints.size() << "waypoints for New Mission Generator";
+    return waypoints;
+}
+
+/**
  * @brief Inserts gripper release command at specified coordinates
  * 
  * This method adds a payload release command to the mission
@@ -6130,6 +6235,394 @@ void AreaPlanEditor::saveMissionToFile(const QList<MissionItem*>& missionItems, 
     f.close();
 }
 
-void AreaPlanEditor::useNewMissionGenerator()
+void AreaPlanEditor::useNewMissionGenerator(int vehicleId)
 {
+    qDebug() << "AreaPlanEditor::useNewMissionGenerator() - Using custom mission generator for vehicle ID:" << vehicleId;
+    
+    if (!_missionService) {
+        qWarning() << "Mission service not initialized, calling initializeMissionGeneratorServices()";
+        initializeMissionGeneratorServices();
+    }
+    
+    if (!_missionService) {
+        qWarning() << "Failed to initialize mission service";
+        return;
+    }
+    
+    // Get current area parameters from AreaPlanEditor properties
+    QString missionType = "Area Coverage";
+    int areaSize = static_cast<int>(_areaWidth); // Use area width as the size
+    int altitude = static_cast<int>(_missionAltitude);
+    double speed = 5.0; // Default speed - could be made configurable later
+    QString description = QString("Area coverage mission: %1m x %2m at %3m altitude")
+                         .arg(_areaWidth)
+                         .arg(_areaHeight)
+                         .arg(_missionAltitude);
+    
+    // Get area center and home location
+    QGeoCoordinate areaCenter = _areaCenter;
+    QGeoCoordinate homeLocation = _homeLocation.isValid() ? _homeLocation : areaCenter;
+    
+    // Use AreaPlanEditor properties for mission parameters
+    double frontDistance = _lineSpacing; // Use line spacing as front distance
+    bool payloadDropMode = _payloadReleaseEnabled; // Use payload release setting
+    int loiterTimeSeconds = static_cast<int>(_loiterTime); // Use loiter time setting
+    int bendHeight = static_cast<int>(_takeoffHeight); // Use takeoff height as bend height
+    double payloadDropHeight = 1.5; // Keep as default - could be made configurable
+    int servoDelaySeconds = 3; // Keep as default - could be made configurable
+    // Ensure safe observation distance - minimum 200m from mission area
+    double observationDistance = qMax(200.0, _areaWidth * 2.0); // At least 200m or 2x area width
+    
+    // New Mission Generator ignores drone count input - uses its own distribution system
+    // Always treat as 1 drone since we only need coordinates for distribution
+    int droneCount = 1; // Ignore _droneCount input - New Mission Generator handles distribution
+    double altitudeBandStart = _altitudeBandStart;
+    double altitudeBandStep = _altitudeBandStep;
+    double timeOffsetPerDrone = _timeOffsetPerDrone;
+    double perTargetSeparationS = _perTargetSeparationS;
+    bool rtlAfterEveryWaypoint = _rtlAfterEveryWaypoint;
+    bool loiterAfterRtl = _loiterAfterRtl;
+    double targetHoldTimeS = _targetHoldTimeS;
+    double homeTurnaroundWaitS = _homeTurnaroundWaitS;
+    
+    qDebug() << "Generating mission with parameters from AreaPlanEditor:";
+    qDebug() << "  Mission Type:" << missionType;
+    qDebug() << "  Area Size:" << areaSize << "m (width:" << _areaWidth << "m, height:" << _areaHeight << "m)";
+    qDebug() << "  Altitude:" << altitude << "m";
+    qDebug() << "  Speed:" << speed << "m/s";
+    qDebug() << "  Description:" << description;
+    qDebug() << "  Area Center:" << areaCenter.toString();
+    qDebug() << "  Home Location:" << homeLocation.toString();
+    qDebug() << "  Front Distance:" << frontDistance << "m (lineSpacing)";
+    qDebug() << "  Payload Drop Mode:" << payloadDropMode << " (payloadReleaseEnabled)";
+    qDebug() << "  Loiter Time:" << loiterTimeSeconds << "s (loiterTime)";
+    qDebug() << "  Bend Height:" << bendHeight << "m (takeoffHeight)";
+    qDebug() << "  Payload Drop Height:" << payloadDropHeight << "m";
+    qDebug() << "  Servo Delay:" << servoDelaySeconds << "s";
+    qDebug() << "  Observation Distance:" << observationDistance << "m (safe separation - min 200m or 2x area width)";
+    qDebug() << "  Multi-drone parameters:";
+    qDebug() << "    Drone Count:" << droneCount << "(ignored - New Mission Generator uses its own distribution)";
+    qDebug() << "    Altitude Band Start:" << altitudeBandStart << "m";
+    qDebug() << "    Altitude Band Step:" << altitudeBandStep << "m";
+    qDebug() << "    Time Offset Per Drone:" << timeOffsetPerDrone << "s";
+    qDebug() << "    Per Target Separation:" << perTargetSeparationS << "s";
+    qDebug() << "    RTL After Every Waypoint:" << rtlAfterEveryWaypoint;
+    qDebug() << "    Loiter After RTL:" << loiterAfterRtl;
+    qDebug() << "    Target Hold Time:" << targetHoldTimeS << "s";
+    qDebug() << "    Home Turnaround Wait:" << homeTurnaroundWaitS << "s";
+    
+    // Connect to mission generation signals for feedback
+    connect(_missionService, &MissionService::missionGenerationStarted,
+            this, &AreaPlanEditor::onMissionGenerationStarted);
+    connect(_missionService, &MissionService::missionGenerationCompleted,
+            this, &AreaPlanEditor::onMissionGenerationCompleted);
+    connect(_missionService, &MissionService::waypointsGenerated,
+            this, &AreaPlanEditor::onWaypointsGenerated);
+    
+    // Get drawn area coordinates from AreaPlanEditor
+    QList<QGeoCoordinate> drawnCoordinates = getDrawnAreaCoordinates();
+    
+    if (drawnCoordinates.isEmpty()) {
+        qWarning() << "No drawn area coordinates available - falling back to basic mission generation";
+        // Fallback to basic mission generation if no drawn coordinates
+        _missionService->generateMission(missionType, areaSize, altitude, speed, description,
+                                       frontDistance, payloadDropMode, loiterTimeSeconds,
+                                       bendHeight, payloadDropHeight, servoDelaySeconds,
+                                       observationDistance);
+    } else {
+        qDebug() << "Using drawn area coordinates for mission generation:" << drawnCoordinates.size() << "coordinates";
+        
+        // Check if this is for Vehicle ID 1 (special mission) or NON ID 1 vehicles
+        if (vehicleId == 1) {
+            qDebug() << "Generating special observation mission for Vehicle ID 1";
+            
+            // Generate special mission for Vehicle ID 1 (observation/loiter mission)
+            _missionService->generateSpecialMissionForVehicle1(areaCenter, altitude, speed, description,
+                                                              loiterTimeSeconds, observationDistance);
+        } else {
+            qDebug() << "Generating area coverage mission for NON ID 1 vehicles";
+            
+            // Check if we have pre-distribution (waypointPreview with drone assignments)
+            bool hasPreDistribution = this->hasPreDistribution();
+            
+            if (hasPreDistribution) {
+                qDebug() << "Using pre-distributed waypoints (respecting existing 0,1,0,1... pattern)";
+                
+                // Get pre-distributed coordinates
+                QList<QGeoCoordinate> preDistributedCoordinates = getDrawnAreaCoordinatesWithPreDistribution();
+                
+                // Use pre-distribution method that respects existing drone assignments
+                _missionService->generateMissionFromDrawnAreaWithPreDistribution(preDistributedCoordinates, missionType, altitude, speed, description,
+                                                                                frontDistance, payloadDropMode, loiterTimeSeconds,
+                                                                                bendHeight, payloadDropHeight, servoDelaySeconds,
+                                                                                observationDistance);
+            } else {
+                qDebug() << "Using regular waypoint distribution (2,3,4,2,3,4... pattern)";
+                
+                // Use the regular method that distributes waypoints automatically
+                _missionService->generateMissionFromDrawnArea(drawnCoordinates, missionType, altitude, speed, description,
+                                                            frontDistance, payloadDropMode, loiterTimeSeconds,
+                                                            bendHeight, payloadDropHeight, servoDelaySeconds,
+                                                            observationDistance);
+            }
+        }
+    }
+    
+    // TODO: Future enhancement - pass multi-drone parameters to MissionService
+    // when multi-drone mission generation is implemented:
+    // - droneCount, altitudeBandStart, altitudeBandStep
+    // - timeOffsetPerDrone, perTargetSeparationS
+    // - rtlAfterEveryWaypoint, loiterAfterRtl
+    // - targetHoldTimeS, homeTurnaroundWaitS
+}
+
+void AreaPlanEditor::initializeMissionGeneratorServices()
+{
+    qDebug() << "AreaPlanEditor::initializeMissionGeneratorServices() - Initializing custom mission generator services";
+    
+    // Initialize MissionService (main orchestrator)
+    if (!_missionService) {
+        _missionService = new MissionService(this);
+        qDebug() << "Created MissionService instance";
+    }
+    
+    // Initialize PtahMissionGenerator (waypoint generation logic)
+    if (!_ptahMissionGenerator) {
+        _ptahMissionGenerator = new PtahMissionGenerator(this);
+        qDebug() << "Created PtahMissionGenerator instance";
+    }
+    
+    // Initialize MissionUploadService (vehicle upload operations)
+    if (!_missionUploadService) {
+        _missionUploadService = new MissionUploadService(this);
+        qDebug() << "Created MissionUploadService instance";
+    }
+    
+    // Initialize VehicleService (vehicle management)
+    if (!_vehicleService) {
+        _vehicleService = new VehicleService(this);
+        qDebug() << "Created VehicleService instance";
+    }
+    
+    // Initialize CollisionDetectionService (collision monitoring)
+    if (!_collisionDetectionService) {
+        _collisionDetectionService = new CollisionDetectionService(this);
+        qDebug() << "Created CollisionDetectionService instance";
+    }
+    
+    qDebug() << "All custom mission generator services initialized successfully";
+}
+
+void AreaPlanEditor::onMissionGenerationStarted()
+{
+    qDebug() << "AreaPlanEditor::onMissionGenerationStarted() - Mission generation started";
+    updateStatus("Mission generation started...");
+    startProgress("Mission Generation", "Generating mission waypoints...");
+}
+
+void AreaPlanEditor::onMissionGenerationCompleted(bool success, const QString& message)
+{
+    qDebug() << "AreaPlanEditor::onMissionGenerationCompleted() - Mission generation completed:"
+             << "Success:" << success << "Message:" << message;
+    
+    if (success) {
+        updateStatus("Mission generation completed successfully: " + message);
+        finishProgress("Mission generation completed successfully");
+    } else {
+        updateStatus("Mission generation failed: " + message);
+        finishProgress("Mission generation failed");
+    }
+}
+
+void AreaPlanEditor::onWaypointsGenerated(const QList<QGeoCoordinate>& waypoints)
+{
+    qDebug() << "AreaPlanEditor::onWaypointsGenerated() - Received" << waypoints.size() << "waypoints";
+    
+    // Convert QList<QGeoCoordinate> to QVariantList for QML compatibility
+    QVariantList waypointList;
+    for (const QGeoCoordinate& coord : waypoints) {
+        QVariantMap waypoint;
+        waypoint["latitude"] = coord.latitude();
+        waypoint["longitude"] = coord.longitude();
+        waypoint["altitude"] = coord.altitude();
+        waypointList.append(waypoint);
+    }
+    
+    // Update progress
+    updateProgress(50, QString("Generated %1 waypoints").arg(waypoints.size()));
+    
+    // Emit signal to notify QML about the waypoints
+    emit waypointsGenerated(waypointList);
+    
+    qDebug() << "Converted waypoints to QVariantList for QML compatibility";
+}
+
+QObject* AreaPlanEditor::getMissionService() const
+{
+    return qobject_cast<QObject*>(_missionService);
+}
+
+QList<QGeoCoordinate> AreaPlanEditor::getDrawnAreaCoordinates() const
+{
+    qDebug() << "AreaPlanEditor::getDrawnAreaCoordinates() - Getting drawn area coordinates";
+    
+    QList<QGeoCoordinate> coordinates;
+    
+    // Use the existing waypoint generation logic that properly calculates waypoints
+    // based on the area parameters (width, height, line spacing, rotation, etc.)
+    if (_areaCenter.isValid() && _areaWidth > 0 && _areaHeight > 0) {
+        qDebug() << "Generating coordinates using proper area calculation:";
+        qDebug() << "  Area Center:" << _areaCenter.toString();
+        qDebug() << "  Area Width:" << _areaWidth << "m";
+        qDebug() << "  Area Height:" << _areaHeight << "m";
+        qDebug() << "  Line Spacing:" << _lineSpacing << "m";
+        qDebug() << "  Number of Points:" << _numPoints;
+        qDebug() << "  Area Rotation:" << _areaRotation << "degrees";
+        
+        // Generate all waypoints without drone distribution for New Mission Generator
+        // The New Mission Generator handles its own distribution, so we just need all coordinates
+        QList<QVariant> waypointVariants = generateAllWaypointsForNewMissionGenerator();
+        
+        qDebug() << "Generated" << waypointVariants.size() << "waypoints using proper area calculation";
+        
+        // Convert QVariant waypoints to QGeoCoordinate list
+        for (int i = 0; i < waypointVariants.size(); i++) {
+            QVariant waypointVariant = waypointVariants[i];
+            if (waypointVariant.canConvert<QGeoCoordinate>()) {
+                QGeoCoordinate coord = waypointVariant.value<QGeoCoordinate>();
+                if (coord.isValid()) {
+                    coordinates.append(coord);
+                    qDebug() << "Waypoint" << (i + 1) << ":" << coord.toString();
+                }
+            }
+        }
+        
+        qDebug() << "Converted" << coordinates.size() << "waypoints to QGeoCoordinate list";
+    } else {
+        qDebug() << "No valid area properties found - cannot generate coordinates";
+        qDebug() << "  Area Center valid:" << _areaCenter.isValid();
+        qDebug() << "  Area Width:" << _areaWidth;
+        qDebug() << "  Area Height:" << _areaHeight;
+    }
+    
+    qDebug() << "Returning" << coordinates.size() << "drawn area coordinates";
+    return coordinates;
+}
+
+QList<QGeoCoordinate> AreaPlanEditor::getDrawnAreaCoordinatesWithPreDistribution() const
+{
+    qDebug() << "AreaPlanEditor::getDrawnAreaCoordinatesWithPreDistribution() - Getting waypoints with pre-distribution";
+    
+    QList<QGeoCoordinate> coordinates;
+    
+    // Check if we have pre-distribution data (waypointPreview)
+    if (!_waypointPreview.isEmpty()) {
+        qDebug() << "Using pre-distribution waypoints from waypointPreview with" << _waypointPreview.size() << "drone groups";
+        
+        // Extract waypoints from all drone groups in order (0,1,0,1... pattern)
+        for (const QVariant& group : _waypointPreview) {
+            if (group.canConvert<QVariantMap>()) {
+                QVariantMap groupMap = group.toMap();
+                if (groupMap.contains("droneIndex") && groupMap.contains("waypoints")) {
+                    int droneIndex = groupMap["droneIndex"].toInt();
+                    QVariantList waypoints = groupMap["waypoints"].toList();
+                    
+                    qDebug() << "Processing drone" << droneIndex << "with" << waypoints.size() << "waypoints";
+                    
+                    // Convert waypoints to QGeoCoordinate list
+                    for (const QVariant& waypointVariant : waypoints) {
+                        if (waypointVariant.canConvert<QGeoCoordinate>()) {
+                            QGeoCoordinate coord = waypointVariant.value<QGeoCoordinate>();
+                            if (coord.isValid()) {
+                                coordinates.append(coord);
+                                qDebug() << "Pre-distributed waypoint for drone" << droneIndex << ":" << coord.toString();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        qDebug() << "Extracted" << coordinates.size() << "pre-distributed waypoints from waypointPreview";
+    } else {
+        qDebug() << "No waypointPreview data available, falling back to regular generation";
+        
+        // Fallback to regular waypoint generation
+        if (_areaCenter.isValid() && _areaWidth > 0 && _areaHeight > 0) {
+            QList<QVariant> waypointVariants = generatePerDroneWaypoints(0);
+            
+            // Convert QVariant waypoints to QGeoCoordinate list
+            for (int i = 0; i < waypointVariants.size(); i++) {
+                QVariant waypointVariant = waypointVariants[i];
+                if (waypointVariant.canConvert<QGeoCoordinate>()) {
+                    QGeoCoordinate coord = waypointVariant.value<QGeoCoordinate>();
+                    if (coord.isValid()) {
+                        coordinates.append(coord);
+                    }
+                }
+            }
+            
+            qDebug() << "Generated" << coordinates.size() << "fallback waypoints";
+        }
+    }
+    
+    qDebug() << "Returning" << coordinates.size() << "pre-distributed waypoints";
+    return coordinates;
+}
+
+QVariantList AreaPlanEditor::waypointPreview() const
+{
+    return _waypointPreview;
+}
+
+void AreaPlanEditor::setWaypointPreview(const QVariantList& waypointPreview)
+{
+    if (_waypointPreview != waypointPreview) {
+        _waypointPreview = waypointPreview;
+        emit waypointPreviewChanged();
+        
+        // Update pre-distribution status based on waypointPreview content
+        updatePreDistributionStatus();
+    }
+}
+
+bool AreaPlanEditor::hasPreDistribution() const
+{
+    return _hasPreDistribution;
+}
+
+void AreaPlanEditor::updatePreDistributionStatus()
+{
+    bool hasPreDist = false;
+    
+    // Check if waypointPreview contains pre-distributed data
+    // Look for waypoints with specific drone assignments (0,1,0,1... pattern)
+    if (!_waypointPreview.isEmpty()) {
+        qDebug() << "Checking waypointPreview for pre-distribution pattern";
+        
+        // Check if we have multiple drones with waypoints
+        int droneCount = 0;
+        for (const QVariant& group : _waypointPreview) {
+            if (group.canConvert<QVariantMap>()) {
+                QVariantMap groupMap = group.toMap();
+                if (groupMap.contains("droneIndex") && groupMap.contains("waypoints")) {
+                    QVariantList waypoints = groupMap["waypoints"].toList();
+                    if (!waypoints.isEmpty()) {
+                        droneCount++;
+                        qDebug() << "Found drone" << groupMap["droneIndex"].toInt() << "with" << waypoints.size() << "waypoints";
+                    }
+                }
+            }
+        }
+        
+        // If we have multiple drones with waypoints, consider it pre-distributed
+        hasPreDist = (droneCount > 1);
+        qDebug() << "Pre-distribution detection: droneCount=" << droneCount << ", hasPreDist=" << hasPreDist;
+    }
+    
+    if (_hasPreDistribution != hasPreDist) {
+        _hasPreDistribution = hasPreDist;
+        emit hasPreDistributionChanged();
+        qDebug() << "Pre-distribution status changed to:" << hasPreDist;
+    }
 }

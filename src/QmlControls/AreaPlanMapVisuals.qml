@@ -522,7 +522,7 @@ Item {
                     // Drone index label
                     Text {
                         anchors.centerIn: parent
-                        text: (missionPoints.droneIndex).toString()
+                        text: (missionPoints.droneIndex + 1).toString()
                         color: waypointBorderColor
                         font.pixelSize: waypointLabelSize
                         font.bold: true

@@ -5,7 +5,7 @@
 #include "Vehicle/MultiVehicleManager.h"
 #include "Vehicle/Vehicle.h"
 #include "MissionManager/MissionManager.h"
-#include "QGCApplication.h"
+// #include "QGCApplication.h"  // Not used directly
 #include "QGCLoggingCategory.h"
 #include "Settings/AppSettings.h"
 #include "Settings/SettingsManager.h"
@@ -349,7 +349,7 @@ void MissionService::generateWaypointsFromPosition(const QGeoCoordinate& vehicle
         // Set different altitude for each drone to avoid collisions
         int vehicleAltitude = altitude + (i * 10); // 10m altitude difference per drone
         
-        qCDebug(MissionServiceLog) << "=== DRONE DISTRIBUTION ===";
+        qCDebug(MissionServiceLog) << "=== NON ID 1 DRONE DISTRIBUTION ===";
         qCDebug(MissionServiceLog) << "Drone index:" << i << "Vehicle ID:" << vehicle->id() << "at altitude" << vehicleAltitude;
         qCDebug(MissionServiceLog) << "Waypoints assigned:" << vehicleWaypoints.size();
         qCDebug(MissionServiceLog) << "Mission sequence: TAKEOFF ->" << vehicleWaypoints.size() << "WAYPOINTS -> LAND";
@@ -382,10 +382,153 @@ void MissionService::generateWaypointsFromPosition(const QGeoCoordinate& vehicle
         }
     }
     
-    // GenCall26: Create special observation mission for drone ID 1
-    qCDebug(MissionServiceLog) << "GenCall26: Creating special observation mission for drone ID 1";
+    // ID1 drone is now included in regular waypoint distribution - no special loiter mission needed
+}
+
+void MissionService::onMissionUploadCompleted(bool success, const QString& message)
+{
+    // GenCall47: MissionService::onMissionUploadCompleted() - Final completion callback
+    qCDebug(MissionServiceLog) << "Mission upload completed:" << success << message;
     
-    // Find drone ID 1
+    // GenCall48: Emit final mission generation completed signal
+    emit missionGenerationCompleted(success, message);
+}
+
+void MissionService::generateMissionFromDrawnArea(const QList<QGeoCoordinate>& drawnCoordinates,
+                                                 const QString& missionType,
+                                                 int altitude,
+                                                 double speed,
+                                                 const QString& description,
+                                                 double frontDistance,
+                                                 bool payloadDropMode,
+                                                 int loiterTimeSeconds,
+                                                 int bendHeight,
+                                                 double payloadDropHeight,
+                                                 int servoDelaySeconds,
+                                                 double observationDistance)
+{
+    // GenCall70: MissionService::generateMissionFromDrawnArea() - Generate mission from AreaPlanEditor drawn coordinates
+    qCDebug(MissionServiceLog) << "GenCall70: MissionService::generateMissionFromDrawnArea() - Generating mission from drawn area coordinates";
+    qCDebug(MissionServiceLog) << "Drawn coordinates count:" << drawnCoordinates.size();
+    qCDebug(MissionServiceLog) << "Mission type:" << missionType << "Altitude:" << altitude << "Speed:" << speed;
+    qCDebug(MissionServiceLog) << "Description:" << description;
+    
+    if (drawnCoordinates.isEmpty()) {
+        qCWarning(MissionServiceLog) << "No drawn coordinates provided";
+        emit missionGenerationCompleted(false, "No drawn area coordinates provided");
+        return;
+    }
+    
+    // Store current mission parameters
+    m_currentMissionType = missionType;
+    m_currentAltitude = altitude;
+    m_currentSpeed = speed;
+    m_currentDescription = description;
+    
+    // Calculate total tripods for demining operations
+    if (payloadDropMode) {
+        const double stepDistance = 4.5; // meters between bulbs and drones
+        m_totalTripods = static_cast<int>(drawnCoordinates.size());
+        m_installedTripods = 0;
+        m_vehicleTripodCount.clear();
+        m_explodeButtonEnabled = false;
+        
+        qCDebug(MissionServiceLog) << "Demining mode: Total tripods to install:" << m_totalTripods;
+    } else {
+        resetTripodTracking();
+    }
+    
+    // Emit mission generation started signal
+    emit missionGenerationStarted();
+    
+    // Get the active vehicle from MultiVehicleManager
+    MultiVehicleManager* multiVehicleManager = MultiVehicleManager::instance();
+    Vehicle* activeVehicle = multiVehicleManager ? multiVehicleManager->activeVehicle() : nullptr;
+    
+    if (!activeVehicle) {
+        qCWarning(MissionServiceLog) << "No active vehicle found";
+        emit missionGenerationCompleted(false, "No active vehicle connected");
+        return;
+    }
+    
+    qCDebug(MissionServiceLog) << "Active vehicle found:" << activeVehicle->id();
+    
+    // Use the drawn coordinates directly as waypoints
+    QList<QGeoCoordinate> waypoints = drawnCoordinates;
+    
+    // Set altitude for all waypoints
+    for (QGeoCoordinate& coord : waypoints) {
+        coord.setAltitude(altitude);
+    }
+    
+    qCDebug(MissionServiceLog) << "Using" << waypoints.size() << "drawn coordinates as waypoints";
+    
+    // Log waypoint pattern for debugging (2,3,4,2,3,4...)
+    qCDebug(MissionServiceLog) << "Waypoint pattern: 2,3,4,2,3,4... (waypoint sequence numbers, all drones)";
+    for (int i = 0; i < waypoints.size(); i++) {
+        int waypointNumber = 2 + (i % 3); // Pattern: 2,3,4,2,3,4...
+        qCDebug(MissionServiceLog) << "Waypoint" << (i + 1) << "(pattern#" << waypointNumber << "):" << waypoints[i].toString();
+    }
+    
+    if (waypoints.isEmpty()) {
+        qCWarning(MissionServiceLog) << "No waypoints generated from drawn coordinates";
+        emit missionGenerationCompleted(false, "No waypoints generated from drawn coordinates");
+        return;
+    }
+    
+    // Emit waypoints generated signal
+    emit waypointsGenerated(waypoints);
+    
+    // Distribute waypoints among NON ID 1 drones (ID 1 gets special loiter mission)
+    QmlObjectListModel* vehiclesModel = multiVehicleManager->vehicles();
+    QList<Vehicle*> nonId1Vehicles;
+    
+    // Include NON ID 1 vehicles in waypoint distribution
+    for (int i = 0; i < vehiclesModel->count(); i++) {
+        Vehicle* vehicle = qobject_cast<Vehicle*>(vehiclesModel->get(i));
+        if (vehicle && vehicle->id() != 1) {
+            nonId1Vehicles.append(vehicle);
+        }
+    }
+    
+    if (nonId1Vehicles.isEmpty()) {
+        emit missionGenerationCompleted(false, "No non-ID1 vehicles found");
+        return;
+    }
+    
+    qCDebug(MissionServiceLog) << "Found" << nonId1Vehicles.size() << "non-ID1 vehicles for waypoint distribution";
+    
+    // Distribute waypoints among NON ID 1 vehicles
+    QList<QList<QGeoCoordinate>> distributedWaypoints = m_ptahMissionGenerator->distributeWaypointsAmongDrones(waypoints, nonId1Vehicles.size());
+    
+    // Upload missions with different altitudes for each NON ID 1 drone
+    for (int i = 0; i < nonId1Vehicles.size() && i < distributedWaypoints.size(); i++) {
+        Vehicle* vehicle = nonId1Vehicles[i];
+        QList<QGeoCoordinate> vehicleWaypoints = distributedWaypoints[i];
+        
+        // Set different altitude for each drone to avoid collisions
+        int vehicleAltitude = altitude + (i * 10); // 10m altitude difference per drone
+        
+        qCDebug(MissionServiceLog) << "=== NON ID 1 DRONE DISTRIBUTION ===";
+        qCDebug(MissionServiceLog) << "Drone index:" << i << "Vehicle ID:" << vehicle->id() << "at altitude" << vehicleAltitude;
+        qCDebug(MissionServiceLog) << "Waypoints assigned:" << vehicleWaypoints.size();
+        
+        // Set altitude for all waypoints
+        for (QGeoCoordinate& coord : vehicleWaypoints) {
+            coord.setAltitude(vehicleAltitude);
+        }
+        
+        // Upload complete mission (takeoff + waypoints + land) to this specific vehicle
+        if (payloadDropMode) {
+            qCDebug(MissionServiceLog) << "Uploading payload drop mission for vehicle ID" << vehicle->id();
+            m_uploadService->uploadPayloadDropMissionToVehicle(vehicle, vehicleWaypoints, vehicleAltitude, loiterTimeSeconds, bendHeight, payloadDropHeight, servoDelaySeconds);
+        } else {
+            qCDebug(MissionServiceLog) << "Uploading standard mission for vehicle ID" << vehicle->id();
+            m_uploadService->uploadMissionToVehicle(vehicle, vehicleWaypoints, vehicleAltitude);
+        }
+    }
+    
+    // Create special observation mission for drone ID 1
     Vehicle* droneId1 = nullptr;
     for (int i = 0; i < vehiclesModel->count(); i++) {
         Vehicle* vehicle = qobject_cast<Vehicle*>(vehiclesModel->get(i));
@@ -402,15 +545,13 @@ void MissionService::generateWaypointsFromPosition(const QGeoCoordinate& vehicle
         if (missionCenter.isValid() && !waypoints.isEmpty()) {
             qCDebug(MissionServiceLog) << "Drone ID 1 mission center:" << missionCenter.toString();
             qCDebug(MissionServiceLog) << "Drone ID 1 observation distance:" << observationDistance << "meters";
-            qCDebug(MissionServiceLog) << "Drone ID 1 mission sequence: TAKEOFF -> YAW CONTROL -> LOITER AT OBSERVATION POSITION -> LAND";
             
             // Calculate observation position at configurable distance from mission center
             QGeoCoordinate observationPosition = m_ptahMissionGenerator->calculateObservationPosition(missionCenter, observationDistance, altitude);
             
             if (observationPosition.isValid()) {
                 qCDebug(MissionServiceLog) << "Drone ID 1 observation position:" << observationPosition.toString();
-                qCDebug(MissionServiceLog) << "Distance from mission center:" << missionCenter.distanceTo(observationPosition) << "meters";
-                m_uploadService->uploadLoiterMissionToVehicle(droneId1, observationPosition, altitude + 20, missionCenter);
+                m_uploadService->uploadLoiterMissionToVehicle(droneId1, observationPosition, altitude + 50, missionCenter);
             } else {
                 qCWarning(MissionServiceLog) << "Could not calculate valid observation position for drone ID 1";
             }
@@ -420,15 +561,6 @@ void MissionService::generateWaypointsFromPosition(const QGeoCoordinate& vehicle
     } else {
         qCDebug(MissionServiceLog) << "Drone ID 1 not found - skipping observation mission";
     }
-}
-
-void MissionService::onMissionUploadCompleted(bool success, const QString& message)
-{
-    // GenCall47: MissionService::onMissionUploadCompleted() - Final completion callback
-    qCDebug(MissionServiceLog) << "Mission upload completed:" << success << message;
-    
-    // GenCall48: Emit final mission generation completed signal
-    emit missionGenerationCompleted(success, message);
 }
 
 void MissionService::processMissionGeneration(const QString& missionType, 
@@ -559,4 +691,229 @@ void MissionService::testMarkAllPayloadsInstalled()
 bool MissionService::waterAvoidanceEnabled() const
 {
     return SettingsManager::instance()->appSettings()->waterAvoidanceEnabled()->rawValue().toBool();
+}
+
+void MissionService::generateSpecialMissionForVehicle1(const QGeoCoordinate& areaCenter,
+                                                     int altitude,
+                                                     double speed,
+                                                     const QString& description,
+                                                     int loiterTimeSeconds,
+                                                     double observationDistance)
+{
+    qCDebug(MissionServiceLog) << "GenCall1: generateSpecialMissionForVehicle1() - Generating special observation mission for Vehicle ID 1";
+    
+    // Emit mission generation started signal
+    emit missionGenerationStarted();
+    
+    // Find Vehicle ID 1
+    Vehicle* vehicle1 = nullptr;
+    MultiVehicleManager* multiVehicleManager = MultiVehicleManager::instance();
+    if (multiVehicleManager) {
+        QmlObjectListModel* vehiclesModel = multiVehicleManager->vehicles();
+        for (int i = 0; i < vehiclesModel->count(); i++) {
+            Vehicle* vehicle = qobject_cast<Vehicle*>(vehiclesModel->get(i));
+            if (vehicle && vehicle->id() == 1) {
+                vehicle1 = vehicle;
+                break;
+            }
+        }
+    }
+    
+    if (!vehicle1) {
+        qCWarning(MissionServiceLog) << "GenCall2: Vehicle ID 1 not found";
+        emit missionGenerationCompleted(false, "Vehicle ID 1 not found");
+        return;
+    }
+    
+    qCDebug(MissionServiceLog) << "GenCall3: Found Vehicle ID 1, generating special observation mission";
+    
+    // Calculate safe observation position (offset from area center)
+    QGeoCoordinate observationPosition = areaCenter;
+    observationPosition.setAltitude(altitude + 20); // 20m higher than other vehicles for safety
+    
+    // Create special mission for Vehicle ID 1: Takeoff -> Loiter -> Land
+    QList<QGeoCoordinate> specialWaypoints;
+    
+    // 1. Takeoff position (same as observation position)
+    specialWaypoints.append(observationPosition);
+    
+    // 2. Loiter position (slightly offset for observation)
+    QGeoCoordinate loiterPosition = observationPosition;
+    loiterPosition.setLatitude(loiterPosition.latitude() + 0.0001); // Small offset
+    specialWaypoints.append(loiterPosition);
+    
+    // 3. Land position (back to takeoff position)
+    specialWaypoints.append(observationPosition);
+    
+    qCDebug(MissionServiceLog) << "GenCall4: Generated special mission waypoints for Vehicle ID 1:";
+    for (int i = 0; i < specialWaypoints.size(); i++) {
+        qCDebug(MissionServiceLog) << "  Waypoint" << (i+1) << ":" << specialWaypoints[i].toString();
+    }
+    
+    // Upload special mission to Vehicle ID 1
+    if (m_uploadService) {
+        qCDebug(MissionServiceLog) << "GenCall5: Uploading special mission to Vehicle ID 1";
+        
+        // Upload special loiter mission for observation
+        m_uploadService->uploadLoiterMissionToVehicle(vehicle1, observationPosition, 
+                                                     altitude + 20, areaCenter);
+        
+        qCDebug(MissionServiceLog) << "GenCall6: Special loiter mission uploaded to Vehicle ID 1";
+        emit missionGenerationCompleted(true, "Special observation mission generated for Vehicle ID 1");
+    } else {
+        qCWarning(MissionServiceLog) << "GenCall8: Mission upload service not available";
+        emit missionGenerationCompleted(false, "Mission upload service not available");
+    }
+}
+
+void MissionService::generateMissionFromDrawnAreaWithPreDistribution(const QList<QGeoCoordinate>& drawnCoordinates,
+                                                                   const QString& missionType,
+                                                                   int altitude,
+                                                                   double speed,
+                                                                   const QString& description,
+                                                                   double frontDistance,
+                                                                   bool payloadDropMode,
+                                                                   int loiterTimeSeconds,
+                                                                   int bendHeight,
+                                                                   double payloadDropHeight,
+                                                                   int servoDelaySeconds,
+                                                                   double observationDistance)
+{
+    qCDebug(MissionServiceLog) << "GenCall1: generateMissionFromDrawnAreaWithPreDistribution() - Using pre-distributed waypoints";
+    
+    // Emit mission generation started signal
+    emit missionGenerationStarted();
+    
+    // Copy waypoints and set altitude
+    QList<QGeoCoordinate> waypoints = drawnCoordinates;
+    for (QGeoCoordinate& coord : waypoints) {
+        coord.setAltitude(altitude);
+    }
+    
+    qCDebug(MissionServiceLog) << "Using" << waypoints.size() << "pre-distributed waypoints (NO redistribution)";
+    
+    // Log waypoint pattern for debugging (2,3,4,2,3,4...)
+    qCDebug(MissionServiceLog) << "Pre-distributed waypoint pattern: 2,3,4,2,3,4... (waypoint sequence numbers, respecting existing distribution)";
+    for (int i = 0; i < waypoints.size(); i++) {
+        int waypointNumber = 2 + (i % 3); // Pattern: 2,3,4,2,3,4...
+        qCDebug(MissionServiceLog) << "Pre-distributed waypoint" << (i + 1) << "(pattern#" << waypointNumber << "):" << waypoints[i].toString();
+    }
+    
+    if (waypoints.isEmpty()) {
+        qCWarning(MissionServiceLog) << "No pre-distributed waypoints provided";
+        emit missionGenerationCompleted(false, "No pre-distributed waypoints provided");
+        return;
+    }
+    
+    // Get available vehicles
+    MultiVehicleManager* multiVehicleManager = MultiVehicleManager::instance();
+    if (!multiVehicleManager) {
+        qCWarning(MissionServiceLog) << "MultiVehicleManager not available";
+        emit missionGenerationCompleted(false, "MultiVehicleManager not available");
+        return;
+    }
+    
+    QmlObjectListModel* vehiclesModel = multiVehicleManager->vehicles();
+    QList<Vehicle*> nonId1Vehicles;
+    
+    // Include NON ID 1 vehicles in waypoint distribution (ID 1 gets special loiter mission)
+    for (int i = 0; i < vehiclesModel->count(); i++) {
+        Vehicle* vehicle = qobject_cast<Vehicle*>(vehiclesModel->get(i));
+        if (vehicle && vehicle->id() != 1) {
+            nonId1Vehicles.append(vehicle);
+        }
+    }
+    
+    if (nonId1Vehicles.isEmpty()) {
+        emit missionGenerationCompleted(false, "No non-ID1 vehicles found");
+        return;
+    }
+    
+    qCDebug(MissionServiceLog) << "Found" << nonId1Vehicles.size() << "non-ID1 vehicles for pre-distributed mission";
+    
+    // IMPORTANT: Do NOT redistribute waypoints - use them as-is with pre-distribution
+    // The waypoints are already assigned to specific drones in the 1,2,1,2,1,2... pattern (user-facing)
+    
+    // Upload missions with different altitudes for each NON ID 1 drone
+    // We'll distribute waypoints evenly among available NON ID 1 vehicles while respecting the pattern
+    int waypointsPerVehicle = waypoints.size() / nonId1Vehicles.size();
+    int remainingWaypoints = waypoints.size() % nonId1Vehicles.size();
+    
+    qCDebug(MissionServiceLog) << "Pre-distribution: Each NON ID 1 vehicle gets" << waypointsPerVehicle << "waypoints, with" << remainingWaypoints << "extra";
+    
+    int waypointIndex = 0;
+    for (int i = 0; i < nonId1Vehicles.size(); i++) {
+        Vehicle* vehicle = nonId1Vehicles[i];
+        
+        // Calculate how many waypoints this vehicle gets
+        int vehicleWaypointCount = waypointsPerVehicle;
+        if (i < remainingWaypoints) {
+            vehicleWaypointCount++; // Give extra waypoints to first few vehicles
+        }
+        
+        // Extract waypoints for this vehicle
+        QList<QGeoCoordinate> vehicleWaypoints;
+        for (int j = 0; j < vehicleWaypointCount && waypointIndex < waypoints.size(); j++) {
+            vehicleWaypoints.append(waypoints[waypointIndex]);
+            waypointIndex++;
+        }
+        
+        // Set different altitude for each drone to avoid collisions
+        int vehicleAltitude = altitude + (i * 10); // 10m altitude difference per drone
+        
+        qCDebug(MissionServiceLog) << "=== PRE-DISTRIBUTED NON ID 1 MISSION ===";
+        qCDebug(MissionServiceLog) << "Vehicle ID:" << vehicle->id() << "at altitude" << vehicleAltitude;
+        qCDebug(MissionServiceLog) << "Pre-distributed waypoints assigned:" << vehicleWaypoints.size();
+        
+        // Set altitude for all waypoints
+        for (QGeoCoordinate& coord : vehicleWaypoints) {
+            coord.setAltitude(vehicleAltitude);
+        }
+        
+        // Upload complete mission (takeoff + waypoints + land) to this specific vehicle
+        if (payloadDropMode) {
+            qCDebug(MissionServiceLog) << "Uploading pre-distributed payload drop mission for vehicle ID" << vehicle->id();
+            m_uploadService->uploadPayloadDropMissionToVehicle(vehicle, vehicleWaypoints, vehicleAltitude, loiterTimeSeconds, bendHeight, payloadDropHeight, servoDelaySeconds);
+        } else {
+            qCDebug(MissionServiceLog) << "Uploading pre-distributed standard mission for vehicle ID" << vehicle->id();
+            m_uploadService->uploadMissionToVehicle(vehicle, vehicleWaypoints, vehicleAltitude);
+        }
+    }
+    
+    // Create special observation mission for drone ID 1
+    Vehicle* droneId1 = nullptr;
+    for (int i = 0; i < vehiclesModel->count(); i++) {
+        Vehicle* vehicle = qobject_cast<Vehicle*>(vehiclesModel->get(i));
+        if (vehicle && vehicle->id() == 1) {
+            droneId1 = vehicle;
+            break;
+        }
+    }
+    
+    if (droneId1) {
+        // Calculate mission center for yaw control
+        QGeoCoordinate missionCenter = m_ptahMissionGenerator->calculateMiddlePoint(waypoints);
+        
+        if (missionCenter.isValid() && !waypoints.isEmpty()) {
+            qCDebug(MissionServiceLog) << "Drone ID 1 mission center:" << missionCenter.toString();
+            qCDebug(MissionServiceLog) << "Drone ID 1 observation distance:" << observationDistance << "meters";
+            
+            // Calculate observation position at configurable distance from mission center
+            QGeoCoordinate observationPosition = m_ptahMissionGenerator->calculateObservationPosition(missionCenter, observationDistance, altitude);
+            
+            if (observationPosition.isValid()) {
+                qCDebug(MissionServiceLog) << "Drone ID 1 observation position:" << observationPosition.toString();
+                m_uploadService->uploadLoiterMissionToVehicle(droneId1, observationPosition, altitude + 50, missionCenter);
+            } else {
+                qCWarning(MissionServiceLog) << "Could not calculate valid observation position for drone ID 1";
+            }
+        } else {
+            qCWarning(MissionServiceLog) << "Could not calculate mission center or no waypoints available";
+        }
+    } else {
+        qCWarning(MissionServiceLog) << "Drone ID 1 not found for special observation mission";
+    }
+    
+    qCDebug(MissionServiceLog) << "Pre-distributed mission generation completed with" << waypoints.size() << "waypoints";
+    emit missionGenerationCompleted(true, "Pre-distributed mission generated successfully");
 }

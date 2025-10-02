@@ -360,6 +360,10 @@ Item {
 			console.log("  isDrawingMode:", areaPlanEditor.isDrawingMode)
             // Initialize preview data
             waypointPreview = areaPlanEditor.computePerDroneWaypointPreview()
+            // Sync with C++ backend
+            if (areaPlanEditor && areaPlanEditor.setWaypointPreview) {
+                areaPlanEditor.setWaypointPreview(waypointPreview)
+            }
 		}
 	}
 
@@ -2343,14 +2347,64 @@ var err = _safeValidate("numPoints", parseInt(text))
                                     }
                                 }
 
+								// Payload Drop Mode Toggle
+								Row {
+									width: parent.width
+									height: _h
+									spacing: _w
+									QGCLabel {
+										text: qsTr("Payload Drop Mode:")
+										anchors.verticalCenter: parent.verticalCenter
+									}
+									QGCCheckBox {
+										id: payloadDropModeCheckBox
+										checked: areaPlanEditor ? areaPlanEditor.payloadReleaseEnabled : false
+										onCheckedChanged: {
+											if (areaPlanEditor) {
+												areaPlanEditor.payloadReleaseEnabled = checked
+											}
+										}
+										anchors.verticalCenter: parent.verticalCenter
+										ToolTip.visible: hovered
+										ToolTip.text: qsTr("Enable payload drop mode for mission generation. When enabled, missions will include payload drop commands at waypoints.")
+									}
+									QGCLabel {
+										text: payloadDropModeCheckBox.checked ? qsTr("(Payload Drop Enabled)") : qsTr("(Carry Mode)")
+										color: payloadDropModeCheckBox.checked ? "#00ff00" : "#ffaa00"
+										font.bold: true
+										anchors.verticalCenter: parent.verticalCenter
+									}
+								}
+
 								Row {
 									width: parent.width
 									height: _h * 2
 									spacing: _w
 									QGCButton {
-										text: qsTr("Use New Mission Generator")
+										text: payloadDropModeCheckBox.checked ? 
+											  qsTr("Use New Mission Generator (Payload Drop)") : 
+											  qsTr("Use New Mission Generator (Carry)")
 										onClicked: {
 											areaPlanEditor.useNewMissionGenerator()
+										}
+									}
+
+									QGCButton {
+										text: payloadDropModeCheckBox.checked ? 
+											  qsTr("Use New Mission Generator (ID1 - Payload Drop)") : 
+											  qsTr("Use New Mission Generator (ID1)")
+										onClicked: {
+											areaPlanEditor.useNewMissionGenerator(1)
+										}
+									}
+									
+									QGCButton {
+										text: payloadDropModeCheckBox.checked ? 
+											  qsTr("Use New Mission Generator (Pre-Distributed - Payload Drop)") : 
+											  qsTr("Use New Mission Generator (Pre-Distributed)")
+										onClicked: {
+											// This would use pre-distribution mode when implemented
+											areaPlanEditor.useNewMissionGenerator() // Calls with default -1, but respects pre-distribution
 										}
 									}
 								}
@@ -2684,7 +2738,7 @@ var err = _safeValidate("numPoints", parseInt(text))
                                         spacing: _w
 
                                         QGCLabel {
-                                            text: qsTr("Aircraft %1").arg(modelData.droneIndex)
+                                            text: qsTr("Aircraft %1").arg(modelData.droneIndex + 1)
                                             width: parent.width * 0.3
                                             height: parent.height
                                             verticalAlignment: Text.AlignVCenter

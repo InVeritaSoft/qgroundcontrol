@@ -19,6 +19,7 @@ public:
     void uploadMissionToVehicle(Vehicle* vehicle, const QList<QGeoCoordinate>& waypoints, int altitude);
     void uploadLoiterMissionToVehicle(Vehicle* vehicle, const QGeoCoordinate& loiterPosition, int altitude, const QGeoCoordinate& missionCenter = QGeoCoordinate());
     void uploadPayloadDropMissionToVehicle(Vehicle* vehicle, const QList<QGeoCoordinate>& waypoints, int altitude, int loiterTimeSeconds, int bendHeight, double payloadDropHeight, int servoDelaySeconds);
+    void clearMission(Vehicle* vehicle);
 
 signals:
     void missionUploadCompleted(bool success, const QString& message);

@@ -487,3 +487,22 @@ void MissionUploadService::uploadPayloadDropMissionToVehicle(Vehicle* vehicle, c
         emit missionUploadCompleted(false, QString("No mission manager for vehicle %1").arg(vehicle->id()));
     }
 }
+
+void MissionUploadService::clearMission(Vehicle* vehicle)
+{
+    qCDebug(MissionUploadServiceLog) << "GenCall1: clearMission() - Clearing mission for vehicle" << vehicle->id();
+    
+    if (!vehicle) {
+        qCWarning(MissionUploadServiceLog) << "GenCall2: Invalid vehicle provided";
+        return;
+    }
+    
+    if (!vehicle->missionManager()) {
+        qCWarning(MissionUploadServiceLog) << "GenCall3: No mission manager for vehicle" << vehicle->id();
+        return;
+    }
+    
+    // Note: Mission clearing is handled by the mission generation process
+    // The new mission will overwrite the existing one
+    qCDebug(MissionUploadServiceLog) << "GenCall4: Mission will be overwritten for vehicle" << vehicle->id();
+}

@@ -32,6 +32,40 @@ public:
                                     int servoDelaySeconds = 3,
                                     double observationDistance = 100.0);
 
+    // New polymorphic method for AreaPlanEditor integration
+    Q_INVOKABLE void generateMissionFromDrawnArea(const QList<QGeoCoordinate>& drawnCoordinates,
+                                                 const QString& missionType,
+                                                 int altitude,
+                                                 double speed,
+                                                 const QString& description,
+                                                 double frontDistance = 10.0,
+                                                 bool payloadDropMode = false,
+                                                 int loiterTimeSeconds = 50,
+                                                 int bendHeight = 10,
+                                                 double payloadDropHeight = 1.5,
+                                                 int servoDelaySeconds = 3,
+                                                 double observationDistance = 100.0);
+    
+    Q_INVOKABLE void generateSpecialMissionForVehicle1(const QGeoCoordinate& areaCenter,
+                                                      int altitude,
+                                                      double speed,
+                                                      const QString& description,
+                                                      int loiterTimeSeconds = 50,
+                                                      double observationDistance = 100.0);
+    
+    Q_INVOKABLE void generateMissionFromDrawnAreaWithPreDistribution(const QList<QGeoCoordinate>& drawnCoordinates,
+                                                                    const QString& missionType,
+                                                                    int altitude,
+                                                                    double speed,
+                                                                    const QString& description,
+                                                                    double frontDistance = 10.0,
+                                                                    bool payloadDropMode = false,
+                                                                    int loiterTimeSeconds = 50,
+                                                                    int bendHeight = 10,
+                                                                    double payloadDropHeight = 1.5,
+                                                                    int servoDelaySeconds = 3,
+                                                                    double observationDistance = 100.0);
+
     // Tripod tracking methods for demining operations
     Q_INVOKABLE void reportTripodInstalled(int vehicleId);
     Q_INVOKABLE bool isExplodeButtonEnabled() const;

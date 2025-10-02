@@ -1,5 +1,4 @@
 #include "PtahMissionGenerator.h"
-#include "QGCApplication.h"
 #include "Settings/AppSettings.h"
 #include "Settings/SettingsManager.h"
 #include <QtMath>
@@ -569,7 +568,7 @@ QGeoCoordinate PtahMissionGenerator::calculateObservationPosition(const QGeoCoor
     double bearing = 45.0; // 45 degrees northeast
     
     QGeoCoordinate observationPosition = calculateNewCoordinates(missionCenter, bearing, observationDistanceMeters);
-    observationPosition.setAltitude(altitude + 20); // 20m higher than mission altitude
+    observationPosition.setAltitude(altitude + 50); // 50m higher than mission altitude for safe separation
     
     qDebug() << "Observation position calculated:" << observationPosition.toString();
     qDebug() << "Distance from mission center:" << missionCenter.distanceTo(observationPosition) << "meters";
