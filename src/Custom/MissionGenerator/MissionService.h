@@ -4,7 +4,6 @@
 #include <QString>
 #include <QGeoCoordinate>
 #include <QList>
-#include <QSet>
 
 class PtahMissionGenerator;
 class MissionUploadService;
@@ -33,11 +32,14 @@ public:
                                     int servoDelaySeconds = 3,
                                     double observationDistance = 100.0);
 
-    Q_INVOKABLE void markPayloadInstalled(int vehicleId);
-    Q_INVOKABLE bool areAllPayloadsInstalled() const;
-    Q_INVOKABLE void triggerDeminingSuccess();
-    Q_INVOKABLE void showDeminingAreaOverlay();
-    Q_INVOKABLE void testMarkAllPayloadsInstalled(); // For testing purposes
+    // Tripod tracking methods for demining operations
+    Q_INVOKABLE void reportTripodInstalled(int vehicleId);
+    Q_INVOKABLE bool isExplodeButtonEnabled() const;
+    Q_INVOKABLE void executeExplode();
+    Q_INVOKABLE void resetTripodTracking();
+
+    // Water avoidance settings (read from global AppSettings)
+    Q_INVOKABLE bool waterAvoidanceEnabled() const;
 
 private:
     void generateWaypointsForActiveVehicle(Vehicle* vehicle, const QGeoCoordinate& vehicleCoord, double frontDistanceMeters, bool payloadDropMode = false, int loiterTimeSeconds = 50, int bendHeight = 10, double payloadDropHeight = 1.5, int servoDelaySeconds = 3, double observationDistance = 100.0);
@@ -47,9 +49,10 @@ signals:
     void missionGenerationProgress(int current, int total);
     void missionGenerationCompleted(bool success, const QString& message);
     void waypointsGenerated(const QList<QGeoCoordinate>& waypoints);
-    void payloadInstallationCompleted();
+    void tripodInstalled(int vehicleId, int tripodCount, int totalTripods);
+    void allTripodsInstalled();
+    void explodeButtonEnabled(bool enabled);
     void deminingSuccess();
-    void showDeminingAreaOverlay(const QGeoCoordinate& center, double size);
 
 private slots:
     void onVehicleDataReady(const QList<QGeoCoordinate>& vehicleCoordinates);
@@ -85,11 +88,9 @@ private:
     double m_currentSpeed;
     QString m_currentDescription;
     
-    // Payload tracking
-    QSet<int> m_installedPayloads;
-    QSet<int> m_expectedPayloadVehicles;
-    
-    // Demining area tracking
-    QGeoCoordinate m_deminingAreaCenter;
-    double m_deminingAreaSize;
+    // Tripod tracking for demining operations
+    int m_totalTripods;
+    int m_installedTripods;
+    QMap<int, int> m_vehicleTripodCount; // vehicleId -> tripod count
+    bool m_explodeButtonEnabled;
 };

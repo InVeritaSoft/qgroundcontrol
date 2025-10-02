@@ -382,3 +382,5 @@ QLocale::Language AppSettings::_qLocaleLanguageEarlyAccess(void)
 
     return localeLanguage;
 }
+
+DECLARE_SETTINGSFACT(AppSettings, waterAvoidanceEnabled)

@@ -159,6 +159,63 @@ Item {
             }
         }
         
+        // Water avoidance settings
+        Rectangle {
+            width: parent.width
+            height: waterAvoidanceColumn.height + 20
+            color: Qt.rgba(0, 0, 0, 0.1)
+            radius: 5
+            
+            Column {
+                id: waterAvoidanceColumn
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: 10
+                spacing: 5
+                
+                QGCLabel {
+                    text: qsTr("Safety Settings")
+                    font.pointSize: 12
+                    font.bold: true
+                }
+                
+                // Water avoidance toggle
+                Row {
+                    width: parent.width
+                    spacing: 10
+                    
+                    QGCLabel {
+                        text: qsTr("Water Avoidance:")
+                        width: 120
+                    }
+                    
+                    QGCSwitch {
+                        id: waterAvoidanceSwitch
+                        checked: QGroundControl.settingsManager ? QGroundControl.settingsManager.appSettings.waterAvoidanceEnabled.rawValue : false
+                        onToggled: {
+                            if (QGroundControl.settingsManager) {
+                                QGroundControl.settingsManager.appSettings.waterAvoidanceEnabled.rawValue = checked
+                            }
+                        }
+                    }
+                    
+                    QGCLabel {
+                        text: waterAvoidanceSwitch.checked ? qsTr("Enabled") : qsTr("Disabled")
+                        color: waterAvoidanceSwitch.checked ? "green" : "red"
+                    }
+                }
+                
+                QGCLabel {
+                    text: qsTr("When enabled, prevents mission generation over water areas")
+                    font.pointSize: 10
+                    color: "gray"
+                    wrapMode: Text.WordWrap
+                    width: parent.width
+                }
+            }
+        }
+        
         // Area manipulation controls
         Rectangle {
             width: parent.width

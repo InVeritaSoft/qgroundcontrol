@@ -261,6 +261,13 @@
     "shortDesc": "AirLink Password",
     "type": "string",
     "default": ""
+},
+{
+    "name": "waterAvoidanceEnabled",
+    "shortDesc": "Enable water avoidance for mission generation",
+    "longDesc": "When enabled, prevents mission generation over water areas to ensure flight safety. Disable only for testing purposes.",
+    "type": "bool",
+    "default": false
 }
 ]
 }

@@ -22,7 +22,6 @@ Q_DECLARE_LOGGING_CATEGORY(PlanMasterControllerLog)
 class QmlObjectListModel;
 class MultiVehicleManager;
 class Vehicle;
-class AreaPlanEditor;
 
 /// Master controller for mission, fence, rally
 class PlanMasterController : public QObject
@@ -57,7 +56,6 @@ public:
     Q_PROPERTY(QStringList              loadNameFilters         READ loadNameFilters                        CONSTANT)                       ///< File filter list loading plan files
     Q_PROPERTY(QStringList              saveNameFilters         READ saveNameFilters                        CONSTANT)                       ///< File filter list saving plan files
     Q_PROPERTY(QmlObjectListModel*      planCreators            MEMBER _planCreators                        NOTIFY planCreatorsChanged)
-    Q_PROPERTY(AreaPlanEditor*          areaPlanEditor          READ areaPlanEditor                          CONSTANT)
 
     /// Should be called immediately upon Component.onCompleted.
     Q_INVOKABLE void start(void);
@@ -91,7 +89,6 @@ public:
     MissionController*      missionController(void)     { return &_missionController; }
     GeoFenceController*     geoFenceController(void)    { return &_geoFenceController; }
     RallyPointController*   rallyPointController(void)  { return &_rallyPointController; }
-    AreaPlanEditor*         areaPlanEditor(void)        { return _areaPlanEditor; }
 
     bool        offline         (void) const { return _offline; }
     bool        containsItems   (void) const;
@@ -151,7 +148,6 @@ private:
     MissionController       _missionController;
     GeoFenceController      _geoFenceController;
     RallyPointController    _rallyPointController;
-    AreaPlanEditor*         _areaPlanEditor;
     bool                    _loadGeoFence =             false;
     bool                    _loadRallyPoints =          false;
     bool                    _sendGeoFence =             false;

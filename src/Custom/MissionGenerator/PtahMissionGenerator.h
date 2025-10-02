@@ -44,4 +44,5 @@ public:
     
     // Validate coordinates to prevent waypoints in oceans or invalid locations
     Q_INVOKABLE bool isValidLandCoordinate(const QGeoCoordinate& coordinate);
+    
 };

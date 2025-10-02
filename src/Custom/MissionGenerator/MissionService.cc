@@ -7,6 +7,8 @@
 #include "MissionManager/MissionManager.h"
 #include "QGCApplication.h"
 #include "QGCLoggingCategory.h"
+#include "Settings/AppSettings.h"
+#include "Settings/SettingsManager.h"
 #include <QObject>
 #include <QString>
 #include <QTimer>
@@ -20,6 +22,9 @@ MissionService::MissionService(QObject* parent)
     , m_ptahMissionGenerator(nullptr)
     , m_uploadService(nullptr)
     , m_vehicleService(nullptr)
+    , m_totalTripods(0)
+    , m_installedTripods(0)
+    , m_explodeButtonEnabled(false)
 {
     m_ptahMissionGenerator = new PtahMissionGenerator(this);
     m_uploadService = new MissionUploadService(this);
@@ -72,6 +77,23 @@ void MissionService::generateMission(const QString& missionType,
     m_currentAltitude = altitude;
     m_currentSpeed = speed;
     m_currentDescription = description;
+    
+    // Calculate total tripods for demining operations
+    if (payloadDropMode) {
+        // For demining operations, calculate tripods based on area size
+        // Each waypoint represents a tripod installation point
+        const double stepDistance = 4.5; // meters between bulbs and drones
+        m_totalTripods = static_cast<int>(areaSize / stepDistance);
+        m_installedTripods = 0;
+        m_vehicleTripodCount.clear();
+        m_explodeButtonEnabled = false;
+        
+        qCDebug(MissionServiceLog) << "Demining mode: Total tripods to install:" << m_totalTripods;
+        qCDebug(MissionServiceLog) << "Step distance:" << stepDistance << "m, Area size:" << areaSize << "m";
+    } else {
+        // Reset tripod tracking for non-demining missions
+        resetTripodTracking();
+    }
 
     // GenCall10: Emit mission generation started signal
     qCDebug(MissionServiceLog) << "GenCall10: Emitting mission generation started signal";
@@ -249,13 +271,6 @@ void MissionService::generateWaypointsFromPosition(const QGeoCoordinate& vehicle
     
     qCDebug(MissionServiceLog) << "Generated" << waypoints.size() << "waypoints";
     
-    // Store demining area information for overlay
-    if (!waypoints.isEmpty()) {
-        m_deminingAreaCenter = m_ptahMissionGenerator->calculateMiddlePoint(waypoints);
-        m_deminingAreaSize = static_cast<double>(areaSize);
-        qCDebug(MissionServiceLog) << "Demining area center calculated:" << m_deminingAreaCenter.toString() << "Size:" << m_deminingAreaSize;
-    }
-    
     // Log ALL waypoints for debugging
     for (int i = 0; i < waypoints.size(); i++) {
         qCDebug(MissionServiceLog) << "Waypoint" << i << ":" << waypoints[i].toString();
@@ -290,17 +305,11 @@ void MissionService::generateWaypointsFromPosition(const QGeoCoordinate& vehicle
     QmlObjectListModel* vehiclesModel = multiVehicleManager->vehicles();
     QList<Vehicle*> nonId1Vehicles;
     
-    // Clear previous payload tracking
-    m_installedPayloads.clear();
-    m_expectedPayloadVehicles.clear();
-    
     // Filter out vehicle ID 1 (for special mission later)
     for (int i = 0; i < vehiclesModel->count(); i++) {
         Vehicle* vehicle = qobject_cast<Vehicle*>(vehiclesModel->get(i));
         if (vehicle && vehicle->id() != 1) {
             nonId1Vehicles.append(vehicle);
-            // Track which vehicles should have payloads (all non-ID 1 vehicles)
-            m_expectedPayloadVehicles.insert(vehicle->id());
         }
     }
     
@@ -416,65 +425,66 @@ void MissionService::processMissionGeneration(const QString& missionType,
     generateMission(missionType, areaSize, altitude, speed, description, frontDistance);
 }
 
-void MissionService::markPayloadInstalled(int vehicleId)
+// Tripod tracking methods for demining operations
+void MissionService::reportTripodInstalled(int vehicleId)
 {
-    qCDebug(MissionServiceLog) << "GenCall66: Marking payload installed for vehicle ID:" << vehicleId;
-    m_installedPayloads.insert(vehicleId);
+    qCDebug(MissionServiceLog) << "GenCall60: Tripod installed by vehicle" << vehicleId;
     
-    // Check if all expected payloads are installed
-    if (areAllPayloadsInstalled()) {
-        qCDebug(MissionServiceLog) << "GenCall67: All payloads installed! Enabling explode button";
-        emit payloadInstallationCompleted();
+    // Increment tripod count for this vehicle
+    m_vehicleTripodCount[vehicleId]++;
+    m_installedTripods++;
+    
+    qCDebug(MissionServiceLog) << "Vehicle" << vehicleId << "tripod count:" << m_vehicleTripodCount[vehicleId];
+    qCDebug(MissionServiceLog) << "Total installed tripods:" << m_installedTripods << "of" << m_totalTripods;
+    
+    // Emit tripod installed signal
+    emit tripodInstalled(vehicleId, m_vehicleTripodCount[vehicleId], m_totalTripods);
+    
+    // Check if all tripods are installed
+    if (m_installedTripods >= m_totalTripods) {
+        qCDebug(MissionServiceLog) << "All tripods installed - enabling explode button";
+        m_explodeButtonEnabled = true;
+        emit allTripodsInstalled();
+        emit explodeButtonEnabled(true);
     }
 }
 
-bool MissionService::areAllPayloadsInstalled() const
+bool MissionService::isExplodeButtonEnabled() const
 {
-    qCDebug(MissionServiceLog) << "GenCall68: Checking payload installation status";
-    qCDebug(MissionServiceLog) << "Installed payloads:" << m_installedPayloads.size() << "Expected:" << m_expectedPayloadVehicles.size();
-    
-    // Check if all expected vehicles have installed payloads
-    for (int vehicleId : m_expectedPayloadVehicles) {
-        if (!m_installedPayloads.contains(vehicleId)) {
-            qCDebug(MissionServiceLog) << "Vehicle ID" << vehicleId << "payload not yet installed";
-            return false;
-        }
-    }
-    
-    qCDebug(MissionServiceLog) << "All payloads are installed!";
-    return true;
+    return m_explodeButtonEnabled;
 }
 
-void MissionService::triggerDeminingSuccess()
+void MissionService::executeExplode()
 {
-    qCDebug(MissionServiceLog) << "GenCall69: Triggering demining success dialog";
-    emit deminingSuccess();
-}
-
-void MissionService::showDeminingAreaOverlay()
-{
-    qCDebug(MissionServiceLog) << "GenCall70: Showing demining area overlay";
+    qCDebug(MissionServiceLog) << "GenCall61: Executing explode command";
     
-    // Check if we have valid demining area data
-    if (!m_deminingAreaCenter.isValid() || m_deminingAreaSize <= 0) {
-        qCWarning(MissionServiceLog) << "No valid demining area data available";
+    if (!m_explodeButtonEnabled) {
+        qCWarning(MissionServiceLog) << "Explode button not enabled - cannot execute";
         return;
     }
     
-    qCDebug(MissionServiceLog) << "Demining area center:" << m_deminingAreaCenter.toString() << "Size:" << m_deminingAreaSize;
-    emit showDeminingAreaOverlay(m_deminingAreaCenter, m_deminingAreaSize);
+    // Emit demining success signal
+    emit deminingSuccess();
+    
+    qCDebug(MissionServiceLog) << "Demining operation completed successfully";
 }
 
-void MissionService::testMarkAllPayloadsInstalled()
+void MissionService::resetTripodTracking()
 {
-    qCDebug(MissionServiceLog) << "GenCall72: Test function - marking all payloads as installed";
+    qCDebug(MissionServiceLog) << "GenCall62: Resetting tripod tracking";
     
-    // Mark all expected vehicles as having installed payloads
-    for (int vehicleId : m_expectedPayloadVehicles) {
-        m_installedPayloads.insert(vehicleId);
-        qCDebug(MissionServiceLog) << "Test: Marked payload installed for vehicle ID:" << vehicleId;
-    }
+    m_totalTripods = 0;
+    m_installedTripods = 0;
+    m_vehicleTripodCount.clear();
+    m_explodeButtonEnabled = false;
     
-    // Trigger the payload installation completed signal
-    emit payloadInstallationCompleted();
+    emit explodeButtonEnabled(false);
+    
+    qCDebug(MissionServiceLog) << "Tripod tracking reset";
+}
+
+// Water avoidance settings (read from global AppSettings)
+bool MissionService::waterAvoidanceEnabled() const
+{
+    return SettingsManager::instance()->appSettings()->waterAvoidanceEnabled()->rawValue().toBool();
 }

@@ -1,4 +1,7 @@
 #include "PtahMissionGenerator.h"
+#include "QGCApplication.h"
+#include "Settings/AppSettings.h"
+#include "Settings/SettingsManager.h"
 #include <QtMath>
 #include <QtPositioning/QGeoCoordinate>
 #include <QObject>
@@ -110,52 +113,85 @@ QList<QGeoCoordinate> PtahMissionGenerator::generateCoordinatesInBothDirections(
         return coordinates;
     }
     
-    // EMERGENCY FIX: Completely disable waypoint generation for water-prone directions
-    // This is a hard stop to prevent any ocean waypoints
+    // Water avoidance logic - only apply if enabled
+    // Read setting from global AppSettings
+    bool waterAvoidanceEnabled = false;
+    if (SettingsManager::instance() && SettingsManager::instance()->appSettings()) {
+        waterAvoidanceEnabled = SettingsManager::instance()->appSettings()->waterAvoidanceEnabled()->rawValue().toBool();
+        qDebug() << "🔍 WATER AVOIDANCE SETTING: Read from settings =" << waterAvoidanceEnabled;
+    } else {
+        qDebug() << "🔍 WATER AVOIDANCE SETTING: SettingsManager not available, defaulting to false";
+    }
+    
+    // Get reference coordinates for water avoidance checks
     double refLat = reference.latitude();
     double refLng = reference.longitude();
     
-    qDebug() << "🔍 EMERGENCY CHECK: Reference lat:" << refLat << "lng:" << refLng << "bearing:" << bearing;
-    qDebug() << "🔍 EMERGENCY CHECK: About to check San Francisco area...";
-    
-    // Check if we're in the San Francisco area and the bearing leads to water
-    if (refLat >= 37.0 && refLat <= 38.0 && refLng >= -123.0 && refLng <= -122.0) {
-        qDebug() << "🔍 San Francisco area detected - applying strict water avoidance";
-        // San Francisco area - be extremely conservative
-        if (bearing >= 180.0 && bearing <= 360.0) {
-            // North, northeast, east, southeast, south, southwest, west, northwest directions
-            qDebug() << "🚫 EMERGENCY STOP: Bearing" << bearing << "in San Francisco area leads to water - completely blocking waypoint generation";
+    if (waterAvoidanceEnabled) {
+        qDebug() << "🔍 WATER AVOIDANCE ENABLED: Checking for water-prone directions";
+        
+        qDebug() << "🔍 EMERGENCY CHECK: Reference lat:" << refLat << "lng:" << refLng << "bearing:" << bearing;
+        qDebug() << "🔍 EMERGENCY CHECK: About to check San Francisco area...";
+        
+        // Check if we're in the San Francisco area and the bearing leads to water
+        if (refLat >= 37.0 && refLat <= 38.0 && refLng >= -123.0 && refLng <= -122.0) {
+            qDebug() << "🔍 San Francisco area detected - applying strict water avoidance";
+            // San Francisco area - be extremely conservative
+            if (bearing >= 180.0 && bearing <= 360.0) {
+                // North, northeast, east, southeast, south, southwest, west, northwest directions
+                qDebug() << "🚫 EMERGENCY STOP: Bearing" << bearing << "in San Francisco area leads to water - completely blocking waypoint generation";
+                return coordinates; // Return empty list - no waypoints generated
+            }
+        }
+        
+        // Additional emergency check for any bearing that might lead to water
+        qDebug() << "🔍 EMERGENCY CHECK: About to check bearing range 90-270...";
+        if (bearing >= 90.0 && bearing <= 270.0) {
+            qDebug() << "🚫 EMERGENCY STOP: Bearing" << bearing << "leads to water - completely blocking waypoint generation";
             return coordinates; // Return empty list - no waypoints generated
         }
+        qDebug() << "🔍 EMERGENCY CHECK: Bearing" << bearing << "passed 90-270 check";
+        
+        // ULTRA-AGGRESSIVE: Block ALL bearings except very specific land-safe directions
+        // Only allow bearings that are guaranteed to stay on land
+        qDebug() << "🔍 EMERGENCY CHECK: About to check bearing range 0-45...";
+        if (bearing < 0.0 || bearing > 45.0) {
+            qDebug() << "🚫 ULTRA-AGGRESSIVE STOP: Bearing" << bearing << "not in safe land direction (0-45°) - completely blocking waypoint generation";
+            return coordinates; // Return empty list - no waypoints generated
+        }
+        qDebug() << "🔍 EMERGENCY CHECK: Bearing" << bearing << "passed 0-45 check";
+        
+        qDebug() << "✅ Bearing" << bearing << "passed all emergency checks - proceeding with waypoint generation";
+    } else {
+        qDebug() << "🔍 WATER AVOIDANCE DISABLED: Proceeding with waypoint generation without water checks";
     }
     
-    // Additional emergency check for any bearing that might lead to water
-    qDebug() << "🔍 EMERGENCY CHECK: About to check bearing range 90-270...";
-    if (bearing >= 90.0 && bearing <= 270.0) {
-        qDebug() << "🚫 EMERGENCY STOP: Bearing" << bearing << "leads to water - completely blocking waypoint generation";
-        return coordinates; // Return empty list - no waypoints generated
-    }
-    qDebug() << "🔍 EMERGENCY CHECK: Bearing" << bearing << "passed 90-270 check";
+    // Demining zone specifications:
+    // - Zone width: 4.5m (radius 2.25m)
+    // - Platform width: 3m
+    // - Zone length: 4.5m × number of bulbs
+    // - Step between bulbs and drones: 4.5m
     
-    // ULTRA-AGGRESSIVE: Block ALL bearings except very specific land-safe directions
-    // Only allow bearings that are guaranteed to stay on land
-    qDebug() << "🔍 EMERGENCY CHECK: About to check bearing range 0-45...";
-    if (bearing < 0.0 || bearing > 45.0) {
-        qDebug() << "🚫 ULTRA-AGGRESSIVE STOP: Bearing" << bearing << "not in safe land direction (0-45°) - completely blocking waypoint generation";
-        return coordinates; // Return empty list - no waypoints generated
-    }
-    qDebug() << "🔍 EMERGENCY CHECK: Bearing" << bearing << "passed 0-45 check";
+    // GenCall30: Calculate demining zone parameters
+    qDebug() << "GenCall30: Calculating demining zone parameters";
+    const double deminingZoneWidth = 4.5; // meters
+    const double deminingZoneRadius = 2.25; // meters (half width)
+    const double platformWidth = 3.0; // meters
+    const double stepDistance = 4.5; // meters between bulbs and drones
     
-    qDebug() << "✅ Bearing" << bearing << "passed all emergency checks - proceeding with waypoint generation";
+    // Calculate number of waypoints based on demining zone length
+    int numberOfBulbs = static_cast<int>(totalDistanceMeters / stepDistance);
+    int pointsInEachDirection = numberOfBulbs;
     
-    // GenCall30: Calculate how many points to generate in each direction
-    qDebug() << "GenCall30: Calculating how many points to generate in each direction";
-    int pointsInEachDirection = static_cast<int>(totalDistanceMeters / gapMeters);
+    qDebug() << "Demining zone width:" << deminingZoneWidth << "m, radius:" << deminingZoneRadius << "m";
+    qDebug() << "Platform width:" << platformWidth << "m";
+    qDebug() << "Step distance:" << stepDistance << "m";
+    qDebug() << "Number of bulbs:" << numberOfBulbs;
+    qDebug() << "Points in each direction:" << pointsInEachDirection;
     
     // Limit maximum distance to prevent waypoints that are too far away
-    // Be more conservative to avoid ocean waypoints
-    const double maxDistanceMeters = 200.0; // Maximum 200m from reference point (reduced from 1000m)
-    int maxPointsInEachDirection = static_cast<int>(maxDistanceMeters / gapMeters);
+    const double maxDistanceMeters = 200.0; // Maximum 200m from reference point
+    int maxPointsInEachDirection = static_cast<int>(maxDistanceMeters / stepDistance);
     
     if (pointsInEachDirection > maxPointsInEachDirection) {
         pointsInEachDirection = maxPointsInEachDirection;
@@ -186,30 +222,34 @@ QList<QGeoCoordinate> PtahMissionGenerator::generateCoordinatesInBothDirections(
     // This prevents waypoint generation that might lead to water
     // refLat and refLng already declared above
     
-    // Check if reference point is near San Francisco Bay or Pacific Ocean
-    if ((refLat >= 37.4 && refLat <= 38.0 && refLng >= -122.5 && refLng <= -122.0) ||
-        (refLat >= 37.0 && refLat <= 38.0 && refLng <= -122.5)) {
-        qDebug() << "⚠ Reference point is near water - using ultra-conservative waypoint generation";
-        pointsInEachDirection = qMin(pointsInEachDirection, 1); // Only 1 waypoint maximum
-        // Note: maxDistanceMeters is const, so we'll use the existing conservative limits
-    }
-    
-    // Generate waypoints in a straight line with more conservative distances
-    // Skip waypoint generation if the bearing might lead to water
-    // This is a proactive approach to prevent ocean waypoints
+    // Declare skipThisDirection outside the conditional block
     bool skipThisDirection = false;
     
-    // Check if the bearing direction might lead to water based on the reference point location
-    // This is a simplified check - in a real implementation, you'd use more sophisticated terrain analysis
-    if (bearing >= 90.0 && bearing <= 270.0) {
-        // Directions that might lead to water (east, south, west)
-        // Be more conservative and reduce the number of waypoints in these directions
-        qDebug() << "Bearing" << bearing << "might lead to water - being more conservative";
+    if (waterAvoidanceEnabled) {
+        // Check if reference point is near San Francisco Bay or Pacific Ocean
+        if ((refLat >= 37.4 && refLat <= 38.0 && refLng >= -122.5 && refLng <= -122.0) ||
+            (refLat >= 37.0 && refLat <= 38.0 && refLng <= -122.5)) {
+            qDebug() << "⚠ Reference point is near water - using ultra-conservative waypoint generation";
+            pointsInEachDirection = qMin(pointsInEachDirection, 1); // Only 1 waypoint maximum
+            // Note: maxDistanceMeters is const, so we'll use the existing conservative limits
+        }
         
-        // For San Francisco area, be even more aggressive about avoiding water
-        // Reduce the number of waypoints significantly in water-prone directions
-        pointsInEachDirection = qMin(pointsInEachDirection, 2); // Only 2 waypoints max in water-prone directions
-        qDebug() << "Reduced waypoints to" << pointsInEachDirection << "for water-prone direction";
+        // Generate waypoints in a straight line with more conservative distances
+        // Skip waypoint generation if the bearing might lead to water
+        // This is a proactive approach to prevent ocean waypoints
+        
+        // Check if the bearing direction might lead to water based on the reference point location
+        // This is a simplified check - in a real implementation, you'd use more sophisticated terrain analysis
+        if (bearing >= 90.0 && bearing <= 270.0) {
+            // Directions that might lead to water (east, south, west)
+            // Be more conservative and reduce the number of waypoints in these directions
+            qDebug() << "Bearing" << bearing << "might lead to water - being more conservative";
+            
+            // For San Francisco area, be even more aggressive about avoiding water
+            // Reduce the number of waypoints significantly in water-prone directions
+            pointsInEachDirection = qMin(pointsInEachDirection, 2); // Only 2 waypoints max in water-prone directions
+            qDebug() << "Reduced waypoints to" << pointsInEachDirection << "for water-prone direction";
+        }
         
         // If the bearing is specifically towards the ocean (west), be even more restrictive
         if (bearing >= 225.0 && bearing <= 315.0) {
@@ -229,13 +269,17 @@ QList<QGeoCoordinate> PtahMissionGenerator::generateCoordinatesInBothDirections(
                 return coordinates; // Return immediately with just the reference point
             }
         }
+    } else {
+        qDebug() << "🔍 WATER AVOIDANCE DISABLED: Generating full waypoint grid without restrictions";
     }
     
+    qDebug() << "🔍 FINAL WAYPOINT GENERATION: pointsInEachDirection=" << pointsInEachDirection << "skipThisDirection=" << skipThisDirection;
+    
     for (int i = 1; i <= pointsInEachDirection && !skipThisDirection; i++) {
-        double distance = i * gapMeters;
+        double distance = i * stepDistance; // Use step distance for demining zone
         
-        // Use smaller distances to stay closer to land and avoid ocean
-        if (distance > 30.0) {
+        // Use smaller distances to stay closer to land and avoid ocean (only when water avoidance is enabled)
+        if (waterAvoidanceEnabled && distance > 30.0) {
             distance = 30.0; // Cap at 30m to stay very close to reference point and avoid ocean
         }
         QGeoCoordinate waypoint = calculateNewCoordinates(reference, bearing, distance);
@@ -556,13 +600,22 @@ double PtahMissionGenerator::calculateBearingToMissionCenter(const QGeoCoordinat
 
 QList<QGeoCoordinate> PtahMissionGenerator::generatePayloadDropWaypoints(const QGeoCoordinate& reference, double bearing, double gapMeters, double totalDistanceMeters, int loiterTimeSeconds)
 {
-    // GenCall35: Generate waypoints with payload drop pattern
-    qDebug() << "GenCall35: Generating payload drop waypoints with loiter time:" << loiterTimeSeconds << "seconds";
+    // GenCall35: Generate waypoints with payload drop pattern for demining zone
+    qDebug() << "GenCall35: Generating payload drop waypoints for demining zone with loiter time:" << loiterTimeSeconds << "seconds";
     
-    // Use existing waypoint generation logic
-    QList<QGeoCoordinate> waypoints = generateCoordinatesInBothDirections(reference, bearing, gapMeters, totalDistanceMeters);
+    // Demining zone specifications:
+    // - Zone width: 4.5m (radius 2.25m)
+    // - Platform width: 3m
+    // - Zone length: 4.5m × number of bulbs
+    // - Step between bulbs and drones: 4.5m
     
-    qDebug() << "Generated" << waypoints.size() << "waypoints for payload drop mission";
+    const double stepDistance = 4.5; // meters between bulbs and drones
+    qDebug() << "Using demining zone step distance:" << stepDistance << "m";
+    
+    // Use existing waypoint generation logic with step distance
+    QList<QGeoCoordinate> waypoints = generateCoordinatesInBothDirections(reference, bearing, stepDistance, totalDistanceMeters);
+    
+    qDebug() << "Generated" << waypoints.size() << "waypoints for demining payload drop mission";
     
     return waypoints;
 }

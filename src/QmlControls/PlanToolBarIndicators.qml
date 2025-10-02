@@ -18,36 +18,6 @@ Item {
 
     property var _planMasterController: planMasterController
     property var _currentMissionItem: _planMasterController.missionController.currentPlanViewItem ///< Mission item to display status for
-    property bool isDrawingMode: false
-
-    // Function to generate mission using existing Ptah system with drawn area
-    function generateMissionWithArea(center, width, height, rotation) {
-        console.log("Generating mission with area:", center.latitude, center.longitude, width, height, rotation);
-        
-        // Calculate area size for the existing Ptah system
-        var areaSize = Math.max(width, height) / 100; // Convert meters to area size units
-        
-        // Use the existing mission generation with the drawn area
-        if (QGroundControl.missionService) {
-            QGroundControl.missionService.generateMission(
-                "Area Mission", // mission type
-                Math.round(areaSize), // area size
-                50, // altitude
-                5.0, // speed
-                "Generated from drawing tool", // description
-                10.0, // front distance
-                false, // payload drop mode
-                50, // loiter time
-                10, // bend height
-                1.5, // payload drop height
-                3, // servo delay
-                100.0 // observation distance
-            );
-        }
-        
-        // Exit drawing mode
-        isDrawingMode = false;
-    }
 
     property var missionItems: _controllerValid ? _planMasterController.missionController.visualItems : undefined
     property real missionPlannedDistance: _controllerValid ? _planMasterController.missionController.missionPlannedDistance : NaN
@@ -65,12 +35,12 @@ Item {
     property bool _currentItemIsVTOLTakeoff: _currentMissionItemValid && _currentMissionItem.command == 84
     property bool _missionValid: missionItems !== undefined
 
-    property real _dataFontSize: 12
-    property real _largeValueWidth: 80
-    property real _mediumValueWidth: 40
-    property real _smallValueWidth: 30
-    property real _labelToValueSpacing: 10
-    property real _rowSpacing: 0
+    property real _dataFontSize: ScreenTools.defaultFontPointSize
+    property real _largeValueWidth: ScreenTools.defaultFontPixelWidth * 8
+    property real _mediumValueWidth: ScreenTools.defaultFontPixelWidth * 4
+    property real _smallValueWidth: ScreenTools.defaultFontPixelWidth * 3
+    property real _labelToValueSpacing: ScreenTools.defaultFontPixelWidth
+    property real _rowSpacing: ScreenTools.isMobile ? 1 : 0
     property real _distance: _currentMissionItemValid ? _currentMissionItem.distance : NaN
     property real _altDifference: _currentMissionItemValid ? _currentMissionItem.altDifference : NaN
     property real _azimuth: _currentMissionItemValid ? _currentMissionItem.azimuth : NaN
@@ -130,7 +100,7 @@ Item {
     property string _batteryChangePointText: _batteryChangePoint < 0 ? qsTr("N/A") : _batteryChangePoint
     property string _batteriesRequiredText: _batteriesRequired < 0 ? qsTr("N/A") : _batteriesRequired
 
-    readonly property real _margins: 10
+    readonly property real _margins: ScreenTools.defaultFontPixelWidth
 
     // Properties of UTM adapter
     property bool _utmspEnabled: QGroundControl.utmspSupported
@@ -158,7 +128,7 @@ Item {
         anchors.bottom: parent.bottom
         anchors.leftMargin: _margins
         anchors.left: parent.left
-        spacing: 20
+        spacing: ScreenTools.defaultFontPixelWidth * 2
 
         QGCButton {
             id: uploadButton
@@ -194,7 +164,7 @@ Item {
             QGCLabel {
                 text: qsTr("Selected Waypoint")
                 Layout.columnSpan: 8
-                font.pointSize: 10
+                font.pointSize: ScreenTools.smallFontPointSize
             }
 
             QGCLabel {
@@ -271,7 +241,7 @@ Item {
             QGCLabel {
                 text: qsTr("Total Mission")
                 Layout.columnSpan: 5
-                font.pointSize: 10
+                font.pointSize: ScreenTools.smallFontPointSize
             }
 
             QGCLabel {
@@ -319,7 +289,7 @@ Item {
             QGCLabel {
                 text: qsTr("Battery")
                 Layout.columnSpan: 3
-                font.pointSize: 10
+                font.pointSize: ScreenTools.smallFontPointSize
             }
 
             QGCLabel {
@@ -333,15 +303,15 @@ Item {
             }
         }
 
-        // Ptah Drawing Tool Button
         QGCButton {
             id: ptahButton
-            text: isDrawingMode ? "Exit Drawing" : "Ptah"
+            text: "Ptah"
             Layout.columnSpan: 3
             font.pointSize: _dataFontSize
-            primary: isDrawingMode
             onClicked: {
-                isDrawingMode = !isDrawingMode;
+                // Set the vehicles array before opening the dialog
+                missionGeneratorDialogue.vehicles = QGroundControl.multiVehicleManager.vehicles;
+                missionGeneratorDialogue.open();
             }
         }
 
@@ -368,33 +338,42 @@ Item {
         }
     }
 
-    // Note: MissionGeneratorDialogue removed - replaced with Area Plan Editor
+    // QML Mission Generator Dialogue
+    MissionGeneratorDialogue {
+        id: missionGeneratorDialogue
+        onMissionGenerated: function (missionType, areaSize, altitude, speed, frontDistance, loiterTime, bendHeight, payloadDropHeight, servoDelay, payloadDropMode, observationDistance) {
+            // GenCall5: Signal handler receives mission parameters
+            console.log("GenCall5: Signal handler receives mission parameters:", missionType, areaSize, altitude, speed, "front distance:", frontDistance, "loiter time:", loiterTime, "bend height:", bendHeight, "payload drop height:", payloadDropHeight, "servo delay:", servoDelay, "payload drop:", payloadDropMode, "observation distance:", observationDistance);
 
-    // Connect to MissionService signals (for Area Plan Editor)
+            // GenCall6: Call C++ MissionService to actually generate mission
+            console.log("GenCall6: Calling C++ MissionService to generate mission");
+            QGroundControl.missionService.generateMission(missionType, areaSize, altitude, speed, "Generated from UI", frontDistance, payloadDropMode, loiterTime, bendHeight, payloadDropHeight, servoDelay, observationDistance);
+        }
+    }
+
+    // Connect to MissionService signals
     Connections {
         target: QGroundControl.missionService
         function onMissionGenerationStarted() {
-            console.log("Area Plan Editor: Mission generation started signal received");
-            areaPlanDialog.text = qsTr("Generating mission...");
-            areaPlanDialog.visible = true;
+            console.log("GenCall7: Mission generation started signal received");
+            ptahDialog.text = qsTr("Generating mission...");
+            ptahDialog.visible = true;
         }
         function onMissionGenerationCompleted(success, message) {
-            console.log("Area Plan Editor: Mission generation completed signal received:", success, message);
-            areaPlanDialog.text = success ? qsTr("Mission generated successfully!\n") + message : qsTr("Mission generation failed!\n") + message;
-            areaPlanDialog.visible = true;
+            console.log("GenCall48: Mission generation completed signal received:", success, message);
+            ptahDialog.text = success ? qsTr("Mission generated successfully!\n") + message : qsTr("Mission generation failed!\n") + message;
+            ptahDialog.visible = true;
         }
         function onDeminingSuccess() {
-            console.log("Area Plan Editor: Demining success signal received");
+            console.log("GenCall70: Demining success signal received");
             deminingSuccessDialog.open();
         }
     }
 
-    // Note: Drawing tool is integrated in PlanView.qml
-
     QGCSimpleMessageDialog {
-        id: areaPlanDialog
-        title: qsTr("Area Plan Editor")
-        text: qsTr("Mission generated")
+        id: ptahDialog
+        title: qsTr("Ptah")
+        text: qsTr("Waypoint added")
         buttons: Dialog.Ok
         visible: false
         onAccepted: visible = false
