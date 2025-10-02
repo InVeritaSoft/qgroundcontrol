@@ -6129,3 +6129,7 @@ void AreaPlanEditor::saveMissionToFile(const QList<MissionItem*>& missionItems, 
     }
     f.close();
 }
+
+void AreaPlanEditor::useNewMissionGenerator()
+{
+}

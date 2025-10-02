@@ -60,7 +60,6 @@ import Qt.labs.settings 1.1
 
 import QGroundControl
 import QGroundControl.Controls
-import QGroundControl.ScreenTools
 
 /**
  * @brief Main Area Plan Editor component
@@ -2343,6 +2342,18 @@ var err = _safeValidate("numPoints", parseInt(text))
                                         }
                                     }
                                 }
+
+								Row {
+									width: parent.width
+									height: _h * 2
+									spacing: _w
+									QGCButton {
+										text: qsTr("Use New Mission Generator")
+										onClicked: {
+											areaPlanEditor.useNewMissionGenerator()
+										}
+									}
+								}
 
                                 // Helpers for per-vehicle gating similar to FlyView
                                 function _hasMissionItems() {

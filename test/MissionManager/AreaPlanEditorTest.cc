@@ -20,8 +20,9 @@
 
 void AreaPlanEditorTest::_basicProperties()
 {
-    // Access singleton-exposed editor
-    AreaPlanEditor* editor = QGroundControlQmlGlobal::instance()->areaPlanEditor();
+    // Create QGroundControlQmlGlobal instance for testing
+    QGroundControlQmlGlobal qgcGlobal;
+    AreaPlanEditor* editor = qgcGlobal.areaPlanEditor();
     QVERIFY(editor);
 
     // Set basic parameters and verify
@@ -220,7 +221,8 @@ void AreaPlanEditorTest::_axisSelectionAndMinimal()
 }
 void AreaPlanEditorTest::_perDroneGeneratedWaypoints()
 {
-    AreaPlanEditor* editor = QGroundControlQmlGlobal::instance()->areaPlanEditor();
+    QGroundControlQmlGlobal qgcGlobal;
+    AreaPlanEditor* editor = qgcGlobal.areaPlanEditor();
     QVERIFY(editor);
 
     editor->setAreaCenter(QGeoCoordinate(47.3977419, 8.5455938));
@@ -262,7 +264,8 @@ void AreaPlanEditorTest::_generateWaypointsAndAddToMission()
     QVERIFY(mission);
 
     // Hook editor to controller so it can add items
-    AreaPlanEditor* editor = QGroundControlQmlGlobal::instance()->areaPlanEditor();
+    QGroundControlQmlGlobal qgcGlobal;
+    AreaPlanEditor* editor = qgcGlobal.areaPlanEditor();
     QVERIFY(editor);
     editor->setPlanMasterController(&master);
 
@@ -297,7 +300,8 @@ void AreaPlanEditorTest::_policyInjectionSequencing()
     MissionController* mission = master.missionController();
     QVERIFY(mission);
 
-    AreaPlanEditor* editor = QGroundControlQmlGlobal::instance()->areaPlanEditor();
+    QGroundControlQmlGlobal qgcGlobal;
+    AreaPlanEditor* editor = qgcGlobal.areaPlanEditor();
     QVERIFY(editor);
     editor->setPlanMasterController(&master);
 
@@ -325,7 +329,8 @@ void AreaPlanEditorTest::_policyInjectionSequencing()
 }
 void AreaPlanEditorTest::_multiDroneDefaultsAndSetters()
 {
-    AreaPlanEditor* editor = QGroundControlQmlGlobal::instance()->areaPlanEditor();
+    QGroundControlQmlGlobal qgcGlobal;
+    AreaPlanEditor* editor = qgcGlobal.areaPlanEditor();
     QVERIFY(editor);
 
     // Defaults
@@ -358,7 +363,8 @@ void AreaPlanEditorTest::_multiDroneDefaultsAndSetters()
 
 void AreaPlanEditorTest::_perDronePreviewCounts()
 {
-    AreaPlanEditor* editor = QGroundControlQmlGlobal::instance()->areaPlanEditor();
+    QGroundControlQmlGlobal qgcGlobal;
+    AreaPlanEditor* editor = qgcGlobal.areaPlanEditor();
     QVERIFY(editor);
 
     // Configure a simple scenario
@@ -391,7 +397,8 @@ void AreaPlanEditorTest::_perDronePreviewCounts()
 
 void AreaPlanEditorTest::_waypointGenerationCountsAndPositions()
 {
-    AreaPlanEditor* editor = QGroundControlQmlGlobal::instance()->areaPlanEditor();
+    QGroundControlQmlGlobal qgcGlobal;
+    AreaPlanEditor* editor = qgcGlobal.areaPlanEditor();
     QVERIFY(editor);
 
     // Configure simple rectangular grid, rotation = 0

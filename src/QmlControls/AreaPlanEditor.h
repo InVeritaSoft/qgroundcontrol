@@ -226,6 +226,13 @@ public:
     void setFormationSpacing(qreal spacing);
     bool isFormationTransitioning() const;
     
+    // Mission workflow testing methods (public for testing)
+    Q_INVOKABLE void testCompleteWorkflow();
+    Q_INVOKABLE bool validateAreaParameters();
+    Q_INVOKABLE bool validateWaypointGeneration();
+    Q_INVOKABLE bool validateMissionUpload();
+    Q_INVOKABLE bool validateMissionFileSaving();
+    
 private:
     // Swarm coordination helpers
     bool checkSwarmReadiness() const;
@@ -257,12 +264,7 @@ private:
     void saveMissionToFile(const QList<MissionItem*>& missionItems, const QString& filename);
     void saveMissionToFile(MissionController* missionController, const QString& filename);
     
-    // Mission workflow testing methods
-    Q_INVOKABLE void testCompleteWorkflow();
-    Q_INVOKABLE bool validateAreaParameters();
-    Q_INVOKABLE bool validateWaypointGeneration();
-    Q_INVOKABLE bool validateMissionUpload();
-    Q_INVOKABLE bool validateMissionFileSaving();
+    // Mission workflow testing methods moved to public section
 
     // Swarm configuration methods
     Q_INVOKABLE QVariantMap getDroneAllocationStats(int droneIndex) const;
