@@ -1,0 +1,141 @@
+{
+    "meta": {
+        "generatedAt": "2025-08-08T00:25:00.000Z",
+        "tasksAnalyzed": 16,
+        "totalTasks": 16,
+        "analysisCount": 16,
+        "thresholdScore": 7,
+        "projectName": "QGroundControl - Multi-Drone Area Planner",
+        "usedResearch": true
+    },
+    "complexityAnalysis": [
+        {
+            "taskId": 1,
+            "taskTitle": "Extend Backend Data Model",
+            "complexityScore": 7,
+            "recommendedSubtasks": 5,
+            "expansionPrompt": "In `src/QmlControls/AreaPlanEditor.(h|cc)`, add properties/signals for droneCount, altitudeBandStart, altitudeBandStep, timeOffsetPerDrone, rtlAfterEveryWaypoint, loiterAfterRtl, and ensure loiterTime is wired. Include validation, NOTIFY signals, and QML registration. Update bindings in `src/QmlControls/AreaPlanEditor.qml` and expose to `PlanView.qml`.",
+            "reasoning": "Extends an existing, non-trivial class with multiple properties and validations while preserving current single-drone features and QML bindings."
+        },
+        {
+            "taskId": 2,
+            "taskTitle": "Implement Area Partitioning Algorithm",
+            "complexityScore": 8,
+            "recommendedSubtasks": 4,
+            "expansionPrompt": "Implement stripe-based split (short axis) and optionally round-robin line assignment in `AreaPlanEditor.cc`. Define a DroneAssignment struct (index, altitudeOffset, timeOffset, lines). Handle rotation and uneven divisions; add unit-testable helpers.",
+            "reasoning": "Algorithmic work with geometric reasoning, rotation handling, and fairness/bounds guarantees; must integrate well with downstream waypoint generation."
+        },
+        {
+            "taskId": 3,
+            "taskTitle": "Generate Per-Drone Waypoints",
+            "complexityScore": 7,
+            "recommendedSubtasks": 4,
+            "expansionPrompt": "From partition output, generate ordered waypoint lists per drone using lineSpacing, numPoints, and areaRotation math already used in single-drone `generateWaypoints`. Ensure determinism and rotation correctness; return structures suitable for mission item creation.",
+            "reasoning": "Multiple coordinate computations across drones and lines; must align with QML visuals and mission item creation."
+        },
+        {
+            "taskId": 4,
+            "taskTitle": "Altitude Banding and Time Staggering (v1)",
+            "complexityScore": 6,
+            "recommendedSubtasks": 3,
+            "expansionPrompt": "Apply altitudeOffset = altitudeBandStart + droneIndex*altitudeBandStep and timeOffsetPerDrone on per-drone outputs. Validate against firmware limits; surface effective values to UI. Implement as pure helpers to keep logic testable.",
+            "reasoning": "Straightforward calculation but must mesh with mission constraints and future upload/start logic."
+        },
+        {
+            "taskId": 5,
+            "taskTitle": "Inject Policy Steps (Loiter/RTL/LoiterAfterRTL)",
+            "complexityScore": 7,
+            "recommendedSubtasks": 4,
+            "expansionPrompt": "Augment per-drone waypoint sequences by inserting MAV_CMD_NAV_LOITER_TIME and optional RTL-after-waypoint based on toggles. Leverage existing single-drone loiter logic in `AreaPlanEditor::addWaypointsToMission` and generalize. Guard for firmware differences; keep params stable across command conversions.",
+            "reasoning": "Requires precise mission-item sequencing and parameter mapping; small ordering mistakes can break vehicle behavior."
+        },
+        {
+            "taskId": 6,
+            "taskTitle": "Develop Visualization Overlays",
+            "complexityScore": 7,
+            "recommendedSubtasks": 4,
+            "expansionPrompt": "Extend `src/QmlControls/AreaPlanMapVisuals.qml` to render per-drone overlays (rectangle/grid/waypoints) with distinct colors and quick toggles. Optimize object creation using QGCDynamicObjectManager; ensure updates on property changes.",
+            "reasoning": "Multiple overlaid series with performance constraints and clear operator feedback; needs careful z-order and update throttling."
+        },
+        {
+            "taskId": 7,
+            "taskTitle": "Integrate UI Controls",
+            "complexityScore": 6,
+            "recommendedSubtasks": 3,
+            "expansionPrompt": "In `AreaPlanEditor.qml` and `PlanView.qml` Area tab, add inputs for droneCount, altitude band start/step, time offset, loiter time, and toggles for RTL/Loiter policies. Bind to the new C++ properties and add basic validation feedback.",
+            "reasoning": "Several fields/toggles with bindings and validation; lower algorithmic complexity but UX correctness matters."
+        },
+        {
+            "taskId": 8,
+            "taskTitle": "Wire Map Visuals into PlanView",
+            "complexityScore": 5,
+            "recommendedSubtasks": 3,
+            "expansionPrompt": "Compose `AreaPlanMapVisuals.qml` into the Plan View map with correct visibility and z-order. Add legend hook and per-drone visibility toggles. Update `src/QmlControls/CMakeLists.txt` to include QML files.",
+            "reasoning": "Integration task touching view composition and build system entries; moderate complexity."
+        },
+        {
+            "taskId": 9,
+            "taskTitle": "Implement Save Mission Functionality",
+            "complexityScore": 6,
+            "recommendedSubtasks": 3,
+            "expansionPrompt": "Export per-drone missions as separate .waypoints files from `AreaPlanEditor`. Generate filenames `area_mission_drone_<idx>.waypoints`; include altitude banding and policy-injected steps. Verify WPL 110 formatting.",
+            "reasoning": "File I/O plus correct mission item serialization per drone; leverages existing single-drone save path."
+        },
+        {
+            "taskId": 10,
+            "taskTitle": "Implement Upload Flow",
+            "complexityScore": 7,
+            "recommendedSubtasks": 4,
+            "expansionPrompt": "Provide UX to select vehicle-to-mission mapping and upload per-drone missions via `MissionController`/`MissionManager`. Handle disconnected states and progress/errors; reuse existing status/progress signals.",
+            "reasoning": "Cross-cuts UI, controller, and vehicle APIs with error handling; requires robust progress and recovery behavior."
+        },
+        {
+            "taskId": 11,
+            "taskTitle": "Unit Tests: Partitioning",
+            "complexityScore": 6,
+            "recommendedSubtasks": 3,
+            "expansionPrompt": "Cover short/long axis selection, rotation, uneven line counts, and minimal areas. Verify assignments are within bounds and balanced.",
+            "reasoning": "Algorithmic edge cases must be exercised to prevent downstream waypoint issues."
+        },
+        {
+            "taskId": 12,
+            "taskTitle": "Unit Tests: Waypoint Generation",
+            "complexityScore": 6,
+            "recommendedSubtasks": 3,
+            "expansionPrompt": "Validate counts, ordering, and rotation math for multiple drones and lines. Include golden-coordinate tests for a fixed seed center and parameters.",
+            "reasoning": "Geometry-heavy logic with rotation and spacing; tests improve confidence and prevent regressions."
+        },
+        {
+            "taskId": 13,
+            "taskTitle": "Unit Tests: Policy Injection",
+            "complexityScore": 6,
+            "recommendedSubtasks": 3,
+            "expansionPrompt": "Assert correct MAV_CMD sequences and parameter values (loiter time, radius, leave-direction, exit tangent) for toggle combinations including RTL-after-waypoint.",
+            "reasoning": "Mission item conversion details are error-prone; targeted tests are essential."
+        },
+        {
+            "taskId": 14,
+            "taskTitle": "Internationalization and QML Registration",
+            "complexityScore": 5,
+            "recommendedSubtasks": 3,
+            "expansionPrompt": "Ensure all user-facing strings use qsTr(), add new QML files to `src/QmlControls/CMakeLists.txt` (alphabetized), and update TS files as needed.",
+            "reasoning": "Process-oriented work that touches build and translation systems; low-to-moderate complexity."
+        },
+        {
+            "taskId": 15,
+            "taskTitle": "Performance & Logging",
+            "complexityScore": 6,
+            "recommendedSubtasks": 3,
+            "expansionPrompt": "Throttle map updates, cache expensive computations, and avoid duplicate object creation in `AreaPlanMapVisuals.qml`. Maintain exhaustive logs for drawing and mission generation per your logging standard.",
+            "reasoning": "Performance tuning plus detailed diagnostics; important for responsiveness and field debugging."
+        },
+        {
+            "taskId": 16,
+            "taskTitle": "End-to-End SITL Test (Multi-Drone)",
+            "complexityScore": 9,
+            "recommendedSubtasks": 5,
+            "expansionPrompt": "Using `sitl-demo/`, connect 2–4 vehicles, load/upload per-drone missions, and validate altitude bands/time staggering. Capture logs and screenshots, and create a short checklist doc.",
+            "reasoning": "High coordination across components and environments; validates the complete operator workflow."
+        }
+    ]
+}

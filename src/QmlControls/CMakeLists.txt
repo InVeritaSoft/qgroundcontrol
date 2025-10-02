@@ -55,6 +55,8 @@ target_sources(${CMAKE_PROJECT_NAME}
         ToolStripAction.h
         ToolStripActionList.cc
         ToolStripActionList.h
+        AreaPlanEditor.cc
+        AreaPlanEditor.h
 )
 
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -71,9 +73,11 @@ qt_add_qml_module(QGroundControlControlsModule
     RESOURCE_PREFIX /qml
     QML_FILES
         AltModeDialog.qml
-        AppSettings.qml
         APMSubMotorDisplay.qml
         AppMessages.qml
+        AppSettings.qml
+        AreaPlanEditor.qml
+        AreaPlanMapVisuals.qml
         AutotuneUI.qml
         AxisMonitor.qml
         ClickableColor.qml

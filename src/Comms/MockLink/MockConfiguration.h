@@ -29,7 +29,11 @@ public:
     explicit MockConfiguration(const MockConfiguration *copy, QObject *parent = nullptr);
     ~MockConfiguration();
 
+#ifdef QT_DEBUG
     LinkType type() const final { return LinkConfiguration::TypeMock; }
+#else
+    LinkType type() const final { return LinkConfiguration::TypeLogReplay; } // Fallback for Release builds
+#endif
     void copyFrom(const LinkConfiguration *source) final;
     void loadSettings(QSettings &settings, const QString &root) final;
     void saveSettings(QSettings &settings, const QString &root) const final;

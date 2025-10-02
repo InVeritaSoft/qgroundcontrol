@@ -1,0 +1,162 @@
+services:
+  # Simple SITL Copter using Python MAVLink simulation
+  sitl-copter:
+    image: python:3.11-slim
+    container_name: qgc-sitl-copter
+    profiles: ["copters"]
+    ports:
+      - "14550:14550/udp"  # MAVLink UDP (primary)
+    environment:
+      - VEHICLE_TYPE=copter
+      - FRAME_TYPE=quad
+      - INSTANCE=0
+      - SIM_GPS_LAT=47.397742
+      - SIM_GPS_LON=8.545594
+      - SIM_GPS_ALT=488
+      - SIM_SPEEDUP=1
+      - SITL_TX_HOST=host.docker.internal
+    volumes:
+      - ./configs:/configs:ro
+      - ./logs:/logs
+      - ./missions:/missions:ro
+      - ./scripts:/app/scripts:ro
+    working_dir: /app
+    command: >
+      bash -c "
+        pip install --no-cache-dir -r scripts/requirements.txt &&
+        python scripts/simple_sitl.py --vehicle=copter --port=14550 --sysid=1 --auto-start --rate=5
+      "
+  sitl-copter-2:
+    image: python:3.11-slim
+    container_name: qgc-sitl-copter-2
+    profiles: ["copters"]
+    ports:
+      - "14552:14552/udp"
+    environment:
+      - VEHICLE_TYPE=copter
+      - FRAME_TYPE=quad
+      - INSTANCE=1
+      - SIM_GPS_LAT=47.397842
+      - SIM_GPS_LON=8.545794
+      - SIM_GPS_ALT=488
+      - SIM_SPEEDUP=1
+      - SITL_TX_HOST=host.docker.internal
+    volumes:
+      - ./configs:/configs:ro
+      - ./logs:/logs
+      - ./missions:/missions:ro
+      - ./scripts:/app/scripts:ro
+    working_dir: /app
+    command: >
+      bash -c "
+        pip install --no-cache-dir -r scripts/requirements.txt &&
+        python scripts/simple_sitl.py --vehicle=copter --port=14552 --sysid=2 --auto-start --rate=5 --start-lat 47.397842 --start-lon 8.545794 --start-alt 488
+      "
+    restart: unless-stopped
+    networks:
+      - qgc-network
+
+  sitl-copter-3:
+    image: python:3.11-slim
+    container_name: qgc-sitl-copter-3
+    profiles: ["copters"]
+    ports:
+      - "14554:14554/udp"
+    environment:
+      - VEHICLE_TYPE=copter
+      - FRAME_TYPE=quad
+      - INSTANCE=2
+      - SIM_GPS_LAT=47.397642
+      - SIM_GPS_LON=8.545394
+      - SIM_GPS_ALT=488
+      - SIM_SPEEDUP=1
+      - SITL_TX_HOST=host.docker.internal
+    volumes:
+      - ./configs:/configs:ro
+      - ./logs:/logs
+      - ./missions:/missions:ro
+      - ./scripts:/app/scripts:ro
+    working_dir: /app
+    command: >
+      bash -c "
+        pip install --no-cache-dir -r scripts/requirements.txt &&
+        python scripts/simple_sitl.py --vehicle=copter --port=14554 --sysid=3 --auto-start --rate=5 --start-lat 47.397642 --start-lon 8.545394 --start-alt 488
+      "
+    restart: unless-stopped
+    networks:
+      - qgc-network
+
+  # # Simple SITL Plane using Python MAVLink simulation
+  # sitl-plane:
+  #   image: python:3.11-slim
+  #   container_name: qgc-sitl-plane
+  #   ports:
+  #     - "14552:14550/udp"  # MAVLink UDP
+  #     - "14553:14551/udp"  # MAVLink UDP (secondary)
+  #   environment:
+  #     - VEHICLE_TYPE=plane
+  #     - FRAME_TYPE=plane
+  #     - INSTANCE=1
+  #     - SIM_GPS_LAT=47.397742
+  #     - SIM_GPS_LON=8.545594
+  #     - SIM_GPS_ALT=1000
+  #     - SIM_SPEEDUP=1
+  #     - SITL_TX_HOST=host.docker.internal
+  #   volumes:
+  #     - ./configs:/configs:ro
+  #     - ./logs:/logs
+  #     - ./missions:/missions:ro
+  #     - ./scripts:/app/scripts:ro
+  #   working_dir: /app
+  #   command: >
+  #     bash -c "
+  #       pip install --no-cache-dir -r scripts/requirements.txt &&
+  #       python scripts/simple_sitl.py --vehicle=plane --port=14552
+  #     "
+  #   restart: unless-stopped
+  #   networks:
+  #     - qgc-network
+
+  # # Simple SITL Rover using Python MAVLink simulation
+  # sitl-rover:
+  #   image: python:3.11-slim
+  #   container_name: qgc-sitl-rover
+  #   ports:
+  #     - "14554:14550/udp"  # MAVLink UDP
+  #     - "14555:14551/udp"  # MAVLink UDP (secondary)
+  #   environment:
+  #     - VEHICLE_TYPE=rover
+  #     - FRAME_TYPE=rover
+  #     - INSTANCE=2
+  #     - SIM_GPS_LAT=47.397742
+  #     - SIM_GPS_LON=8.545594
+  #     - SIM_GPS_ALT=488
+  #     - SIM_SPEEDUP=1
+  #     - SITL_TX_HOST=host.docker.internal
+  #   volumes:
+  #     - ./configs:/configs:ro
+  #     - ./logs:/logs
+  #     - ./missions:/missions:ro
+  #     - ./scripts:/app/scripts:ro
+  #   working_dir: /app
+  #   command: >
+  #     bash -c "
+  #       pip install --no-cache-dir -r scripts/requirements.txt &&
+  #       python scripts/simple_sitl.py --vehicle=rover --port=14554
+  #     "
+  #   restart: unless-stopped
+  #   networks:
+  #     - qgc-network
+
+networks:
+  qgc-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  sitl-data:
+    driver: local
+  sitl-logs:
+    driver: local 

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Logs - SITL Demo Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .log-container { max-height: 500px; overflow-y: auto; }
+        .log-line { font-family: 'Courier New', monospace; font-size: 0.9em; }
+        .log-error { color: #dc3545; }
+        .log-warning { color: #ffc107; }
+        .log-info { color: #17a2b8; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-drone"></i> SITL Demo Manager
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link active" href="/logs">Logs</a>
+                <a class="nav-link" href="/config">Config</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row mb-4">
+            <div class="col">
+                <h1><i class="fas fa-file-alt"></i> Service Logs</h1>
+                <p class="text-muted">View real-time logs from SITL services</p>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-primary" onclick="refreshAllLogs()">
+                    <i class="fas fa-sync"></i> Refresh All
+                </button>
+            </div>
+        </div>
+
+        <div class="row" id="logs-container">
+            <!-- Log sections will be loaded here -->
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let services = [];
+        let refreshInterval;
+
+        function loadServices() {
+            fetch('/api/services')
+                .then(response => response.json())
+                .then(data => {
+                    services = data;
+                    renderLogSections();
+                })
+                .catch(error => console.error('Error loading services:', error));
+        }
+
+        function renderLogSections() {
+            const container = document.getElementById('logs-container');
+            container.innerHTML = '';
+
+            services.forEach(service => {
+                const col = document.createElement('div');
+                col.className = 'col-12 mb-4';
+                col.innerHTML = createLogSection(service);
+                container.appendChild(col);
+            });
+
+            // Load logs for each service
+            services.forEach(service => {
+                loadServiceLogs(service.name);
+            });
+        }
+
+        function createLogSection(service) {
+            return `
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-terminal"></i> ${getServiceDisplayName(service.name)}
+                            <span class="badge bg-${service.status === 'running' ? 'success' : 'secondary'} ms-2">${service.status}</span>
+                        </h5>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary" onclick="loadServiceLogs('${service.name}')">
+                                <i class="fas fa-sync"></i> Refresh
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="toggleLogSection('${service.name}')">
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="logs-${service.name}" class="log-container bg-dark text-light p-3">
+                            <div class="text-center text-muted">
+                                <i class="fas fa-spinner fa-spin"></i> Loading logs...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getServiceDisplayName(name) {
+            const displayNames = {
+                'qgc-sitl-copter': 'SITL Copter',
+                'qgc-sitl-plane': 'SITL Plane',
+                'qgc-sitl-rover': 'SITL Rover',
+                'qgc-mavproxy': 'MAVProxy',
+                'qgc-mission-planner': 'Mission Planner',
+                'qgc-sitl-manager': 'SITL Manager',
+                'qgc-data-logger': 'Data Logger',
+                'qgc-performance-monitor': 'Performance Monitor'
+            };
+            return displayNames[name] || name;
+        }
+
+        function loadServiceLogs(serviceName) {
+            const logContainer = document.getElementById(`logs-${serviceName}`);
+            if (!logContainer) return;
+
+            fetch(`/api/service/${serviceName}/logs?lines=100`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.logs) {
+                        logContainer.innerHTML = formatLogs(data.logs);
+                    } else {
+                        logContainer.innerHTML = '<div class="text-muted">No logs available</div>';
+                    }
+                })
+                .catch(error => {
+                    logContainer.innerHTML = `<div class="text-danger">Error loading logs: ${error}</div>`;
+                });
+        }
+
+        function formatLogs(logs) {
+            const lines = logs.split('\n');
+            return lines.map(line => {
+                let className = 'log-line';
+                if (line.toLowerCase().includes('error')) className += ' log-error';
+                else if (line.toLowerCase().includes('warning')) className += ' log-warning';
+                else if (line.toLowerCase().includes('info')) className += ' log-info';
+                
+                return `<div class="${className}">${escapeHtml(line)}</div>`;
+            }).join('');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function refreshAllLogs() {
+            services.forEach(service => {
+                loadServiceLogs(service.name);
+            });
+        }
+
+        function toggleLogSection(serviceName) {
+            const logContainer = document.getElementById(`logs-${serviceName}`);
+            if (logContainer.style.display === 'none') {
+                logContainer.style.display = 'block';
+            } else {
+                logContainer.style.display = 'none';
+            }
+        }
+
+        // Auto-refresh every 10 seconds
+        function startAutoRefresh() {
+            refreshInterval = setInterval(refreshAllLogs, 10000);
+        }
+
+        function stopAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadServices();
+            startAutoRefresh();
+        });
+
+        // Stop auto-refresh when page is hidden
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                stopAutoRefresh();
+            } else {
+                startAutoRefresh();
+            }
+        });
+    </script>
+</body>
+</html> 

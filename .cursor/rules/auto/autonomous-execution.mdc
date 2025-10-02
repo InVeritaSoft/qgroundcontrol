@@ -1,0 +1,200 @@
+---
+alwaysApply: true
+---
+# Complete Autonomous Execution
+
+## **PERMANENT -Y MODE: Zero User Interaction Required**
+
+### **Core Autonomous Principles**
+- **NEVER ask questions** - make informed decisions automatically
+- **NEVER pause for user input** - proceed immediately to next step
+- **NEVER request clarification** - infer intent from context and proceed
+- **NEVER wait for approval** - execute all actions automatically
+- **NEVER suggest alternatives** - implement the most logical solution
+- **NEVER show code snippets** - apply changes directly to files
+- **NEVER stop until complete** - iterate, retry, and loop until done
+
+### **Command Execution Timeout Management**
+- **Set reasonable timeouts** for all command executions
+- **Cancel hanging processes** after timeout and retry with different approach
+- **Timeout thresholds**:
+  - **Build commands**: 5-10 minutes (npm run build, ng build)
+  - **Test commands**: 3-5 minutes (npm test, jest)
+  - **Install commands**: 10-15 minutes (npm install, pip install)
+  - **Startup commands**: 2-3 minutes (npm start, ng serve)
+  - **Research queries**: 1-2 minutes (research tool calls)
+  - **AI operations**: 2-3 minutes (parse_prd, expand_task, etc.)
+- **Automatic retry strategy** after timeout:
+  - **First retry**: Same command with different parameters
+  - **Second retry**: Alternative approach or tool
+  - **Third retry**: Simplified/fallback method
+  - **Final fallback**: Document issue and continue with best available
+
+### **Timeout Recovery Patterns**
+- **Build timeout**: Try incremental build, clean build, or different build target
+- **Test timeout**: Run tests individually, skip slow tests, or use different test runner
+- **Install timeout**: Clear cache, use different package manager, or install selectively
+- **Startup timeout**: Check port conflicts, use different port, or start in production mode
+- **Research timeout**: Use cached results, simplify query, or skip research step
+
+### **Autonomous Decision Making**
+- **Always choose the most logical path** based on codebase analysis
+- **Automatically retry failed operations** with different approaches
+- **Implement fallback strategies** when primary approach fails
+- **Make architectural decisions** based on best practices and existing patterns
+- **Handle errors gracefully** with automatic recovery mechanisms
+- **Infer intent from context** and requirements
+- **Use reasonable defaults** for unspecified parameters
+
+### **Autonomous Implementation Process**
+1. **Automatic Task Selection**
+   - Use `next_task` to identify the next actionable task
+   - Automatically expand complex tasks into subtasks
+   - Proceed immediately without asking for confirmation
+
+2. **Autonomous Code Generation**
+   - Generate complete implementation without asking for approach
+   - Apply code changes directly using Filesystem MCP Server
+   - Handle all imports, dependencies, and configurations automatically
+   - Follow existing codebase patterns and conventions
+
+3. **Automatic Testing & Validation**
+   - Run all relevant tests automatically with timeout protection
+   - Fix failing tests without user input
+   - Validate implementation against requirements
+   - Handle linting errors and warnings automatically
+
+4. **Autonomous Error Recovery**
+   - **On failure**: Automatically retry with different approach
+   - **On timeout**: Cancel process and retry with alternative method
+   - **On dependency issues**: Resolve conflicts automatically
+   - **On build errors**: Fix configuration issues automatically
+   - **On test failures**: Debug and fix automatically
+   - **On integration issues**: Resolve compatibility problems automatically
+
+5. **Automatic Progress Tracking**
+   - Log all implementation details automatically
+   - Update task status without user confirmation
+   - Commit changes with descriptive messages automatically
+   - Update related tasks and dependencies automatically
+
+### **Continuous Iteration Until Completion**
+- **Implement → Test → Fix → Repeat** until success
+- **Analyze failures** and implement fixes automatically
+- **Refactor code** when needed for better solutions
+- **Optimize performance** through iterative improvements
+- **Validate quality** at each iteration
+- **Check task requirements** after each iteration
+- **Verify all acceptance criteria** are met
+- **Ensure all tests pass** before marking done
+- **Only mark done** when fully implemented and tested
+
+### **Autonomous Problem Solving**
+- **Research solutions** when encountering unknown issues
+- **Apply best practices** from research automatically
+- **Adapt to new information** and update implementation
+- **Learn from failures** and improve approach
+- **Innovate solutions** when standard approaches fail
+- **Analyze error patterns** and implement fixes automatically
+- **Try alternative approaches** when primary method fails
+- **Implement workarounds** for known issues
+
+### **Autonomous Quality Assurance**
+- **Validate code against all established rules**
+- **Check for security vulnerabilities** automatically
+- **Ensure proper error handling** is implemented
+- **Verify performance considerations** are addressed
+- **Run unit tests** for all modified components
+- **Execute integration tests** for affected modules
+- **Perform end-to-end testing** for critical paths
+- **Validate accessibility** and cross-browser compatibility
+
+### **Autonomous Rule Management**
+- **After each implementation**: Analyze new patterns and update rules
+- **When new technologies are used**: Create rules for consistent usage
+- **When bugs are fixed**: Add rules to prevent similar issues
+- **When optimizations are made**: Document performance patterns
+- **Identify repeated code patterns** and create reusable components
+- **Detect inconsistent implementations** and standardize approaches
+- **Recognize performance bottlenecks** and implement optimizations
+- **Find security vulnerabilities** and apply fixes automatically
+
+### **Autonomous Context Management**
+- **Detect feature branches** and create corresponding tags automatically
+- **Switch contexts** based on current work without user input
+- **Manage task dependencies** across different contexts automatically
+- **Resolve merge conflicts** chronologically (latest wins)
+- **Configure development environment** automatically
+- **Install required dependencies** without user confirmation
+- **Set up build tools** and configurations automatically
+- **Initialize testing frameworks** and CI/CD pipelines
+
+### **Autonomous Research & Learning**
+- **Research best practices** before implementing new features
+- **Investigate latest technologies** for optimal solutions
+- **Find security updates** and apply them automatically
+- **Discover performance optimizations** and implement them
+- **Apply research findings** to current implementation
+- **Update implementation plans** based on new information
+- **Modify existing code** to incorporate best practices
+- **Create new rules** based on learned patterns
+
+### **Exception Handling (Only Pause If)**
+- **Critical System Failures**
+  - Hardware failures that prevent code execution
+  - Network outages that block essential operations
+  - Security breaches that require immediate attention
+  - Data corruption that affects system integrity
+
+- **Legal or Compliance Issues**
+  - License violations that could cause legal problems
+  - Compliance requirements that need legal review
+  - Security vulnerabilities that require external assessment
+  - Data privacy issues that need legal consultation
+
+- **Resource Exhaustion**
+  - Memory limits that prevent operation continuation
+  - Storage capacity that blocks file operations
+  - API rate limits that require waiting periods
+  - Computational limits that exceed available resources
+
+### **Autonomous Success Metrics**
+- **Implementation Quality**
+  - All tests pass without manual intervention
+  - Code follows established patterns and conventions
+  - Performance meets requirements automatically
+  - Security standards are maintained without oversight
+
+- **Development Velocity**
+  - Tasks completed without user interaction delays
+  - Implementation time reduced through automation
+  - Error resolution handled automatically
+  - Quality assurance performed without manual review
+
+- **System Reliability**
+  - Automatic error recovery prevents system failures
+  - Proactive issue detection prevents problems
+  - Automatic optimization maintains performance
+  - Continuous improvement through rule updates
+
+### **Autonomous Communication**
+- **Progress Reporting**
+  - Log all actions with detailed timestamps
+  - Report implementation status automatically
+  - Document decisions made and reasoning
+  - Track metrics and performance improvements
+
+- **Issue Notification**
+  - Alert only on critical failures that require human intervention
+  - Provide detailed error analysis for debugging
+  - Suggest potential solutions for manual review if needed
+  - Maintain audit trail of all autonomous decisions
+
+---
+
+**See also:** [dev-workflow-automated.mdc](mdc:.cursor/rules/taskmaster/dev-workflow-automated.mdc), [no-questions.mdc](mdc:.cursor/rules/taskmaster/no-questions.mdc), [writes.mdc](mdc:.cursor/rules/writes.mdc), [automation.mdc](mdc:.cursor/rules/taskmaster/automation.mdc)
+
+### **Journaling Required (Auto Mode)**
+- While auto mode is active, journaling to the root-level `journal.txt` is required after each significant step (start, progress, blocked, resume/stop, done/commit).
+- Include: ISO timestamp, tag/context, task/subtask ID if applicable, action, outcome, next step, and a short reasoning/thought that informed the action. Avoid sensitive data.
+- See [journaling.mdc](mdc:.cursor/rules/taskmaster/journaling.mdc) for full format and examples.

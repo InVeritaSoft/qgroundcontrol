@@ -1,0 +1,114 @@
+#include "AreaPlanEditor.h"
+#include <QDebug>
+#include <QtMath>
+#include <QtPositioning>
+#include <QVariant>
+#include <QFile>
+#include <QTextStream>
+#include <QTimer>
+#include <QElapsedTimer>
+#include <QCache>
+
+// QGC includes for mission management
+#include "Vehicle.h"
+#include "MissionManager.h"
+#include "MissionItem.h"
+#include "QGCCorePlugin.h"
+#include "QGCOptions.h"
+#include "QGroundControlQmlGlobal.h"
+#include "MultiVehicleManager.h"
+#include "QGCMAVLink.h"
+#include "MissionController.h" // Added for MissionController
+#include "SimpleMissionItem.h"
+#include "MissionManager/AreaPartition.h"
+
+void AreaPlanEditor::calculateFormationPositions()
+{
+    QList<Vehicle*> vehicles = QGroundControl::multiVehicleManager()->vehicles();
+    if (vehicles.isEmpty()) return;
+    
+    _formationOffsets.clear();
+    
+    switch (_currentFormation) {
+        case VFormation:
+            // V formation with leader at front
+            for (Vehicle* vehicle : vehicles) {
+                int role = _formationRoles[vehicle->id()];
+                if (role == 0) {
+                    // Leader at front
+                    _formationOffsets[vehicle->id()] = QGeoCoordinate();
+                } else {
+                    // Followers in V shape
+                    bool isLeft = (role % 2 == 1);
+                    int position = (role + 1) / 2;
+                    double angle = isLeft ? 30.0 : -30.0;  // 30-degree V shape
+                    double distance = position * _formationSpacing;
+                    
+                    // Calculate offset using trigonometry
+                    double dx = distance * qSin(qDegreesToRadians(angle));
+                    double dy = -distance * qCos(qDegreesToRadians(angle));
+                    
+                    QGeoCoordinate offset = calculateOffsetCoordinate(QGeoCoordinate(), dy, 0.0);
+                    offset = calculateOffsetCoordinate(offset, dx, 90.0);
+                    _formationOffsets[vehicle->id()] = offset;
+                }
+            }
+            break;
+            
+        case LineFormation:
+            // Line formation with equal spacing
+            for (Vehicle* vehicle : vehicles) {
+                int role = _formationRoles[vehicle->id()];
+                if (role == 0) {
+                    _formationOffsets[vehicle->id()] = QGeoCoordinate();
+                } else {
+                    double offset = role * _formationSpacing;
+                    _formationOffsets[vehicle->id()] = calculateOffsetCoordinate(QGeoCoordinate(), 0.0, offset);
+                }
+            }
+            break;
+            
+        case CircleFormation:
+            // Circle formation with equal angular spacing
+            int totalVehicles = vehicles.size();
+            for (Vehicle* vehicle : vehicles) {
+                int role = _formationRoles[vehicle->id()];
+                if (role == 0) {
+                    _formationOffsets[vehicle->id()] = QGeoCoordinate();
+                } else {
+                    double angle = (360.0 * role) / totalVehicles;
+                    double dx = _formationSpacing * qSin(qDegreesToRadians(angle));
+                    double dy = _formationSpacing * qCos(qDegreesToRadians(angle));
+                    
+                    QGeoCoordinate offset = calculateOffsetCoordinate(QGeoCoordinate(), dy, 0.0);
+                    offset = calculateOffsetCoordinate(offset, dx, 90.0);
+                    _formationOffsets[vehicle->id()] = offset;
+                }
+            }
+            break;
+            
+        case GridFormation:
+            // Grid formation with equal spacing
+            int gridSize = qCeil(qSqrt(vehicles.size()));
+            for (Vehicle* vehicle : vehicles) {
+                int role = _formationRoles[vehicle->id()];
+                if (role == 0) {
+                    _formationOffsets[vehicle->id()] = QGeoCoordinate();
+                } else {
+                    int row = role / gridSize;
+                    int col = role % gridSize;
+                    double dx = col * _formationSpacing;
+                    double dy = row * _formationSpacing;
+                    
+                    QGeoCoordinate offset = calculateOffsetCoordinate(QGeoCoordinate(), dy, 0.0);
+                    offset = calculateOffsetCoordinate(offset, dx, 90.0);
+                    _formationOffsets[vehicle->id()] = offset;
+                }
+            }
+            break;
+            
+        case NoFormation:
+        default:
+            break;
+    }
+}

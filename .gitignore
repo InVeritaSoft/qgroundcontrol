@@ -10,6 +10,8 @@ libs/lib/Frameworks/GStreamer.framework
 CMakeFiles
 tags
 build/
+build-tests/
+build-tests-vs/
 obj
 .DS_Store
 *.log
@@ -94,3 +96,24 @@ docs/.vitepress/dist/
 
 CMakeUserPresets.json
 cpm_modules
+
+# Logs
+logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dev-debug.log
+# Dependency directories
+# Environment variables
+.env
+# Editor directories and files
+.idea
+.vscode
+*.ntvs*
+*.njsproj
+*.sw?
+# OS specific
+
+# Task files
+# tasks.json
+# tasks/ 

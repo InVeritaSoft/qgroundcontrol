@@ -1,0 +1,8 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+
+If any chance writing md documentation you see a possible mermaid syntax - do it, 
+Writing Mermaid charts - visually percepts better

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ filename }} - SITL Demo Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .config-content {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.4;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .config-line {
+            margin-bottom: 0.25rem;
+        }
+        .config-comment {
+            color: #6c757d;
+            font-style: italic;
+        }
+        .config-param {
+            color: #0d6efd;
+            font-weight: bold;
+        }
+        .config-value {
+            color: #198754;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-drone"></i> SITL Demo Manager
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/logs">Logs</a>
+                <a class="nav-link" href="/config">Config</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row mb-4">
+            <div class="col">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="/config">Configuration</a></li>
+                        <li class="breadcrumb-item active">{{ filename }}</li>
+                    </ol>
+                </nav>
+                <h1>
+                    <i class="fas fa-file-code"></i> {{ filename }}
+                </h1>
+                <p class="text-muted">ArduPilot SITL configuration parameters</p>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-outline-primary" onclick="copyToClipboard()">
+                    <i class="fas fa-copy"></i> Copy
+                </button>
+                <button class="btn btn-outline-secondary" onclick="downloadFile()">
+                    <i class="fas fa-download"></i> Download
+                </button>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-code"></i> Configuration Content</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="config-content" class="config-content">
+                            {{ content | safe }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-info-circle"></i> Parameter Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>File Details</h6>
+                                <ul class="list-unstyled">
+                                    <li><strong>Filename:</strong> {{ filename }}</li>
+                                    <li><strong>Type:</strong> ArduPilot Parameter File</li>
+                                    <li><strong>Format:</strong> Key-Value pairs</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Usage</h6>
+                                <p>This parameter file is automatically loaded when starting the corresponding SITL vehicle type. Parameters can be modified to customize the simulation behavior.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function copyToClipboard() {
+            const content = document.getElementById('config-content').textContent;
+            navigator.clipboard.writeText(content).then(() => {
+                // Show success message
+                const button = event.target;
+                const originalText = button.innerHTML;
+                button.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                button.classList.remove('btn-outline-primary');
+                button.classList.add('btn-success');
+                
+                setTimeout(() => {
+                    button.innerHTML = originalText;
+                    button.classList.remove('btn-success');
+                    button.classList.add('btn-outline-primary');
+                }, 2000);
+            });
+        }
+
+        function downloadFile() {
+            const content = document.getElementById('config-content').textContent;
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = '{{ filename }}';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Syntax highlighting for parameter files
+        function highlightSyntax() {
+            const content = document.getElementById('config-content');
+            const lines = content.innerHTML.split('\n');
+            
+            const highlightedLines = lines.map(line => {
+                if (line.trim().startsWith('#')) {
+                    return `<div class="config-line config-comment">${line}</div>`;
+                } else if (line.includes(' ')) {
+                    const parts = line.split(' ');
+                    if (parts.length >= 2) {
+                        const param = parts[0];
+                        const value = parts.slice(1).join(' ');
+                        return `<div class="config-line"><span class="config-param">${param}</span> <span class="config-value">${value}</span></div>`;
+                    }
+                }
+                return `<div class="config-line">${line}</div>`;
+            });
+            
+            content.innerHTML = highlightedLines.join('');
+        }
+
+        // Initialize syntax highlighting
+        document.addEventListener('DOMContentLoaded', function() {
+            highlightSyntax();
+        });
+    </script>
+</body>
+</html> 

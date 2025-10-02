@@ -211,6 +211,8 @@ qt_add_qml_module(${CMAKE_PROJECT_NAME}
 
 add_subdirectory(src)
 if(QGC_BUILD_TESTING)
+    include(CTest)
+    enable_testing()
     add_subdirectory(test)
     set_property(DIRECTORY test PROPERTY QT_EXCLUDE_FROM_TRANSLATION ON)
 endif()

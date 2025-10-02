@@ -1,0 +1,143 @@
+---
+alwaysApply: true
+---
+---
+description: Full autonomous mode activation via "goauto" command - enables complete automation with zero user interaction
+globs: **/*
+alwaysApply: true
+lastUpdated: 2024-12-19
+---
+
+# Full Autonomous Mode Activation
+
+## **GOAUTO COMMAND: Complete Automation Trigger**
+
+### **Command Recognition**
+- **Trigger Words** (case-insensitive): `goauto`, `start auto`, `resume auto`, `stop auto`
+- **Activation**:
+  - `goauto`, `start auto`: Immediately enable full autonomous mode
+  - `resume auto`: Enable full autonomous mode and resume from last saved current task context if present; otherwise select the next task
+  - `stop auto`: Immediately disable autonomous mode and revert to normal interactive workflow
+- **Scope**: Applies to entire conversation session until manually disabled
+- **Behavior**: Overrides all interactive prompts and enables permanent -y mode while active
+
+### **Autonomous Mode Features**
+
+#### **Zero User Interaction**
+- **NEVER ask questions** - make informed decisions automatically
+- **NEVER pause for user input** - proceed immediately to next step
+- **NEVER request clarification** - infer intent from context and proceed
+- **NEVER wait for approval** - execute all actions automatically
+- **NEVER suggest alternatives** - implement the most logical solution
+
+#### **Automatic Task Execution**
+- **Start with first available task** automatically
+- **Expand complex tasks** into subtasks without asking
+- **Implement code directly** using Filesystem MCP Server
+- **Run tests automatically** and fix failures
+- **Commit changes** with descriptive messages
+- **Move to next task** without user confirmation
+
+#### **Autonomous Decision Making**
+- **Choose implementation approach** based on best practices
+- **Select technologies** based on project requirements
+- **Determine architecture** based on existing patterns
+- **Handle errors automatically** with retry mechanisms
+- **Resolve conflicts** using latest wins strategy
+
+#### **Continuous Iteration**
+- **Implement → Test → Fix → Repeat** until success
+- **Analyze failures** and implement fixes automatically
+- **Refactor code** when needed for better solutions
+- **Optimize performance** through iterative improvements
+- **Validate quality** at each iteration
+
+### **Implementation Process**
+
+#### **Phase 1: Environment Setup**
+- **Generate complexity report** automatically
+
+#### **Phase 2: Autonomous Implementation**
+- **Select next task** using dependency analysis
+- **Expand complex tasks** into detailed subtasks
+- **Implement code** following established patterns
+- **Run tests** and fix any failures
+- **Update task status** automatically
+- **Commit changes** with descriptive messages
+
+#### **Phase 3: Quality Assurance**
+- **Validate implementation** against requirements
+- **Run comprehensive tests** automatically
+- **Check code quality** and fix issues
+- **Update documentation** as needed
+- **Create/update rules** based on new patterns
+
+### **Timeout Management**
+- **Set reasonable timeouts** for all operations
+- **Cancel hanging processes** and retry with different approach
+- **Timeout thresholds**:
+  - Build commands: 5-10 minutes
+  - Test commands: 3-5 minutes
+  - Install commands: 10-15 minutes
+  - Research queries: 1-2 minutes
+  - AI operations: 2-3 minutes
+
+### **Error Recovery**
+- **On failure**: Automatically retry with different approach
+- **On timeout**: Cancel process and retry with alternative method
+- **On dependency issues**: Resolve conflicts automatically
+- **On build failures**: Fix configuration and retry
+- **On test failures**: Debug and fix automatically
+
+### **Progress Tracking**
+- **Log all actions** with detailed timestamps
+- **Update task status** without user confirmation
+- **Report implementation status** automatically
+- **Track metrics** and performance improvements
+- **Document decisions** made and reasoning
+
+### **Exception Handling**
+Only pause for:
+- **Critical system failures** that prevent execution
+- **Legal/compliance issues** requiring external review
+- **Resource exhaustion** that blocks operations
+- **Security breaches** requiring immediate attention
+
+### **Success Criteria**
+- **All tasks completed** without user interaction
+- **All tests passing** automatically
+- **Code follows established patterns** and conventions
+- **Performance meets requirements** automatically
+- **Security standards maintained** without oversight
+
+### **Communication**
+- **Progress reporting**: Log all actions with timestamps
+- **Issue notification**: Alert only on critical failures
+- **Decision documentation**: Record all autonomous decisions
+- **Audit trail**: Maintain complete history of actions
+
+---
+
+**See also:** [autonomous-execution.mdc](mdc:.cursor/rules/taskmaster/autonomous-execution.mdc), [dev-workflow-automated.mdc](mdc:.cursor/rules/taskmaster/dev-workflow-automated.mdc), [no-questions.mdc](mdc:.cursor/rules/taskmaster/no-questions.mdc), [automation.mdc](mdc:.cursor/rules/taskmaste
+
+### **Deactivation & Resume Semantics**
+- `stop auto`:
+  - Stop issuing automatic MCP/CLI commands
+  - Leave `.taskmaster/state.json` `current` pointer intact for later resume
+  - Journal the stop event
+- `resume auto`:
+  - If `.taskmaster/state.json` contains a `current` entry, continue with that item (set `in-progress` if not already); otherwise select via `next_task`
+  - Journal the resume event
+
+### **Journaling Required (Auto Mode)**
+- **Mandatory**: While auto mode is enabled, append entries to the root-level `journal.txt` after each significant step: start, progress, blocked, resume/stop, and done/commit.
+- **Entry contents**: ISO timestamp, tag/context, task/subtask ID (if applicable), action, outcome, and next step. Include a brief reasoning/thought that influenced the action to aid future context. Do not include secrets.
+- **Format example**:
+
+  ```text
+  2025-08-08T12:40:12Z [master] (task 7.2) start → in-progress; reason: selected by next_task; next: implement helper
+  2025-08-08T12:55:05Z [master] (task 7.2) progress: helper implemented; reason: fixes rounding edge-case; next: verify bounds
+  2025-08-08T13:05:33Z [master] (task 7.2) done → committed; next: select next task
+  ```
+
+- **Cross-reference**: See detailed guidance in [journaling.mdc](mdc:.cursor/rules/taskmaster/journaling.mdc).

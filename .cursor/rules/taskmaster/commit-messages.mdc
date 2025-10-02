@@ -1,0 +1,65 @@
+---
+description: Commit each completed task/subtask with the Taskmaster ID prepended in the commit message
+globs: **/*
+alwaysApply: true
+lastUpdated: 2025-08-08
+---
+
+- **Commit-on-Done Policy**
+  - When marking a Taskmaster item as `done` (task or subtask), immediately create a commit dedicated to that item.
+  - Prepend the commit subject with the exact Taskmaster ID.
+  - Include a concise scope and summary; add details in the body (what changed, rationale, risks, follow-ups).
+  - Stage related source edits, updated rules, and the appended `journal.txt` entry together.
+
+- **Commit Subject Format**
+  - `{id}: {summary}`
+  - Optional conventional components: `{id}: {type}({scope}): {summary}`
+  - Examples of valid IDs: `12`, `12.3`, `7.10`.
+
+- **DO**
+
+  ```text
+  12.3: feat(area-planner): insert MAV_CMD_NAV_LOITER_TIME with correct params
+
+  - Set param1=loiterSeconds, param2=1, param3=50m, param4=1 before setting command
+  - Saved mission file and updated journaling
+  - Next: add altitude banding split
+  ```
+
+  ```text
+  5: refactor(QmlControls): use ScreenTools + QGCPalette, remove hardcoded sizes
+
+  - Replaced explicit pixel sizes with ScreenTools multipliers
+  - Ensured qsTr() for user-facing text
+  - Journal updated with verification notes
+  ```
+
+- **DON'T**
+
+  ```text
+  update files
+  ```
+
+  ```text
+  feat: mission stuff
+  ```
+
+  - Missing task ID prefix
+  - Vague summary with no scope or context
+  - Bundling unrelated tasks/subtasks in a single commit
+
+- **Process Guidance**
+  - After `set_task_status --id=<id> --status=done`:
+    - Stage only changes relevant to `<id>` plus `journal.txt` and any rule updates.
+    - Commit using the required subject format with `<id>` prepended.
+    - If multiple subtasks are completed together, commit each subtask separately to preserve traceability.
+  - Prefer small, isolated commits aligned with a single Taskmaster item.
+
+- **QGroundControl Notes**
+  - Do not introduce Node-based changeset tooling in this Qt/CMake project.
+  - Ensure QML follows `QGCPalette`, `ScreenTools`, `qsTr()` conventions before committing.
+
+- **Cross-References**
+  - Workflow: [dev_workflow.mdc](mdc:.cursor/rules/taskmaster/dev_workflow.mdc)
+  - Journaling: [journaling.mdc](mdc:.cursor/rules/taskmaster/journaling.mdc)
+

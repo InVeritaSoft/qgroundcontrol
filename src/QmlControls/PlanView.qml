@@ -36,7 +36,7 @@ Item {
     readonly property real  _margin:                    ScreenTools.defaultFontPixelHeight * 0.5
     readonly property real  _toolsMargin:               ScreenTools.defaultFontPixelWidth * 0.75
     readonly property real  _radius:                    ScreenTools.defaultFontPixelWidth  * 0.5
-    readonly property real  _rightPanelWidth:           Math.min(width / 3, ScreenTools.defaultFontPixelWidth * 30)
+    readonly property real  _rightPanelWidth:           Math.min(width / 1.25, ScreenTools.defaultFontPixelWidth * 130)  // Make right panel (tab content) wider
     readonly property var   _defaultVehicleCoordinate:  QtPositioning.coordinate(37.803784, -122.462276)
     readonly property bool  _waypointsOnlyMode:         QGroundControl.corePlugin.options.missionWaypointsOnly
 
@@ -59,13 +59,14 @@ Item {
     property bool   _triggerSubmit
     property bool   _resetRegisterFlightPlan
 
-    readonly property var       _layers:                    [_layerMission, _layerGeoFence, _layerRallyPoints]
-    readonly property var       _layersUTMSP:               [_layerMission, _layerRallyPoints, _layerUTMSP] //Adds additional UTMSP layer
+    readonly property var       _layers:                    [_layerMission, _layerGeoFence, _layerRallyPoints, _layerAreaPlan]
+    readonly property var       _layersUTMSP:               [_layerMission, _layerRallyPoints, _layerUTMSP, _layerAreaPlan] //Adds additional UTMSP layer
 
     readonly property int       _layerMission:              1
     readonly property int       _layerGeoFence:             2
     readonly property int       _layerRallyPoints:          3
     readonly property int       _layerUTMSP:                4 // Additional Tab button when UTMSP is enabled
+    readonly property int       _layerAreaPlan:             5 // Area tab
     readonly property string    _armedVehicleUploadPrompt:  qsTr("Vehicle is currently armed. Do you want to upload the mission to the vehicle?")
 
 
@@ -89,6 +90,14 @@ Item {
         planMasterController:       _planMasterController
     }
 
+    Component.onCompleted: {
+        if (QGroundControl.areaPlanEditor) {
+            // Pass the MissionController instance expected by the backend
+            QGroundControl.areaPlanEditor.planMasterController = _missionController
+            console.log("PlanView: Bound MissionController to AreaPlanEditor backend")
+        }
+    }
+
     onVisibleChanged: {
         if(visible) {
             editorMap.zoomLevel = QGroundControl.flightMapZoom
@@ -96,6 +105,16 @@ Item {
             if (!_planMasterController.containsItems) {
                 toolStrip.simulateClick(toolStrip.fileButtonIndex)
             }
+        }
+    }
+    
+    Connections {
+        target: layerTabBar
+        function onCurrentIndexChanged() {
+            console.log("PlanView: Tab changed to index:", layerTabBar.currentIndex)
+            console.log("  _editingLayer:", _editingLayer)
+            console.log("  _layerAreaPlan:", _layerAreaPlan)
+            console.log("  Area plan should be visible:", _editingLayer == _layerAreaPlan)
         }
     }
 
@@ -405,6 +424,24 @@ Item {
                         _addROIOnClick = false
                     }
                     break
+                    
+                case _layerAreaPlan:
+                    // Handle Area Plan interactions
+                    if (QGroundControl.areaPlanEditor) {
+                        console.log("Area Plan: Map clicked at", coordinate.latitude, coordinate.longitude)
+                        
+                        // Allow shape manipulation in any state
+                        console.log("Area Plan: Map clicked at", coordinate.latitude, coordinate.longitude)
+                        QGroundControl.areaPlanEditor.setAreaCenter(coordinate)
+                        
+                        // Set default area size if not already set
+                        if (QGroundControl.areaPlanEditor.areaWidth <= 0 || QGroundControl.areaPlanEditor.areaHeight <= 0) {
+                            QGroundControl.areaPlanEditor.setAreaWidth(10.0)
+                            QGroundControl.areaPlanEditor.setAreaHeight(10.0)
+                            console.log("Set default area size: 10x10 meters")
+                        }
+                    }
+                    break
                 }
             }
 
@@ -437,6 +474,17 @@ Item {
                     arrowPosition:  3
                     z:              QGroundControl.zOrderWaypointLines + 1
                 }
+            }
+
+            // Area Plan Map Visuals (visible on Area layer)
+            AreaPlanMapVisuals {
+                id: areaPlanVisuals
+                mapControl: editorMap
+                areaPlanEditor: QGroundControl.areaPlanEditor
+                visible: true  // Always keep visible, use opacity for showing/hiding
+                opacity: _editingLayer == _layerAreaPlan ? 1 : 0  // Fully hide when not on area layer
+                z: QGroundControl.zOrderMapItems + 0.5  // Place shapes just above base map items but below mission elements
+                anchors.fill: parent
             }
 
             // Incomplete segment lines
@@ -528,6 +576,34 @@ Item {
                 planView:               true
                 opacity:                _editingLayer != _layerUTMSP ? editorMap._nonInteractiveOpacity : 1
                 resetCheck:             _resetGeofencePolygon
+            }
+
+            AreaPlanMapVisuals {
+                id: areaPlanMapVisuals
+                mapControl:             editorMap
+                areaPlanEditor:         QGroundControl.areaPlanEditor
+                interactive:            _editingLayer == _layerAreaPlan
+                opacity:                _editingLayer == _layerAreaPlan ? 1 : 0
+                visible:                _editingLayer == _layerAreaPlan
+                isDrawingMode:          QGroundControl.areaPlanEditor.isDrawingMode
+                
+                Component.onCompleted: {
+                    console.log("AreaPlanMapVisuals: Component completed")
+                    console.log("  _editingLayer:", _editingLayer)
+                    console.log("  _layerAreaPlan:", _layerAreaPlan)
+                    console.log("  visible:", _editingLayer == _layerAreaPlan)
+                    console.log("  opacity:", _editingLayer == _layerAreaPlan ? 1 : 0)
+                    console.log("  interactive:", _editingLayer == _layerAreaPlan)
+                }
+                
+                // Force removal of map items when not on Area tab
+                onVisibleChanged: {
+                    console.log("AreaPlanMapVisuals: Visibility changed in PlanView to:", visible)
+                    if (!visible) {
+                        console.log("AreaPlanMapVisuals: Forcing removal of map items due to visibility change")
+                        removeMapItems()
+                    }
+                }
             }
 
             Connections {
@@ -714,6 +790,9 @@ Item {
                         text:       qsTr("Rally")
                         enabled:    _rallyPointController.supported
                     }
+                    QGCTabButton {
+                        text:       qsTr("Area")
+                    }
                 }
 
                 QGCTabBar {
@@ -731,6 +810,9 @@ Item {
                         id: utmspbutton
                         text:       qsTr("UTM-Adapter")
                         visible: _utmspEnabled
+                    }
+                    QGCTabButton {
+                        text:       qsTr("Area")
                     }
                 }
             }
@@ -821,6 +903,25 @@ Item {
                 visible:                 _editingLayer == _layerUTMSP
                 triggerSubmitButton:     _triggerSubmit
                 resetRegisterFlightPlan: _resetRegisterFlightPlan
+            }
+            
+            AreaPlanEditor {
+                id: areaPlanEditor
+                anchors.top:             rightControls.bottom
+                anchors.topMargin:       ScreenTools.defaultFontPixelHeight * 0.25
+                anchors.bottom:          parent.bottom
+                anchors.left:            parent.left
+                anchors.right:           parent.right
+                visible:                 _editingLayer == _layerAreaPlan
+                
+                Component.onCompleted: {
+                    // Pass the plan master controller to the area plan editor
+                    if (QGroundControl.areaPlanEditor) {
+                        // NOTE: Use the existing _planMasterController object here.
+                        QGroundControl.areaPlanEditor.planMasterController = _missionController
+                        console.log("AreaPlanEditor: MissionController set")
+                    }
+                }
             }
         }
 

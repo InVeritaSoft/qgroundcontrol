@@ -1,0 +1,103 @@
+---
+alwaysApply: true
+---
+# Complete Autonomous Operation
+
+## **PERMANENT AUTOMATION: Retry, Loop, Iterate Until Done**
+
+### **Core Automation Principles**
+- **NEVER stop until task is complete** - iterate continuously
+- **NEVER give up on errors** - retry with different approaches
+- **NEVER wait for user input** - proceed automatically
+- **NEVER accept partial completion** - ensure full implementation
+- **Loop and retry** until all requirements are met
+
+### **Command Execution Timeout Management**
+- **Set reasonable timeouts** for all command executions
+- **Cancel hanging processes** after timeout and retry with different approach
+- **Timeout thresholds**:
+  - **Build commands**: 5-10 minutes (npm run build, ng build)
+  - **Test commands**: 3-5 minutes (npm test, jest)
+  - **Install commands**: 10-15 minutes (npm install, pip install)
+  - **Startup commands**: 2-3 minutes (npm start, ng serve)
+  - **Research queries**: 1-2 minutes (research tool calls)
+  - **AI operations**: 2-3 minutes (parse_prd, expand_task, etc.)
+- **Automatic retry strategy** after timeout:
+  - **First retry**: Same command with different parameters
+  - **Second retry**: Alternative approach or tool
+  - **Third retry**: Simplified/fallback method
+  - **Final fallback**: Document issue and continue with best available
+
+### **Timeout Recovery Patterns**
+- **Build timeout**: Try incremental build, clean build, or different build target
+- **Test timeout**: Run tests individually, skip slow tests, or use different test runner
+- **Install timeout**: Clear cache, use different package manager, or install selectively
+- **Startup timeout**: Check port conflicts, use different port, or start in production mode
+- **Research timeout**: Use cached results, simplify query, or skip research step
+
+### **Automatic Retry Mechanisms**
+- **On failure**: Immediately try alternative approach
+- **On error**: Analyze, fix, and retry automatically
+- **On timeout**: Cancel process and retry with different strategy
+- **On dependency issues**: Resolve and retry
+- **On build failures**: Fix configuration and retry
+
+### **Continuous Iteration Process**
+- **Implement → Test → Fix → Repeat** until success
+- **Analyze failures** and implement fixes automatically
+- **Refactor code** when needed for better solutions
+- **Optimize performance** through iterative improvements
+- **Validate quality** at each iteration
+
+### **Loop Until Completion**
+- **Check task requirements** after each iteration
+- **Verify all acceptance criteria** are met
+- **Ensure all tests pass** before marking done
+- **Validate against specifications** completely
+- **Only mark done** when fully implemented and tested
+
+### **Autonomous Problem Solving**
+- **Research solutions** when encountering unknown issues
+- **Apply best practices** from research automatically
+- **Adapt to new information** and update implementation
+- **Learn from failures** and improve approach
+- **Innovate solutions** when standard approaches fail
+
+### **Quality Assurance Loops**
+- **Run tests** after each change
+- **Fix failing tests** automatically
+- **Validate code quality** continuously
+- **Check performance** and optimize
+- **Ensure security** standards are met
+
+### **Error Recovery Strategies**
+- **Primary approach fails**: Try alternative method
+- **Alternative fails**: Research and implement new solution
+- **Research fails**: Innovate custom solution
+- **Custom solution fails**: Simplify and retry
+- **All approaches fail**: Document issue and continue with best available
+
+### **Implementation Completion Criteria**
+- **All code written** and applied to files
+- **All tests passing** without manual intervention
+- **All requirements met** according to specifications
+- **All dependencies resolved** and working
+- **All documentation updated** automatically
+
+### **Autonomous Decision Making**
+- **Choose implementation approach** based on best practices
+- **Select technologies** based on project requirements
+- **Determine architecture** based on existing patterns
+- **Pick algorithms** based on performance needs
+- **Decide on patterns** based on maintainability
+
+### **Continuous Learning**
+- **Analyze successful patterns** and create rules
+- **Document failed approaches** to avoid repetition
+- **Update knowledge base** with new solutions
+- **Improve decision making** based on outcomes
+- **Evolve strategies** based on project needs
+
+---
+
+**See also:** [dev-workflow-automated.mdc](mdc:.cursor/rules/taskmaster/dev-workflow-automated.mdc), [no-questions.mdc](mdc:.cursor/rules/taskmaster/no-questions.mdc), [writes.mdc](mdc:.cursor/rules/writes.mdc)

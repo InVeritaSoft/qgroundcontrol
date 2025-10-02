@@ -1,0 +1,120 @@
+2025-08-08T02:59:02.5402276Z [master] (task 2.1) start ? in-progress; plan: add DroneAssignment struct in src/MissionManager; next: wire helpers
+2025-08-08T03:05:50.5786878Z [master] (task 1) review ? done; verified QML<->C++ bindings, PlanView exposure, and added tests for new properties
+2025-08-08T03:16:51.9999744Z [master] (task 2.2) in-progress; added AreaPartition header-only helpers; next: integrate into partition flow
+2025-08-08T07:07:03.3888800Z [master] (task 2.3) done; per-drone RR indices + assignments exposed; next: 2.4 rotation handling
+2025-08-08T07:10:44.1787734Z [master] (task 2.4) done; rotation handled via splitIntoStripes + _areaRotation adapter; next: 2.5 uneven divisions
+2025-08-08T07:13:37.0165482Z [master] (task 2.5) done; uneven division handled (RR doc + per-drone counts API); next: 2.6 unit-testable helpers
+2025-08-08T07:17:08.5951225Z [master] (task 2.6) done; unit-testable helpers ready; next: 2.7 integrate with waypoint generation
+2025-08-08T07:26:18.7407477Z [master] (task 2.7) progress: per-drone waypoint preview adapter added; next: expose in QML + tests
+2025-08-08T07:29:22.7573898Z [master] (task 2.7) progress: QML preview added (Refresh Preview, per-drone counts); next: tests + mission wiring
+2025-08-08T07:35:18.4787485Z [master] (task 2.7) progress: per-drone test added; next: mission insertion wiring
+2025-08-08T07:39:08.2737684Z [master] (task 2.7) done; integration to preview/UI/tests complete; next: 2.8 balanced partition tests
+2025-08-08T07:43:10.0388924Z [master] (task 2.8) done; balanced RR tests added; next: 2.9 bounds tests
+2025-08-08T07:47:11.3942616Z [master] (task 2.9) done; bounds/rotation tests added; next: 2.10 rotation handling tests
+2025-08-08T08:05:09.1943206Z [master] (task 2) done; all subtasks complete; next: 5 policy steps
+2025-08-08T08:07:40.1560489Z [master] (task 5) start: policy steps injection plan (RTL/Loiter after RTL via toggles)
+2025-08-08T08:15:28.2393024Z [master] (task 11) done; added axis selection and minimal area tests; next: 12 waypoint gen tests
+2025-08-08T08:27:19.7269662Z [master] (task 12) done; waypoint generation count/position tests added; next: 13 policy tests
+2025-08-08T08:48:18.4238223Z [master] (task 6.1) per-drone overlays + legend/toggles implemented in AreaPlanMapVisuals.qml; next: 6.5 performance throttling
+2025-08-08T08:53:34.4474783Z [master] (task 6) done; overlays + legend + toggles + debounce complete; next: 15 perf/logging
+2025-08-08T08:57:32.3708341Z [master] (task 15) start: perf/logging plan ? extend debounce, add caching key, audit logs
+2025-08-08T09:01:44.4684611Z [master] (task 15.1/15.2) done; debounce + preview cache added
+2025-08-08T09:04:14.9094897Z [master] (task 15.3/15.4) done; marker reuse + timing logs in overlays
+2025-08-08T09:12:59.9259280Z [master] (task 8.1/8.2/8.3) done; AreaPlanMapVisuals added to PlanView with proper z/visibility
+2025-08-08T09:22:26.2999743Z [master] (task 8.4/8.5/8.6/8.7/8.8/8.9/8.10) done; PlanView wired, CMake confirmed, legend/toggles/z-order verified
+2025-08-08T09:29:44.8338500Z [master] (task 9) done; per-drone WPL save implemented via savePerDroneMissionFiles
+2025-08-08T09:40:18.9212378Z [master] (task 10.3/10.5/10.7) done; per-drone upload hook + UI buttons added
+2025-08-08T09:40:43.2450346Z [master] resume journaling → success; next: append after each significant action
+2025-08-08T12:45:00.0000000Z [master] (rule) auto-mode journaling requirement added → success; next: include brief reasoning in entries per updated rules
+2025-08-08T09:46:50.8030682Z [master] (task 10.1) start ? in-progress; plan: add vehicle QGCComboBox bound to multiVehicleManager.vehicles, store selection, use in per-drone upload
+2025-08-08T09:47:34.2600143Z [master] (task 10.1) done; vehicle selector wired to per-drone upload
+2025-08-08T09:48:44.5872224Z [master] (task 10.2) start ? in-progress; plan: per-drone vehicle mapping UI + Upload All mapped
+2025-08-08T09:57:32.9639138Z [master] (task 10.2) done; per-drone vehicle mapping UI + Upload All mapped implemented
+2025-08-08T10:02:05.6759472Z [master] (task 10.4/10.6) done; upload progress/error/sendComplete signals integrated
+2025-08-08T10:03:28.2424214Z [master] (task 10.10) start ? in-progress; plan: document upload flow (UI + backend), include error/progress behavior and troubleshooting
+2025-08-08T10:06:39.7661196Z [master] (task 10.10) done; upload flow documented in .taskmaster/docs/UPLOAD-FLOW.md
+2025-08-08T10:07:32.0935617Z [master] (task 10.8) start ? in-progress; plan: add connected SITL testing checklist for upload flow
+2025-08-08T10:08:23.8242436Z [master] (task 10.8) start ? in-progress; plan: add connected SITL testing checklist for upload flow
+2025-08-08T10:12:32.9314200Z [master] (task 10.8) done; connected SITL testing checklist added
+2025-08-08T10:12:52.5520944Z [master] (task 10.9) start ? in-progress; plan: add disconnected SITL testing checklist for upload flow
+2025-08-08T12:50:12.0000000Z [master] (init) Taskmaster MCP configured via .cursor/mcp.json → success; reason: enable MCP-first tools; next: parse PRD and generate tasks
+2025-08-08T12:50:22.0000000Z [master] (rules) added rule scaffolding (.cursor/rules/auto/ai-suggested.mdc, .cursor/rules/cursor_rules.mdc, .cursor/rules/self_improve.mdc) → success; reason: standardize rule formatting and evolution; next: enforce in future edits
+2025-08-08T12:50:32.0000000Z [master] (automation) added automation frameworks (automation.mdc, autonomous-execution.mdc, dev-workflow-automated.mdc, no-questions.mdc) → success; reason: enable full-auto execution; next: apply for tagged Taskmaster work
+2025-08-08T12:50:42.0000000Z [master] (goauto) added goauto.mdc command semantics → success; reason: single-command activation of autonomous mode; next: respect journaling and status transitions
+2025-08-08T12:50:52.0000000Z [master] (timeouts) added timeout-handling.mdc → success; reason: define cancel/retry policy; next: follow thresholds during long ops
+2025-08-08T12:51:02.0000000Z [master] (validation) added task-validation.mdc → success; reason: prevent marking done on unverified work; next: validate before status changes
+2025-08-08T12:51:12.0000000Z [master] (qgc-overrides) added QGC-specific automation overrides → success; reason: align with Qt/CMake toolchain and QML conventions; next: follow QGCPalette/ScreenTools/qsTr()
+2025-08-08T12:51:22.0000000Z [master] (taskmaster-docs) added taskmaster.mdc, dev_workflow.mdc, journaling.mdc, commit-messages.mdc → success; reason: document tagged tasks and commit-on-done; next: adhere to commit subject with ID
+2025-08-08T12:51:32.0000000Z [master] (config) initialized .taskmaster/config.json models/endpoints → success; reason: set main/research/fallback models; next: verify API keys in .cursor/mcp.json/.env
+2025-08-08T12:51:42.0000000Z [master] (prd) added Multi-Drone-Area-Planner-PRD.md → success; reason: formalize multi-drone feature requirements; next: parse into tasks/tag when needed
+2025-08-08T12:51:52.0000000Z [master] (complexity) added .taskmaster/reports/task-complexity-report.json → success; reason: guide subtask counts and priorities; next: expand tasks per recommendations
+2025-08-08T12:52:02.0000000Z [master] (gitignore) unignored Taskmaster task files → success; reason: track tasks.json/tasks/ in git; next: include task artifacts in commits
+2025-08-08T12:52:12.0000000Z [master] (tasks) initialized/updated .taskmaster/tasks/tasks.json per PRD and tagging system → success; reason: structure work items with subtasks, priorities, and testStrategy; next: proceed via next_task
+2025-08-08T10:15:14.1758022Z [master] (task 10) done; upload flow and testing docs completed
+2025-08-08T12:52:20.0000000Z [master] (commit 3eb40a9) Init TM → success; reason: configured MCP server via .cursor/mcp.json for task-master-ai and added automation/rule scaffolding; next: operate MCP-first with journaling
+2025-08-08T12:52:21.0000000Z [master] (commit 3eb40a9) tasks.json restructure → success; reason: migrated to tagged Taskmaster with complexity/priorities/subtasks derived from PRD; next: drive execution via next_task
+2025-08-08T12:52:23.0000000Z [master] (docs) mvp/mulri-drone-storm-tuned.md added → success; reason: defines per-drone mission flow (RTL, Loiter/Hold) and area distribution; next: align planner/upload behavior with doc
+2025-08-08T12:52:24.0000000Z [master] (policy) commit-on-done enforced → success; reason: commit message rules added; next: prefix all commits with Taskmaster ID and include journal updates
+
+2025-08-08T12:53:00.0000000Z [master] (commit 3eb40a9) expanded context
+Overview:
+- Purpose: Establish Taskmaster (MCP-first) planning inside Cursor and codify automation/rules to manage the Multi-Drone Area Planner work with traceability and zero-interaction execution where safe.
+- Scope: Adds MCP server config, rules (automation, journaling, commit policy, QGC overrides), PRD, complexity report, and migrates tasks into a tagged Taskmaster structure tracked in git.
+
+Key changes and rationale:
+- .cursor/mcp.json (task-master-ai server):
+  - Command: npx -y --package=task-master-ai task-master-ai
+  - Env: OLLAMA_API_KEY placeholder, OLLAMA_BASE_URL=http://localhost:11434/api
+  - Why: Enable MCP tools (next_task, update_subtask, set_task_status, etc.) directly in Cursor for a deterministic, scripted workflow.
+- Rules/docs added (.cursor/rules/...):
+  - auto/automation.mdc, auto/autonomous-execution.mdc, auto/no-questions.mdc, auto/goauto.mdc
+    - Why: Define autonomous execution behavior, retries/timeouts, and zero-prompt policy to keep momentum.
+  - auto/timeout-handling.mdc, taskmaster/task-validation.mdc
+    - Why: Prevent hanging/partial success; enforce validation before marking tasks done.
+  - auto/qgc-overrides.mdc
+    - Why: Align with QGroundControl toolchain (Qt/CMake), avoid auto builds, follow QML conventions (QGCPalette, ScreenTools, qsTr()).
+  - taskmaster/commit-messages.mdc, taskmaster/journaling.mdc, taskmaster/dev_workflow.mdc, taskmaster/taskmaster.mdc
+    - Why: Standardize commit subjects with Taskmaster IDs, require journaling, and describe the MCP-first workflow.
+  - cursor_rules.mdc, self_improve.mdc, auto/ai-suggested.mdc
+    - Why: Keep rule quality high, evolve patterns, and cross-link guidance.
+- .taskmaster/config.json (models/global):
+  - Adds main/research/fallback model configs and base URLs for providers.
+  - Why: Centralize AI configuration; keys go in .cursor/mcp.json or .env as appropriate.
+- Multi-Drone-Area-Planner-PRD.md:
+  - Why: Canonical requirements for multi-drone planning (partitioning, waypoint gen, deconfliction, operator controls, UX, roadmap, risks).
+- .taskmaster/reports/task-complexity-report.json:
+  - Why: Provide complexity scores with recommended subtask counts and expansion prompts to guide breakdown.
+- .taskmaster/tasks/tasks.json + .gitignore change:
+  - Tasks now tracked in git (unignored), structured with priorities, dependencies, and subtasks per PRD and complexity report.
+  - Why: Improve traceability; pair with commit-on-done and journaling for full audit chain.
+- mvp/mulri-drone-storm-tuned.md (mission flow doc):
+  - Why: Describes per-drone flow (RTL, Loiter/Hold), independent waypoint sets, and area distribution; informs planner and upload behavior.
+
+Impact on workflow:
+- Use MCP-first commands to select and progress work (next_task → set_task_status=in-progress → update_subtask for plans/progress → set_task_status=done after verification).
+- Maintain `journal.txt` with timestamped entries including reasons/next steps; expand with narrative context for major milestones (this entry).
+- Follow QGC overrides: no automatic builds/tests; keep sizing/theming via ScreenTools/QGCPalette/qsTr().
+- Commit-on-done: prepend Taskmaster ID to commit subject; include concise scope and rationale in body.
+
+Risks & mitigations:
+- Missing API keys for selected providers: verify .cursor/mcp.json/.env before heavy AI operations.
+- Over-automation in QGC: qgc-overrides prevent unintended builds; journal and validation rules gate status changes.
+- Timeout/hangs: timeout-handling policy with retry/backoff patterns documented and to be followed.
+
+Next steps:
+- Drive implementation via MCP next_task in the `master` tag (or create feature tag when branching becomes relevant).
+- Use the PRD and complexity report to expand tasks where needed; continue journaling with contextual summaries after key transitions.
+2025-08-08T10:41:37.8197794Z [master] (task 16.1) start ? in-progress; plan: add SITL setup checklist (multi-vehicle) for E2E test
+2025-08-08T10:42:17.2466780Z [master] (task 16.1) done ? committed; next: 16.2 connect vehicles in SITL
+2025-08-08T10:43:28.9093651Z [master] (task 16.2) start ? in-progress; plan: add SITL connection checklist (2�4 vehicles via UDP) and toolbar verification steps
+2025-08-08T10:45:00.7485437Z [master] (task 16.2) done ? committed; next: 16.3 load per-drone missions
+2025-08-08T10:47:13.4600255Z [master] (task 16.3) start ? in-progress; plan: add per-drone mission loading checklist (from WPL files and Area Planner) with vehicle mapping
+2025-08-08T10:48:31.9568618Z [master] (task 16.3) done ? committed; next: 16.4 upload missions
+2025-08-08T10:49:19.9398475Z [master] (task 16.4) start ? in-progress; plan: add per-drone upload checklist (progress/error signals, per-drone and mapped uploads)
+2025-08-08T10:49:45.6693709Z [master] (task 16.4) done ? committed; next: 16.5 validate altitude bands
+2025-08-08T10:53:10.1516387Z [master] (task 16.5) start ? in-progress; plan: add altitude band validation checklist (per-drone offsets, non-overlap) with steps
+2025-08-08T10:55:39.8406539Z [master] (task 16.5) done ? committed; next: 16.6 validate time staggering
+2025-08-08T11:00:47.4792147Z [master] (task 16.6) start ? in-progress; plan: add time-stagger validation checklist (pre-start loiter offsets, launch separation) with steps
+2025-08-08T11:02:46.7603600Z [master] (task 16.6) done ? committed; next: 16.7 capture logs
+2025-08-08T11:03:42.3333491Z [master] (task 16.7) start ? in-progress; plan: add logs capture checklist (telemetry logs/MAVLink, QGC app logs) with paths
+2025-08-08T11:07:36.4096233Z [master] (task 16) done; E2E SITL docs/checklists completed; all subtasks done

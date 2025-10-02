@@ -1,0 +1,189 @@
+---
+alwaysApply: true
+---
+# Command Execution Timeout Handling
+
+## **AUTONOMOUS TIMEOUT MANAGEMENT: Cancel and Retry**
+
+### **Core Timeout Principles**
+- **NEVER let commands hang indefinitely** - set reasonable timeouts
+- **ALWAYS cancel hanging processes** after timeout threshold
+- **AUTOMATICALLY retry** with different approach after timeout
+- **DOCUMENT timeout issues** for future reference
+- **CONTINUE with best available** when all retries exhausted
+
+### **Timeout Thresholds by Command Type**
+
+#### **Build Commands (5-10 minutes)**
+- `npm run build` - 8 minutes
+- `ng build` - 8 minutes
+- `ng build --prod` - 10 minutes
+- `webpack` - 8 minutes
+- `vite build` - 6 minutes
+- `rollup` - 8 minutes
+
+#### **Test Commands (3-5 minutes)**
+- `npm test` - 4 minutes
+- `jest` - 4 minutes
+- `ng test` - 4 minutes
+- `cypress run` - 5 minutes
+- `playwright test` - 5 minutes
+- `vitest` - 3 minutes
+
+#### **Install Commands (10-15 minutes)**
+- `npm install` - 12 minutes
+- `yarn install` - 12 minutes
+- `pnpm install` - 10 minutes
+- `pip install` - 15 minutes
+- `cargo build` - 15 minutes
+- `go mod download` - 10 minutes
+
+#### **Startup Commands (2-3 minutes)**
+- `npm start` - 2 minutes
+- `ng serve` - 2 minutes
+- `vite` - 2 minutes
+- `next dev` - 3 minutes
+- `nuxt dev` - 3 minutes
+- `storybook` - 3 minutes
+
+#### **Research Queries (1-2 minutes)**
+- `research` tool calls - 2 minutes
+- Web searches - 1 minute
+- Documentation lookups - 1 minute
+- API documentation queries - 1 minute
+
+#### **AI Operations (2-3 minutes)**
+- `parse_prd` - 3 minutes
+- `expand_task` - 3 minutes
+- `analyze_project_complexity` - 3 minutes
+- `update_task` - 2 minutes
+- `add_task` - 2 minutes
+
+### **Automatic Retry Strategy**
+
+#### **First Retry (Same Command, Different Parameters)**
+- **Build timeout**: Try `--watch=false`, `--optimization=false`, or `--source-map=false`
+- **Test timeout**: Try `--maxWorkers=1`, `--runInBand`, or `--bail`
+- **Install timeout**: Try `--no-optional`, `--production`, or `--frozen-lockfile`
+- **Startup timeout**: Try different port, `--host=0.0.0.0`, or `--disable-host-check`
+- **Research timeout**: Simplify query, use different search terms, or skip research
+
+#### **Second Retry (Alternative Approach)**
+- **Build timeout**: Try different build target, incremental build, or clean build
+- **Test timeout**: Run tests individually, skip slow tests, or use different test runner
+- **Install timeout**: Clear cache, use different package manager, or install selectively
+- **Startup timeout**: Check for port conflicts, kill existing processes, or use production mode
+- **Research timeout**: Use cached results, different search engine, or skip step
+
+#### **Third Retry (Simplified/Fallback Method)**
+- **Build timeout**: Build only essential components, skip optimization, or use development build
+- **Test timeout**: Run only critical tests, skip integration tests, or use basic test runner
+- **Install timeout**: Install only core dependencies, skip dev dependencies, or use system packages
+- **Startup timeout**: Start in minimal mode, skip hot reload, or use static build
+- **Research timeout**: Use basic documentation, skip advanced features, or proceed without research
+
+#### **Final Fallback (Document and Continue)**
+- **Log timeout issue** with detailed context
+- **Document attempted approaches** and their failures
+- **Continue with best available** implementation
+- **Mark task for later review** if critical
+- **Proceed to next task** without blocking
+
+### **Timeout Recovery Patterns**
+
+#### **Build Timeout Recovery**
+```bash
+# First retry - different parameters
+npm run build -- --watch=false --optimization=false
+
+# Second retry - incremental build
+npm run build -- --incremental
+
+# Third retry - development build
+npm run build -- --configuration=development
+
+# Final fallback - minimal build
+npm run build:lib -- --skip-optimization
+```
+
+#### **Test Timeout Recovery**
+```bash
+# First retry - single worker
+npm test -- --maxWorkers=1 --runInBand
+
+# Second retry - individual test files
+npm test -- --testPathPattern=critical-tests
+
+# Third retry - basic test runner
+npm run test:basic
+
+# Final fallback - skip tests temporarily
+echo "Tests skipped due to timeout - will retry later"
+```
+
+#### **Install Timeout Recovery**
+```bash
+# First retry - no optional dependencies
+npm install --no-optional --production
+
+# Second retry - clear cache and retry
+npm cache clean --force && npm install
+
+# Third retry - selective installation
+npm install core-dependency1 core-dependency2
+
+# Final fallback - use existing node_modules
+echo "Using existing dependencies - install skipped due to timeout"
+```
+
+### **Timeout Detection and Handling**
+
+#### **Process Monitoring**
+- **Track command start time** for all executions
+- **Monitor process status** during execution
+- **Detect hanging processes** by lack of output
+- **Cancel processes** that exceed timeout threshold
+- **Log timeout events** with context and duration
+
+#### **Resource Monitoring**
+- **Check CPU usage** during long-running commands
+- **Monitor memory consumption** for potential leaks
+- **Track disk I/O** for build/test operations
+- **Detect network issues** for install/research operations
+- **Identify resource bottlenecks** that cause timeouts
+
+### **Timeout Prevention Strategies**
+
+#### **Pre-execution Checks**
+- **Verify system resources** before starting commands
+- **Check for conflicting processes** (ports, file locks)
+- **Validate dependencies** before installation
+- **Pre-warm caches** for build operations
+- **Check network connectivity** for remote operations
+
+#### **Optimization Techniques**
+- **Use incremental builds** when possible
+- **Parallelize operations** where supported
+- **Cache intermediate results** for repeated operations
+- **Skip unnecessary steps** in development mode
+- **Use faster alternatives** when available
+
+### **Timeout Documentation**
+
+#### **Logging Requirements**
+- **Command executed** with full parameters
+- **Start time** and expected duration
+- **Timeout threshold** applied
+- **Retry attempts** with different approaches
+- **Final outcome** and any fallback used
+
+#### **Issue Tracking**
+- **Document timeout patterns** for specific commands
+- **Track timeout frequency** by command type
+- **Identify system bottlenecks** causing timeouts
+- **Update timeout thresholds** based on system performance
+- **Create timeout prevention rules** for common scenarios
+
+---
+
+**See also:** [autonomous-execution.mdc](mdc:.cursor/rules/taskmaster/autonomous-execution.mdc), [automation.mdc](mdc:.cursor/rules/taskmaster/automation.mdc), [dev-workflow-automated.mdc](mdc:.cursor/rules/taskmaster/dev-workflow-automated.mdc)

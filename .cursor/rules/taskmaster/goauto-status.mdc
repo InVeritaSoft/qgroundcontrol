@@ -1,0 +1,139 @@
+---
+description: When `goauto` is active, automatically update Taskmaster task statuses and track the current task/subtask context with journaling
+globs: **/*
+alwaysApply: true
+lastUpdated: 2025-08-08
+---
+
+- **MCP-first policy and task selection via Next Task**
+  - Prefer MCP tools for all task operations; fall back to CLI only if MCP is unavailable.
+  - Always select work using the "next task" mechanism before starting: use MCP `next_task` (preferred) or CLI `task-master next`.
+  - After selecting, immediately set the task/subtask to `in-progress`, log to `journal.txt`, and persist `current` pointer.
+
+### DO (MCP preferred)
+
+```json
+// Identify next actionable task (MCP)
+{"tool":"next_task","projectRoot":"<absPath>","tag":"master"}
+
+// Start it (MCP)
+{"tool":"set_task_status","id":"7.2","status":"in-progress","projectRoot":"<absPath>","tag":"master"}
+
+// Log start (MCP)
+{"tool":"update_subtask","id":"7.2","prompt":"Start: Implement feature X; Files: src/...; Risks: ...","projectRoot":"<absPath>","tag":"master"}
+```
+
+### DO (CLI fallback)
+
+```powershell
+# Identify next actionable task
+task-master next --tag master
+
+# Assume next is id 7.2, begin work and log
+task-master set-status --id=7.2 --status=in-progress --tag master
+task-master update-subtask --id=7.2 --prompt "Start: Implement feature X; Files: src/...; Risks: ..." --tag master
+```
+
+- **Status automation under `goauto`**
+  - Set the selected task/subtask status to `in-progress` immediately upon selection.
+  - Append timestamped progress via `update-subtask` during implementation.
+  - Mark as `done` only after verification (build/tests per project policy) and commit using the required ID-prefixed subject.
+  - Use `blocked` or `deferred` with a short reason when progress cannot continue, then move on to the next task.
+
+- **Current task tracking**
+  - Maintain a single active "current" pointer (tag, id, status, timestamps).
+  - Persist current context updates to both `journal.txt` and a lightweight state file entry.
+    - Preferred: extend `.taskmaster/state.json` with a `current` object:
+
+```json
+{
+  "currentTag": "master",
+  "current": {
+    "id": "12.3",           // task or subtask id
+    "status": "in-progress", // pending | in-progress | done | blocked | deferred
+    "startedAt": "2025-08-08T12:34:56Z",
+    "updatedAt": "2025-08-08T12:40:12Z",
+    "note": "Started implementation"
+  }
+}
+```
+
+- **Atomicity & discipline**
+  - Keep at most one `in-progress` item per tag under `goauto`.
+  - Always journal transitions (start, pause, blocked, done) with ISO timestamp and next step.
+  - Prefer batch status updates for multiple related items only when strictly necessary; otherwise, finish one before starting the next.
+
+### DO
+
+```powershell
+# Start work on the next actionable task (example id 12.3) and record current context
+task-master set-status --id=12.3 --status=in-progress --tag master
+task-master update-subtask --id=12.3 --prompt "Start: Implement area split. Files: src/QmlControls/AreaPlanEditor.qml; Risks: off-by-one stripes." --tag master
+
+# Journal the transition (append a single line)
+Add-Content -Path journal.txt -Value ("$(Get-Date -AsUTC -Format o) [master] (task 12.3) start → in-progress; next: implement area split")
+
+# Persist current pointer update (example using jq; use any JSON-safe method available in your environment)
+# NOTE: Implementation detail varies; the rule requires persisting fields shown in the JSON above.
+
+# Log intermediate progress without flipping status
+task-master update-subtask --id=12.3 --prompt "Progress: Generated stripes with ScreenTools metrics; verifying bounds." --tag master
+
+# Complete only after verification
+task-master set-status --id=12.3 --status=done --tag master
+git add -A
+git commit -m "12.3: feat(area-planner): implement area split with bounds verification"
+
+# Clear current pointer and journal completion
+Add-Content -Path journal.txt -Value ("$(Get-Date -AsUTC -Format o) [master] (task 12.3) done → committed; next: select next task")
+```
+
+```powershell
+# If blocked, record and move on
+task-master set-status --id=12.3 --status=blocked --tag master
+task-master update-subtask --id=12.3 --prompt "Blocked: CMake preset missing; next: wait for preset or add windows-release." --tag master
+Add-Content -Path journal.txt -Value ("$(Get-Date -AsUTC -Format o) [master] (task 12.3) blocked: missing preset; next: configure build preset")
+```
+
+### DON'T
+
+```text
+# ❌ DON'T start tasks arbitrarily without selecting via Next Task (MCP/CLI)
+work on 9.1  # skipped next_task / task-master next
+```
+
+```text
+# ❌ DON'T skip MCP when available
+use CLI first even though MCP tools are operational
+```
+
+```text
+# ❌ DON'T leave multiple tasks as in-progress under the same tag
+set-status 10.1 → in-progress
+set-status 11.2 → in-progress  # ← avoid parallel in-progress states with goauto
+```
+
+```text
+# ❌ DON'T mark 'done' before verification/commit
+set-status 12.3 → done  # tests/build not verified
+```
+
+```text
+# ❌ DON'T skip journaling/current-pointer updates
+# Missing journal.txt line and no state current pointer update
+```
+
+### Why
+
+- **Consistency**: Automated, visible status transitions reduce ambiguity during autonomous execution.
+- **Traceability**: The combination of Taskmaster updates, `journal.txt`, and a current-pointer enables quick context recovery.
+- **Flow efficiency**: Limiting to a single active item prevents context switching and partial work.
+
+### Cross-references
+
+- [goauto.mdc](mdc:.cursor/rules/auto/goauto.mdc)
+- [dev_workflow.mdc](mdc:.cursor/rules/taskmaster/dev_workflow.mdc)
+- [taskmaster.mdc](mdc:.cursor/rules/taskmaster/taskmaster.mdc)
+- [journaling.mdc](mdc:.cursor/rules/taskmaster/journaling.mdc)
+- [timeout-handling.mdc](mdc:.cursor/rules/auto/timeout-handling.mdc)
+

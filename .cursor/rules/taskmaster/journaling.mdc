@@ -1,0 +1,39 @@
+---
+description: Require maintaining a project journal (journal.txt) with timestamped entries for progress, failures, successes, and tricky moments
+globs: **/*
+alwaysApply: true
+lastUpdated: 2025-08-08
+---
+
+- **Journal Requirement**
+  - Maintain a root-level `journal.txt`.
+  - Append a line for each significant action, decision, error, or success.
+  - Include: ISO timestamp, tag/context, task/subtask ID (if applicable), short action, outcome, and next step.
+
+- **Format**
+
+  ```text
+  2025-08-08T12:34:56Z [master] (task 12.3) add Waypoint loiter params → success; next: save mission file
+  2025-08-08T12:40:03Z [feature-multi-drone] (task 3) split area into stripes → failure: off-by-one lines; next: fix ceil/floor
+  ```
+
+- **DO**
+  - Log after: generating waypoints, modifying mission items, saving/uploading missions, adding rules, fixing tests.
+  - Log tricky QGC-specific details (MAV_CMD params, `MissionController` access, `QGCPalette` theming).
+
+- **Context & Reasoning**
+  - It's helpful to include a brief thought or reasoning that influenced the action (e.g., why a decision was made or which edge-case was targeted). Keep it concise and free of secrets.
+  - Example: "reason: selected by next_task" or "reason: fixes rounding edge-case".
+
+- **DON'T**
+  - Overwrite existing entries.
+  - Store sensitive credentials.
+
+- **Why**
+  - Creates an auditable trail for complex Qt/QGC development.
+  - Speeds up debugging and future rule improvements.
+
+- **Cross-References**
+  - Workflow: [dev_workflow.mdc](mdc:.cursor/rules/taskmaster/dev_workflow.mdc)
+  - Self improvement: [self_improve.mdc](mdc:.cursor/rules/self_improve.mdc)
+
