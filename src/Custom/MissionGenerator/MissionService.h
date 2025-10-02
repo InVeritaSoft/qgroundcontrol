@@ -37,6 +37,9 @@ public:
     Q_INVOKABLE bool isExplodeButtonEnabled() const;
     Q_INVOKABLE void executeExplode();
     Q_INVOKABLE void resetTripodTracking();
+    
+    // Test method for development/debugging
+    Q_INVOKABLE void testMarkAllPayloadsInstalled();
 
     // Water avoidance settings (read from global AppSettings)
     Q_INVOKABLE bool waterAvoidanceEnabled() const;

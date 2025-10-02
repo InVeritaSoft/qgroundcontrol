@@ -632,12 +632,12 @@ QList<QObject*> PtahMissionGenerator::createPayloadDropMissionItems(const QList<
         return missionItems;
     }
     
-    // 1. Servo 10 = 2500 (Release payload)
-    qDebug() << "Adding servo command: Release payload (2500)";
+    // 1. Servo 10 = 2400 (Release payload)
+    qDebug() << "Adding servo command: Release payload (2400)";
     QObject* servoRelease = new QObject();
     servoRelease->setProperty("command", 183);  // MAV_CMD_DO_SET_SERVO
     servoRelease->setProperty("frame", 0);
-    servoRelease->setProperty("params", QVariantList() << 10 << 2500 << 0 << 0 << 0 << 0 << 0);
+    servoRelease->setProperty("params", QVariantList() << 10 << 2400 << 0 << 0 << 0 << 0 << 0);
     servoRelease->setProperty("autoContinue", true);
     missionItems.append(servoRelease);
     
@@ -678,13 +678,13 @@ QList<QObject*> PtahMissionGenerator::createPayloadDropMissionItems(const QList<
         loiter->setProperty("altitudeMode", 1);
         missionItems.append(loiter);
         
-        // 3c. Servo 10 = 900 (Hold payload) - only after first waypoint
+        // 3c. Servo 10 = 400 (Hold payload) - only after first waypoint
         if (i == 0) {
-            qDebug() << "Adding servo command: Hold payload (900)";
+            qDebug() << "Adding servo command: Hold payload (400)";
             QObject* servoHold = new QObject();
             servoHold->setProperty("command", 183);  // MAV_CMD_DO_SET_SERVO
             servoHold->setProperty("frame", 0);
-            servoHold->setProperty("params", QVariantList() << 10 << 900 << 0 << 0 << 0 << 0 << 0);
+            servoHold->setProperty("params", QVariantList() << 10 << 400 << 0 << 0 << 0 << 0 << 0);
             servoHold->setProperty("autoContinue", true);
             missionItems.append(servoHold);
         }

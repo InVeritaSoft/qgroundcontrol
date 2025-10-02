@@ -392,12 +392,12 @@ void MissionUploadService::uploadPayloadDropMissionToVehicle(Vehicle* vehicle, c
         
         qCDebug(MissionUploadServiceLog) << "Processing waypoint" << (i + 1) << "of" << waypoints.size() << "at:" << wpCoord.toString();
         
-        // 1. Servo 10 = 900 (Hold payload)
+        // 1. Servo 10 = 400 (Hold payload)
         MissionItem* servoHoldItem = new MissionItem(sequenceNumber++, MAV_CMD_DO_SET_SERVO, MAV_FRAME_MISSION,
-                                                   10, 900, 0, 0, 0, 0, 0,
+                                                   10, 400, 0, 0, 0, 0, 0,
                                                    false, false, missionItemParent);
         missionItems.append(servoHoldItem);
-        qCDebug(MissionUploadServiceLog) << "Added servo hold command (Servo 10 = 900) for waypoint" << (i + 1);
+        qCDebug(MissionUploadServiceLog) << "Added servo hold command (Servo 10 = 400) for waypoint" << (i + 1);
         
         // 2. Delay for servo pickup
         MissionItem* delayItem = new MissionItem(sequenceNumber++, MAV_CMD_NAV_DELAY, MAV_FRAME_MISSION,
@@ -433,12 +433,12 @@ void MissionUploadService::uploadPayloadDropMissionToVehicle(Vehicle* vehicle, c
         missionItems.append(descendItem);
         qCDebug(MissionUploadServiceLog) << "Added descent to payload drop height" << payloadDropHeight << "for waypoint" << (i + 1);
         
-        // 6. Servo 10 = 2500 (Release payload)
+        // 6. Servo 10 = 2400 (Release payload)
         MissionItem* servoReleaseItem = new MissionItem(sequenceNumber++, MAV_CMD_DO_SET_SERVO, MAV_FRAME_MISSION,
-                                                      10, 2500, 0, 0, 0, 0, 0,
+                                                      10, 2400, 0, 0, 0, 0, 0,
                                                       false, false, missionItemParent);
         missionItems.append(servoReleaseItem);
-        qCDebug(MissionUploadServiceLog) << "Added servo release command (Servo 10 = 2500) for waypoint" << (i + 1);
+        qCDebug(MissionUploadServiceLog) << "Added servo release command (Servo 10 = 2400) for waypoint" << (i + 1);
         
         // 7. Climb back to working altitude + bend height
         MissionItem* climbItem = new MissionItem(sequenceNumber++, MAV_CMD_NAV_WAYPOINT, MAV_FRAME_GLOBAL_RELATIVE_ALT,

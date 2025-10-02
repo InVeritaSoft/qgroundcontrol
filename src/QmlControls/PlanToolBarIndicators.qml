@@ -50,7 +50,7 @@ Item {
     property real _missionTime: _missionValid ? missionTime : 0
 
     // Servo 10 PWM Toggler properties
-    property int _servo10PWM: 900  // Current PWM value (MIN: 900, MAX: 2500)
+    property int _servo10PWM: 400  // Current PWM value (MIN: 400, MAX: 2400)
     property bool _servo10Enabled: false  // Current state
     property int _batteryChangePoint: _controllerValid ? _planMasterController.missionController.batteryChangePoint : -1
     property int _batteriesRequired: _controllerValid ? _planMasterController.missionController.batteriesRequired : -1
@@ -66,20 +66,20 @@ Item {
             return;
         }
 
-        // Toggle between MIN (900) and MAX (2500)
+        // Toggle between MIN (400) and MAX (2400)
         if (_servo10Enabled) {
-            _servo10PWM = 900;  // MIN value
+            _servo10PWM = 400;  // MIN value
             _servo10Enabled = false;
             console.log("GenCall3: Setting servo 10 to MIN PWM:", _servo10PWM);
         } else {
-            _servo10PWM = 2500; // MAX value
+            _servo10PWM = 2400; // MAX value
             _servo10Enabled = true;
             console.log("GenCall4: Setting servo 10 to MAX PWM:", _servo10PWM);
         }
 
         // Send MAV_CMD_DO_SET_SERVO command to vehicle
         // param1: Servo number (10)
-        // param2: PWM value (900 or 2500)
+        // param2: PWM value (400 or 2400)
         _planMasterController.controllerVehicle.sendMavCommand(_planMasterController.controllerVehicle.defaultComponentId(), 183  // MAV_CMD_DO_SET_SERVO
         , true // showError
         , 10   // param1: Servo number

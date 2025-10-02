@@ -187,9 +187,23 @@ void MissionService::generateWaypointsFromPosition(const QGeoCoordinate& vehicle
         return;
     }
     
-    // GenCall20: Calculate point in front of vehicle for waypoint generation
-    qCDebug(MissionServiceLog) << "GenCall20: Calculating point in front of vehicle";
-    QGeoCoordinate referencePoint = m_ptahMissionGenerator->calculateNewCoordinates(vehiclePosition, 0.0, frontDistanceMeters);
+    // Get MultiVehicleManager instance for use throughout the function
+    MultiVehicleManager* multiVehicleManager = MultiVehicleManager::instance();
+    
+    // GenCall20: Get vehicle heading and calculate point in front of vehicle for waypoint generation
+    qCDebug(MissionServiceLog) << "GenCall20: Getting vehicle heading and calculating point in front of vehicle";
+    
+    // Get the active vehicle to retrieve its heading
+    double vehicleHeading = 0.0; // Default to north if no vehicle available
+    if (multiVehicleManager && multiVehicleManager->activeVehicle()) {
+        Vehicle* activeVehicle = multiVehicleManager->activeVehicle();
+        if (activeVehicle && activeVehicle->heading()) {
+            vehicleHeading = activeVehicle->heading()->rawValue().toDouble();
+            qCDebug(MissionServiceLog) << "Vehicle heading:" << vehicleHeading << "degrees";
+        }
+    }
+    
+    QGeoCoordinate referencePoint = m_ptahMissionGenerator->calculateNewCoordinates(vehiclePosition, vehicleHeading, frontDistanceMeters);
     if (!referencePoint.isValid()) {
         emit missionGenerationCompleted(false, "Could not calculate front position");
         return;
@@ -247,11 +261,15 @@ void MissionService::generateWaypointsFromPosition(const QGeoCoordinate& vehicle
     
     qCDebug(MissionServiceLog) << "Final reference point:" << referencePoint.toString();
     
-    // GenCall21: Use a fixed bearing for waypoint generation (East-West pattern)
-    qCDebug(MissionServiceLog) << "GenCall21: Using fixed bearing for waypoint generation";
-    double bearing = 90.0; // East-West pattern (90 degrees = East)
+    // GenCall21: Use vehicle heading + 90 degrees for waypoint generation (perpendicular row pattern)
+    qCDebug(MissionServiceLog) << "GenCall21: Using vehicle heading + 90 degrees for waypoint generation";
+    double bearing = vehicleHeading + 90.0; // Add 90 degrees to vehicle's heading for perpendicular row pattern
     
-    qCDebug(MissionServiceLog) << "Using fixed bearing:" << bearing << "degrees (East-West pattern)";
+    // Normalize bearing to 0-360 range
+    while (bearing >= 360.0) bearing -= 360.0;
+    while (bearing < 0.0) bearing += 360.0;
+    
+    qCDebug(MissionServiceLog) << "Using perpendicular bearing:" << bearing << "degrees (90° offset from vehicle heading:" << vehicleHeading << "degrees)";
     
     // GenCall22: Generate waypoints using PtahMissionGenerator
     qCDebug(MissionServiceLog) << "GenCall22: Generating waypoints using PtahMissionGenerator";
@@ -295,8 +313,7 @@ void MissionService::generateWaypointsFromPosition(const QGeoCoordinate& vehicle
     // GenCall25: Distribute waypoints among NON ID 1 drones
     qCDebug(MissionServiceLog) << "GenCall25: Distributing waypoints among NON ID 1 drones";
     
-    // Get all connected vehicles
-    MultiVehicleManager* multiVehicleManager = MultiVehicleManager::instance();
+    // Get all connected vehicles (reuse the multiVehicleManager from earlier)
     if (!multiVehicleManager) {
         emit missionGenerationCompleted(false, "MultiVehicleManager not available");
         return;
@@ -451,22 +468,45 @@ void MissionService::reportTripodInstalled(int vehicleId)
 
 bool MissionService::isExplodeButtonEnabled() const
 {
-    return m_explodeButtonEnabled;
+    // Always enable explode button when Vehicle ID 1 is active
+    MultiVehicleManager* multiVehicleManager = MultiVehicleManager::instance();
+    Vehicle* activeVehicle = multiVehicleManager ? multiVehicleManager->activeVehicle() : nullptr;
+    
+    if (activeVehicle && activeVehicle->id() == 1) {
+        return true;
+    }
+    
+    return false;
 }
 
 void MissionService::executeExplode()
 {
     qCDebug(MissionServiceLog) << "GenCall61: Executing explode command";
     
-    if (!m_explodeButtonEnabled) {
-        qCWarning(MissionServiceLog) << "Explode button not enabled - cannot execute";
-        return;
+    // Get active vehicle
+    MultiVehicleManager* multiVehicleManager = MultiVehicleManager::instance();
+    Vehicle* activeVehicle = multiVehicleManager ? multiVehicleManager->activeVehicle() : nullptr;
+    
+    if (activeVehicle && activeVehicle->id() == 1) {
+        // Send relay HIGH command directly
+        activeVehicle->sendCommand(
+            1, // Component ID
+            181, // MAV_CMD_DO_SET_RELAY
+            true, // showError
+            0, // param1: Relay number (0 for Relay1)
+            1.0, // param2: Value (1=HIGH)
+            0, 0, 0, 0, 0 // param3-7: unused
+        );
+        
+        qCDebug(MissionServiceLog) << "Relay HIGH command sent for Vehicle ID 1";
+    } else {
+        qCWarning(MissionServiceLog) << "Explode command only works with Vehicle ID 1";
     }
     
     // Emit demining success signal
     emit deminingSuccess();
     
-    qCDebug(MissionServiceLog) << "Demining operation completed successfully";
+    qCDebug(MissionServiceLog) << "Explode command completed";
 }
 
 void MissionService::resetTripodTracking()
@@ -481,6 +521,38 @@ void MissionService::resetTripodTracking()
     emit explodeButtonEnabled(false);
     
     qCDebug(MissionServiceLog) << "Tripod tracking reset";
+}
+
+// Test method for development/debugging
+void MissionService::testMarkAllPayloadsInstalled()
+{
+    qCDebug(MissionServiceLog) << "GenCall70: TEST - Marking all payloads as installed";
+    
+    // Get all connected vehicles
+    MultiVehicleManager* multiVehicleManager = MultiVehicleManager::instance();
+    if (!multiVehicleManager) {
+        qCWarning(MissionServiceLog) << "MultiVehicleManager not available for test";
+        return;
+    }
+    
+    QmlObjectListModel* vehiclesModel = multiVehicleManager->vehicles();
+    if (!vehiclesModel) {
+        qCWarning(MissionServiceLog) << "Vehicles model not available for test";
+        return;
+    }
+    
+    qCDebug(MissionServiceLog) << "Found" << vehiclesModel->count() << "vehicles for test";
+    
+    // Mark tripod installed for each vehicle (except ID 1)
+    for (int i = 0; i < vehiclesModel->count(); i++) {
+        Vehicle* vehicle = qobject_cast<Vehicle*>(vehiclesModel->get(i));
+        if (vehicle && vehicle->id() != 1) { // Skip vehicle ID 1 (observation drone)
+            qCDebug(MissionServiceLog) << "TEST - Marking tripod installed for vehicle" << vehicle->id();
+            reportTripodInstalled(vehicle->id());
+        }
+    }
+    
+    qCDebug(MissionServiceLog) << "TEST - All payloads marked as installed";
 }
 
 // Water avoidance settings (read from global AppSettings)
