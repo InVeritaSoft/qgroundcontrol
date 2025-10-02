@@ -13,6 +13,7 @@ import QtQuick.Dialogs
 import QtQuick.Layouts
 
 import QtLocation
+import QGroundControl.Controls
 import QtPositioning
 import QtQuick.Window
 import QtQml.Models
@@ -123,6 +124,7 @@ Item {
         utmspSliderTrigger:         utmspActTrigger
     }
 
+
     //-- Virtual Joystick
     Loader {
         id:                         virtualJoystickMultiTouch
@@ -193,6 +195,46 @@ Item {
 
     GripperMenu {
         id: gripperOptions
+    }
+
+    // Relay1 (Explode) Slider - Only visible when Vehicle ID 1 is active
+    QGCSwitch {
+        id: relay1ExplodeSlider
+        anchors.left:           toolStrip.right
+        anchors.top:            toolStrip.top
+        anchors.leftMargin:     10
+        anchors.topMargin:      50  // Position below the tool strip
+        z:                      QGroundControl.zOrderTopMost
+        text:                   "Relay1"
+        checked:                false
+        visible:                _activeVehicle && _activeVehicle.id === 1 && _relaySliderVisible
+        
+        property bool _relaySliderVisible: false
+        
+        onToggled: {
+            if (_activeVehicle) {
+                console.log("Relay1:", checked ? "HIGH" : "LOW")
+                
+                // Send relay command
+                _activeVehicle.sendCommand(
+                    _activeVehicle.defaultComponentId, // Component ID
+                    181, // MAV_CMD_DO_SET_RELAY
+                    true, // showError
+                    0, // param1: Relay number (0 for Relay1)
+                    checked ? 1.0 : 0.0, // param2: Value (1=HIGH, 0=LOW)
+                    0, 0, 0, 0, 0 // param3-7: unused
+                )
+            }
+        }
+    }
+
+    // Connect to relay slider toggle signal
+    Connections {
+        target: _guidedController
+        function onRelaySliderToggleRequested() {
+            console.log("Relay slider toggle requested")
+            relay1ExplodeSlider._relaySliderVisible = !relay1ExplodeSlider._relaySliderVisible
+        }
     }
 
     VehicleWarnings {

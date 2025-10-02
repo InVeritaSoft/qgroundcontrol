@@ -40,6 +40,8 @@ target_sources(${CMAKE_PROJECT_NAME}
         QGCQGeoCoordinate.h
         QGroundControlQmlGlobal.cc
         QGroundControlQmlGlobal.h
+        AreaPlanEditor.cc
+        AreaPlanEditor.h
         QmlObjectListModel.cc
         QmlObjectListModel.h
         QmlUnitsConversion.h
@@ -152,6 +154,9 @@ qt_add_qml_module(QGroundControlControlsModule
         RCChannelMonitor.qml
         RCToParamDialog.qml
         SectionHeader.qml
+        AreaPlanEditorDialog.qml
+        AreaPlanMapVisuals.qml
+        AreaDrawingTool.qml
         SelectableControl.qml
         SettingsButton.qml
         SettingsGroupLayout.qml

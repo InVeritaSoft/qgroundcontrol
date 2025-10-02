@@ -33,7 +33,8 @@ Item {
     property bool _vehicleWasInMissionFlightMode:   false
     property bool _showMissionCompleteDialog:       _vehicleWasArmed && _vehicleWasInMissionFlightMode &&
                                                     (missionController.containsItems || geoFenceController.containsItems || rallyPointController.containsItems ||
-                                                     (_activeVehicle ? _activeVehicle.cameraTriggerPoints.count !== 0 : false))
+                                                     (_activeVehicle ? _activeVehicle.cameraTriggerPoints.count !== 0 : false)) &&
+                                                    QGroundControl.settingsManager.appSettings.showMissionCompleteDialog.rawValue
 
     on_VehicleArmedChanged: {
         if (_vehicleArmed) {

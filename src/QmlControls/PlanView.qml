@@ -488,6 +488,17 @@ Item {
                 }
             }
 
+            // Area Drawing Tool for Ptah
+            AreaDrawingTool {
+                mapControl: editorMap
+                isDrawingMode: planToolBar.isDrawingMode
+                onAreaDrawn: function(center, width, height, rotation) {
+                    console.log("Area drawn in PlanView:", center.latitude, center.longitude, "Size:", width, height);
+                    // Call the toolbar's mission generation function
+                    planToolBar.generateMissionWithArea(center, width, height, rotation);
+                }
+            }
+
             // Add the vehicles to the map
             MapItemView {
                 model: QGroundControl.multiVehicleManager.vehicles

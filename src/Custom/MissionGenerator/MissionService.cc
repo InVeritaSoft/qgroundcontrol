@@ -4,10 +4,12 @@
 #include "VehicleService.h"
 #include "Vehicle/MultiVehicleManager.h"
 #include "Vehicle/Vehicle.h"
+#include "MissionManager/MissionManager.h"
 #include "QGCApplication.h"
 #include "QGCLoggingCategory.h"
 #include <QObject>
 #include <QString>
+#include <QTimer>
 #include <QGeoCoordinate>
 #include <QList>
 
@@ -100,8 +102,21 @@ void MissionService::generateMission(const QString& missionType,
     
     qCDebug(MissionServiceLog) << "Active vehicle coordinates:" << vehicleCoord.toString();
     
-    // Generate waypoints directly for active vehicle (user-specified distance in front)
-    generateWaypointsForActiveVehicle(activeVehicle, vehicleCoord, frontDistance, payloadDropMode, loiterTimeSeconds, bendHeight, payloadDropHeight, servoDelaySeconds, observationDistance);
+    // Clear existing mission items from vehicle to prevent old orange lines
+    qCDebug(MissionServiceLog) << "Clearing existing mission items from vehicle to prevent old orange lines";
+    if (activeVehicle->missionManager()) {
+        activeVehicle->missionManager()->removeAll();
+        qCDebug(MissionServiceLog) << "Mission clear command sent to vehicle";
+        
+        // Use QTimer to delay waypoint generation until mission clear completes
+        QTimer::singleShot(1000, this, [this, activeVehicle, vehicleCoord, frontDistance, payloadDropMode, loiterTimeSeconds, bendHeight, payloadDropHeight, servoDelaySeconds, observationDistance]() {
+            qCDebug(MissionServiceLog) << "Mission clear delay completed, generating new waypoints";
+            generateWaypointsForActiveVehicle(activeVehicle, vehicleCoord, frontDistance, payloadDropMode, loiterTimeSeconds, bendHeight, payloadDropHeight, servoDelaySeconds, observationDistance);
+        });
+    } else {
+        // If no mission manager, generate waypoints immediately
+        generateWaypointsForActiveVehicle(activeVehicle, vehicleCoord, frontDistance, payloadDropMode, loiterTimeSeconds, bendHeight, payloadDropHeight, servoDelaySeconds, observationDistance);
+    }
 }
 
 void MissionService::generateWaypointsForActiveVehicle(Vehicle* vehicle, const QGeoCoordinate& vehicleCoord, double frontDistanceMeters, bool payloadDropMode, int loiterTimeSeconds, int bendHeight, double payloadDropHeight, int servoDelaySeconds, double observationDistance)
@@ -234,6 +249,13 @@ void MissionService::generateWaypointsFromPosition(const QGeoCoordinate& vehicle
     
     qCDebug(MissionServiceLog) << "Generated" << waypoints.size() << "waypoints";
     
+    // Store demining area information for overlay
+    if (!waypoints.isEmpty()) {
+        m_deminingAreaCenter = m_ptahMissionGenerator->calculateMiddlePoint(waypoints);
+        m_deminingAreaSize = static_cast<double>(areaSize);
+        qCDebug(MissionServiceLog) << "Demining area center calculated:" << m_deminingAreaCenter.toString() << "Size:" << m_deminingAreaSize;
+    }
+    
     // Log ALL waypoints for debugging
     for (int i = 0; i < waypoints.size(); i++) {
         qCDebug(MissionServiceLog) << "Waypoint" << i << ":" << waypoints[i].toString();
@@ -268,11 +290,17 @@ void MissionService::generateWaypointsFromPosition(const QGeoCoordinate& vehicle
     QmlObjectListModel* vehiclesModel = multiVehicleManager->vehicles();
     QList<Vehicle*> nonId1Vehicles;
     
+    // Clear previous payload tracking
+    m_installedPayloads.clear();
+    m_expectedPayloadVehicles.clear();
+    
     // Filter out vehicle ID 1 (for special mission later)
     for (int i = 0; i < vehiclesModel->count(); i++) {
         Vehicle* vehicle = qobject_cast<Vehicle*>(vehiclesModel->get(i));
         if (vehicle && vehicle->id() != 1) {
             nonId1Vehicles.append(vehicle);
+            // Track which vehicles should have payloads (all non-ID 1 vehicles)
+            m_expectedPayloadVehicles.insert(vehicle->id());
         }
     }
     
@@ -386,4 +414,67 @@ void MissionService::processMissionGeneration(const QString& missionType,
 {
     // This method is kept for compatibility but delegates to generateMission
     generateMission(missionType, areaSize, altitude, speed, description, frontDistance);
+}
+
+void MissionService::markPayloadInstalled(int vehicleId)
+{
+    qCDebug(MissionServiceLog) << "GenCall66: Marking payload installed for vehicle ID:" << vehicleId;
+    m_installedPayloads.insert(vehicleId);
+    
+    // Check if all expected payloads are installed
+    if (areAllPayloadsInstalled()) {
+        qCDebug(MissionServiceLog) << "GenCall67: All payloads installed! Enabling explode button";
+        emit payloadInstallationCompleted();
+    }
+}
+
+bool MissionService::areAllPayloadsInstalled() const
+{
+    qCDebug(MissionServiceLog) << "GenCall68: Checking payload installation status";
+    qCDebug(MissionServiceLog) << "Installed payloads:" << m_installedPayloads.size() << "Expected:" << m_expectedPayloadVehicles.size();
+    
+    // Check if all expected vehicles have installed payloads
+    for (int vehicleId : m_expectedPayloadVehicles) {
+        if (!m_installedPayloads.contains(vehicleId)) {
+            qCDebug(MissionServiceLog) << "Vehicle ID" << vehicleId << "payload not yet installed";
+            return false;
+        }
+    }
+    
+    qCDebug(MissionServiceLog) << "All payloads are installed!";
+    return true;
+}
+
+void MissionService::triggerDeminingSuccess()
+{
+    qCDebug(MissionServiceLog) << "GenCall69: Triggering demining success dialog";
+    emit deminingSuccess();
+}
+
+void MissionService::showDeminingAreaOverlay()
+{
+    qCDebug(MissionServiceLog) << "GenCall70: Showing demining area overlay";
+    
+    // Check if we have valid demining area data
+    if (!m_deminingAreaCenter.isValid() || m_deminingAreaSize <= 0) {
+        qCWarning(MissionServiceLog) << "No valid demining area data available";
+        return;
+    }
+    
+    qCDebug(MissionServiceLog) << "Demining area center:" << m_deminingAreaCenter.toString() << "Size:" << m_deminingAreaSize;
+    emit showDeminingAreaOverlay(m_deminingAreaCenter, m_deminingAreaSize);
+}
+
+void MissionService::testMarkAllPayloadsInstalled()
+{
+    qCDebug(MissionServiceLog) << "GenCall72: Test function - marking all payloads as installed";
+    
+    // Mark all expected vehicles as having installed payloads
+    for (int vehicleId : m_expectedPayloadVehicles) {
+        m_installedPayloads.insert(vehicleId);
+        qCDebug(MissionServiceLog) << "Test: Marked payload installed for vehicle ID:" << vehicleId;
+    }
+    
+    // Trigger the payload installation completed signal
+    emit payloadInstallationCompleted();
 }

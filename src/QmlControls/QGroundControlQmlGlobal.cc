@@ -27,6 +27,7 @@
 #include "Custom/MissionGenerator/MissionService.h"
 #include "Custom/MissionGenerator/CollisionDetectionService.h"
 #include "Custom/MissionGenerator/ShortcutManager.h"
+#include "AreaPlanEditor.h"
 #ifndef QGC_NO_SERIAL_LINK
 #include "GPSManager.h"
 #include "GPSRtk.h"

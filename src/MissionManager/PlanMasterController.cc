@@ -25,6 +25,7 @@
 #include "GeoFenceManager.h"
 #include "RallyPointManager.h"
 #include "QGCLoggingCategory.h"
+#include "AreaPlanEditor.h"
 
 #include <QtCore/QJsonDocument>
 #include <QtCore/QFileInfo>
@@ -39,6 +40,7 @@ PlanMasterController::PlanMasterController(QObject* parent)
     , _missionController    (this)
     , _geoFenceController   (this)
     , _rallyPointController (this)
+    , _areaPlanEditor       (new AreaPlanEditor(this))
 {
     _commonInit();
 }
@@ -52,6 +54,7 @@ PlanMasterController::PlanMasterController(MAV_AUTOPILOT firmwareType, MAV_TYPE 
     , _missionController    (this)
     , _geoFenceController   (this)
     , _rallyPointController (this)
+    , _areaPlanEditor       (new AreaPlanEditor(this))
 {
     _commonInit();
 }
@@ -74,6 +77,9 @@ void PlanMasterController::_commonInit(void)
 
     // Offline vehicle can change firmware/vehicle type
     connect(_controllerVehicle,     &Vehicle::vehicleTypeChanged,                   this, &PlanMasterController::_updatePlanCreatorsList);
+    
+    // Set the plan master controller on the area plan editor
+    _areaPlanEditor->setPlanMasterController(this);
 }
 
 

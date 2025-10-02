@@ -18,6 +18,36 @@ Item {
 
     property var _planMasterController: planMasterController
     property var _currentMissionItem: _planMasterController.missionController.currentPlanViewItem ///< Mission item to display status for
+    property bool isDrawingMode: false
+
+    // Function to generate mission using existing Ptah system with drawn area
+    function generateMissionWithArea(center, width, height, rotation) {
+        console.log("Generating mission with area:", center.latitude, center.longitude, width, height, rotation);
+        
+        // Calculate area size for the existing Ptah system
+        var areaSize = Math.max(width, height) / 100; // Convert meters to area size units
+        
+        // Use the existing mission generation with the drawn area
+        if (QGroundControl.missionService) {
+            QGroundControl.missionService.generateMission(
+                "Area Mission", // mission type
+                Math.round(areaSize), // area size
+                50, // altitude
+                5.0, // speed
+                "Generated from drawing tool", // description
+                10.0, // front distance
+                false, // payload drop mode
+                50, // loiter time
+                10, // bend height
+                1.5, // payload drop height
+                3, // servo delay
+                100.0 // observation distance
+            );
+        }
+        
+        // Exit drawing mode
+        isDrawingMode = false;
+    }
 
     property var missionItems: _controllerValid ? _planMasterController.missionController.visualItems : undefined
     property real missionPlannedDistance: _controllerValid ? _planMasterController.missionController.missionPlannedDistance : NaN
@@ -35,12 +65,12 @@ Item {
     property bool _currentItemIsVTOLTakeoff: _currentMissionItemValid && _currentMissionItem.command == 84
     property bool _missionValid: missionItems !== undefined
 
-    property real _dataFontSize: ScreenTools.defaultFontPointSize
-    property real _largeValueWidth: ScreenTools.defaultFontPixelWidth * 8
-    property real _mediumValueWidth: ScreenTools.defaultFontPixelWidth * 4
-    property real _smallValueWidth: ScreenTools.defaultFontPixelWidth * 3
-    property real _labelToValueSpacing: ScreenTools.defaultFontPixelWidth
-    property real _rowSpacing: ScreenTools.isMobile ? 1 : 0
+    property real _dataFontSize: 12
+    property real _largeValueWidth: 80
+    property real _mediumValueWidth: 40
+    property real _smallValueWidth: 30
+    property real _labelToValueSpacing: 10
+    property real _rowSpacing: 0
     property real _distance: _currentMissionItemValid ? _currentMissionItem.distance : NaN
     property real _altDifference: _currentMissionItemValid ? _currentMissionItem.altDifference : NaN
     property real _azimuth: _currentMissionItemValid ? _currentMissionItem.azimuth : NaN
@@ -48,7 +78,7 @@ Item {
     property real _missionPlannedDistance: _missionValid ? missionPlannedDistance : NaN
     property real _missionMaxTelemetry: _missionValid ? missionMaxTelemetry : NaN
     property real _missionTime: _missionValid ? missionTime : 0
-    
+
     // Servo 10 PWM Toggler properties
     property int _servo10PWM: 900  // Current PWM value (MIN: 900, MAX: 2500)
     property bool _servo10Enabled: false  // Current state
@@ -60,12 +90,12 @@ Item {
     // Servo 10 PWM Toggle function
     function toggleServo10PWM() {
         console.log("GenCall1: toggleServo10PWM() - Toggling servo 10 PWM");
-        
+
         if (!_controllerValid || !_planMasterController.controllerVehicle) {
             console.log("GenCall2: No valid vehicle - cannot send servo command");
             return;
         }
-        
+
         // Toggle between MIN (900) and MAX (2500)
         if (_servo10Enabled) {
             _servo10PWM = 900;  // MIN value
@@ -76,19 +106,17 @@ Item {
             _servo10Enabled = true;
             console.log("GenCall4: Setting servo 10 to MAX PWM:", _servo10PWM);
         }
-        
+
         // Send MAV_CMD_DO_SET_SERVO command to vehicle
         // param1: Servo number (10)
         // param2: PWM value (900 or 2500)
-        _planMasterController.controllerVehicle.sendMavCommand(
-            _planMasterController.controllerVehicle.defaultComponentId(),
-            183,  // MAV_CMD_DO_SET_SERVO
-            true, // showError
-            10,   // param1: Servo number
-            _servo10PWM, // param2: PWM value
-            0, 0, 0, 0, 0, 0  // param3-7: unused
+        _planMasterController.controllerVehicle.sendMavCommand(_planMasterController.controllerVehicle.defaultComponentId(), 183  // MAV_CMD_DO_SET_SERVO
+        , true // showError
+        , 10   // param1: Servo number
+        , _servo10PWM // param2: PWM value
+        , 0, 0, 0, 0, 0, 0  // param3-7: unused
         );
-        
+
         console.log("GenCall5: Servo 10 PWM command sent - Servo: 10, PWM:", _servo10PWM);
     }
 
@@ -102,7 +130,7 @@ Item {
     property string _batteryChangePointText: _batteryChangePoint < 0 ? qsTr("N/A") : _batteryChangePoint
     property string _batteriesRequiredText: _batteriesRequired < 0 ? qsTr("N/A") : _batteriesRequired
 
-    readonly property real _margins: ScreenTools.defaultFontPixelWidth
+    readonly property real _margins: 10
 
     // Properties of UTM adapter
     property bool _utmspEnabled: QGroundControl.utmspSupported
@@ -130,7 +158,7 @@ Item {
         anchors.bottom: parent.bottom
         anchors.leftMargin: _margins
         anchors.left: parent.left
-        spacing: ScreenTools.defaultFontPixelWidth * 2
+        spacing: 20
 
         QGCButton {
             id: uploadButton
@@ -166,7 +194,7 @@ Item {
             QGCLabel {
                 text: qsTr("Selected Waypoint")
                 Layout.columnSpan: 8
-                font.pointSize: ScreenTools.smallFontPointSize
+                font.pointSize: 10
             }
 
             QGCLabel {
@@ -243,7 +271,7 @@ Item {
             QGCLabel {
                 text: qsTr("Total Mission")
                 Layout.columnSpan: 5
-                font.pointSize: ScreenTools.smallFontPointSize
+                font.pointSize: 10
             }
 
             QGCLabel {
@@ -291,7 +319,7 @@ Item {
             QGCLabel {
                 text: qsTr("Battery")
                 Layout.columnSpan: 3
-                font.pointSize: ScreenTools.smallFontPointSize
+                font.pointSize: 10
             }
 
             QGCLabel {
@@ -305,54 +333,15 @@ Item {
             }
         }
 
+        // Ptah Drawing Tool Button
         QGCButton {
             id: ptahButton
-            text: "Ptah"
+            text: isDrawingMode ? "Exit Drawing" : "Ptah"
             Layout.columnSpan: 3
             font.pointSize: _dataFontSize
+            primary: isDrawingMode
             onClicked: {
-                // Set the vehicles array before opening the dialog
-                missionGeneratorDialogue.vehicles = QGroundControl.multiVehicleManager.vehicles
-                missionGeneratorDialogue.open();
-            }
-
-            // QML Mission Generator Dialogue
-            MissionGeneratorDialogue {
-                id: missionGeneratorDialogue
-                onMissionGenerated: function (missionType, areaSize, altitude, speed, frontDistance, loiterTime, bendHeight, payloadDropHeight, servoDelay, payloadDropMode, observationDistance) {
-                    // GenCall5: Signal handler receives mission parameters
-                    console.log("GenCall5: Signal handler receives mission parameters:", missionType, areaSize, altitude, speed, "front distance:", frontDistance, "loiter time:", loiterTime, "bend height:", bendHeight, "payload drop height:", payloadDropHeight, "servo delay:", servoDelay, "payload drop:", payloadDropMode, "observation distance:", observationDistance);
-                    
-                    // GenCall6: Call C++ MissionService to actually generate mission
-                    console.log("GenCall6: Calling C++ MissionService to generate mission");
-                    QGroundControl.missionService.generateMission(missionType, areaSize, altitude, speed, "Generated from UI", frontDistance, payloadDropMode, loiterTime, bendHeight, payloadDropHeight, servoDelay, observationDistance);
-                }
-            }
-
-            // Connect to MissionService signals
-            Connections {
-                target: QGroundControl.missionService
-                function onMissionGenerationStarted() {
-                    console.log("GenCall7: Mission generation started signal received");
-                    ptahDialog.text = qsTr("Generating mission...");
-                    ptahDialog.visible = true;
-                }
-                function onMissionGenerationCompleted(success, message) {
-                    console.log("GenCall48: Mission generation completed signal received:", success, message);
-                    ptahDialog.text = success ? 
-                        qsTr("Mission generated successfully!\n") + message :
-                        qsTr("Mission generation failed!\n") + message;
-                    ptahDialog.visible = true;
-                }
-            }
-
-            QGCSimpleMessageDialog {
-                id: ptahDialog
-                title: qsTr("Ptah")
-                text: qsTr("Waypoint added")
-                buttons: Dialog.Ok
-                visible: false
-                onAccepted: visible = false
+                isDrawingMode = !isDrawingMode;
             }
         }
 
@@ -366,179 +355,124 @@ Item {
             }
         }
 
-        // Collision Detection Test Button
+        // Test button for payload installation (for testing purposes)
         QGCButton {
-            text: "Test Collision Alert"
-            Layout.columnSpan: 2
+            id: testPayloadButton
+            text: "Test: Mark All Payloads Installed"
+            visible: true
             onClicked: {
-                QGroundControl.collisionDetectionService.showCollisionAlert("TEST: Collision detected between Vehicle 1 and Vehicle 2 - Proximity Collision")
-                QGroundControl.collisionDetectionService.startCollisionMonitoring()
-            }
-        }
-
-        // Keyboard Shortcuts Test Button
-        QGCButton {
-            text: "Register Keyboard Shortcuts"
-            Layout.columnSpan: 2
-            onClicked: {
-                console.log("Registering keyboard shortcuts...")
-                QGroundControl.shortcutManager.registerMissionGenerationShortcuts()
-                QGroundControl.shortcutManager.registerVehicleControlShortcuts()
-                QGroundControl.shortcutManager.registerCollisionDetectionShortcuts()
-                console.log("Keyboard shortcuts registered!")
-            }
-        }
-
-        // Shortcut Status Display
-        QGCLabel {
-            text: "Registered Shortcuts: " + QGroundControl.shortcutManager.getRegisteredShortcuts().length
-            Layout.columnSpan: 2
-        }
-
-        // All Vehicles Control Shortcuts Display
-        QGCLabel {
-            text: "All Vehicles Control:"
-            font.bold: true
-            Layout.columnSpan: 2
-        }
-
-        QGCLabel {
-            text: "A - AUTO all vehicles"
-            Layout.columnSpan: 2
-        }
-
-        QGCLabel {
-            text: "R - ARM all vehicles"
-            Layout.columnSpan: 2
-        }
-
-        QGCLabel {
-            text: "D - DISARM all vehicles"
-            Layout.columnSpan: 2
-        }
-
-        QGCLabel {
-            text: "L - LAND all vehicles"
-            Layout.columnSpan: 2
-        }
-
-        QGCLabel {
-            text: "H - RTL all vehicles"
-            Layout.columnSpan: 2
-        }
-
-        // All Vehicles Control Functions
-        function setAllVehiclesToAUTO() {
-            console.log("Setting all vehicles to AUTO mode...")
-            var vehicles = QGroundControl.multiVehicleManager.vehicles
-            for (var i = 0; i < vehicles.count; i++) {
-                var vehicle = vehicles.get(i)
-                if (vehicle) {
-                    console.log("Setting vehicle", vehicle.id, "to AUTO mode")
-                    vehicle.flightMode = "AUTO"
+                if (QGroundControl.missionService) {
+                    QGroundControl.missionService.testMarkAllPayloadsInstalled();
                 }
             }
         }
+    }
 
-        function armAllVehicles() {
-            console.log("Arming all vehicles...")
-            var vehicles = QGroundControl.multiVehicleManager.vehicles
-            for (var i = 0; i < vehicles.count; i++) {
-                var vehicle = vehicles.get(i)
-                if (vehicle) {
-                    console.log("Arming vehicle", vehicle.id)
-                    vehicle.armed = true
-                }
+    // Note: MissionGeneratorDialogue removed - replaced with Area Plan Editor
+
+    // Connect to MissionService signals (for Area Plan Editor)
+    Connections {
+        target: QGroundControl.missionService
+        function onMissionGenerationStarted() {
+            console.log("Area Plan Editor: Mission generation started signal received");
+            areaPlanDialog.text = qsTr("Generating mission...");
+            areaPlanDialog.visible = true;
+        }
+        function onMissionGenerationCompleted(success, message) {
+            console.log("Area Plan Editor: Mission generation completed signal received:", success, message);
+            areaPlanDialog.text = success ? qsTr("Mission generated successfully!\n") + message : qsTr("Mission generation failed!\n") + message;
+            areaPlanDialog.visible = true;
+        }
+        function onDeminingSuccess() {
+            console.log("Area Plan Editor: Demining success signal received");
+            deminingSuccessDialog.open();
+        }
+    }
+
+    // Note: Drawing tool is integrated in PlanView.qml
+
+    QGCSimpleMessageDialog {
+        id: areaPlanDialog
+        title: qsTr("Area Plan Editor")
+        text: qsTr("Mission generated")
+        buttons: Dialog.Ok
+        visible: false
+        onAccepted: visible = false
+    }
+
+    QGCSimpleMessageDialog {
+        id: deminingSuccessDialog
+        title: qsTr("Demining Complete")
+        text: qsTr("Demining successful")
+        buttons: Dialog.Ok
+        visible: false
+        destroyOnClose: false
+        onAccepted: {
+            visible = false;
+            // Trigger green square overlay display
+            if (QGroundControl.missionService) {
+                QGroundControl.missionService.showDeminingAreaOverlay();
             }
         }
+    }
 
-        function disarmAllVehicles() {
-            console.log("Disarming all vehicles...")
-            var vehicles = QGroundControl.multiVehicleManager.vehicles
-            for (var i = 0; i < vehicles.count; i++) {
-                var vehicle = vehicles.get(i)
-                if (vehicle) {
-                    console.log("Disarming vehicle", vehicle.id)
-                    vehicle.armed = false
-                }
+    // All Vehicles Control Functions
+    function setAllVehiclesToAUTO() {
+        console.log("Setting all vehicles to AUTO mode...");
+        var vehicles = QGroundControl.multiVehicleManager.vehicles;
+        for (var i = 0; i < vehicles.count; i++) {
+            var vehicle = vehicles.get(i);
+            if (vehicle) {
+                console.log("Setting vehicle", vehicle.id, "to AUTO mode");
+                vehicle.flightMode = "AUTO";
             }
         }
+    }
 
-        function landAllVehicles() {
-            console.log("Landing all vehicles...")
-            var vehicles = QGroundControl.multiVehicleManager.vehicles
-            for (var i = 0; i < vehicles.count; i++) {
-                var vehicle = vehicles.get(i)
-                if (vehicle) {
-                    console.log("Landing vehicle", vehicle.id)
-                    vehicle.flightMode = "LAND"
-                }
+    function armAllVehicles() {
+        console.log("Arming all vehicles...");
+        var vehicles = QGroundControl.multiVehicleManager.vehicles;
+        for (var i = 0; i < vehicles.count; i++) {
+            var vehicle = vehicles.get(i);
+            if (vehicle) {
+                console.log("Arming vehicle", vehicle.id);
+                vehicle.armed = true;
             }
         }
+    }
 
-        function rtlAllVehicles() {
-            console.log("RTL all vehicles...")
-            var vehicles = QGroundControl.multiVehicleManager.vehicles
-            for (var i = 0; i < vehicles.count; i++) {
-                var vehicle = vehicles.get(i)
-                if (vehicle) {
-                    console.log("RTL vehicle", vehicle.id)
-                    vehicle.flightMode = "RTL"
-                }
+    function disarmAllVehicles() {
+        console.log("Disarming all vehicles...");
+        var vehicles = QGroundControl.multiVehicleManager.vehicles;
+        for (var i = 0; i < vehicles.count; i++) {
+            var vehicle = vehicles.get(i);
+            if (vehicle) {
+                console.log("Disarming vehicle", vehicle.id);
+                vehicle.armed = false;
             }
         }
+    }
 
-        // Shortcut Handler
-        Connections {
-            target: QGroundControl.shortcutManager
-            
-            function onShortcutTriggered(shortcutName) {
-                console.log("Shortcut triggered:", shortcutName)
-                
-                switch(shortcutName) {
-                    case "GenerateMission":
-                        console.log("Ctrl+G pressed - Generate Mission")
-                        // You can trigger mission generation here
-                        break
-                    case "OpenMissionDialog":
-                        console.log("Ctrl+M pressed - Open Mission Dialog")
-                        // You can open mission dialog here
-                        break
-                    case "TestCollisionAlert":
-                        console.log("Ctrl+T pressed - Test Collision Alert")
-                        QGroundControl.collisionDetectionService.showCollisionAlert("KEYBOARD SHORTCUT: Collision detected!")
-                        break
-                    case "ArmVehicle":
-                        console.log("Ctrl+A pressed - Arm Vehicle")
-                        // You can arm vehicle here
-                        break
-                    case "DisarmVehicle":
-                        console.log("Ctrl+D pressed - Disarm Vehicle")
-                        // You can disarm vehicle here
-                        break
-                    case "SetAllVehiclesAUTO":
-                        console.log("A pressed - Set All Vehicles to AUTO Mode")
-                        setAllVehiclesToAUTO()
-                        break
-                    case "ArmAllVehicles":
-                        console.log("R pressed - Arm All Vehicles")
-                        armAllVehicles()
-                        break
-                    case "DisarmAllVehicles":
-                        console.log("D pressed - Disarm All Vehicles")
-                        disarmAllVehicles()
-                        break
-                    case "LandAllVehicles":
-                        console.log("L pressed - Land All Vehicles")
-                        landAllVehicles()
-                        break
-                    case "RTLAllVehicles":
-                        console.log("H pressed - RTL All Vehicles")
-                        rtlAllVehicles()
-                        break
-                    default:
-                        console.log("Unknown shortcut:", shortcutName)
-                }
+    function landAllVehicles() {
+        console.log("Landing all vehicles...");
+        var vehicles = QGroundControl.multiVehicleManager.vehicles;
+        for (var i = 0; i < vehicles.count; i++) {
+            var vehicle = vehicles.get(i);
+            if (vehicle) {
+                console.log("Landing vehicle", vehicle.id);
+                vehicle.flightMode = "LAND";
+            }
+        }
+    }
+
+    function rtlAllVehicles() {
+        console.log("RTL all vehicles...");
+        var vehicles = QGroundControl.multiVehicleManager.vehicles;
+        for (var i = 0; i < vehicles.count; i++) {
+            var vehicle = vehicles.get(i);
+            if (vehicle) {
+                console.log("RTL vehicle", vehicle.id);
+                vehicle.flightMode = "RTL";
             }
         }
     }
@@ -546,46 +480,52 @@ Item {
     // Collision Alert Dialog - Overlay on top of everything
     Rectangle {
         id: collisionAlertDialog
-        
+
         property bool showAlert: false
         property string alertMessage: ""
-        
+
         anchors.centerIn: parent
         z: 1000 // High z-order to appear on top
-        
+
         width: 400
         height: 200
         color: "#ff4444" // Red background for collision alert
         border.color: "#ff0000"
         border.width: 3
         radius: 10
-        
+
         visible: showAlert
-        
+
         // Blinking animation for attention
         SequentialAnimation on opacity {
             running: showAlert
             loops: Animation.Infinite
-            NumberAnimation { to: 0.7; duration: 500 }
-            NumberAnimation { to: 1.0; duration: 500 }
+            NumberAnimation {
+                to: 0.7
+                duration: 500
+            }
+            NumberAnimation {
+                to: 1.0
+                duration: 500
+            }
         }
-        
+
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: 20
             spacing: 10
-            
+
             // Alert icon and title
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 10
-                
+
                 Text {
                     text: "⚠️"
                     font.pixelSize: 30
                     color: "white"
                 }
-                
+
                 Text {
                     text: "COLLISION DETECTED"
                     font.pixelSize: 20
@@ -594,7 +534,7 @@ Item {
                     Layout.fillWidth: true
                 }
             }
-            
+
             // Alert message
             Text {
                 text: alertMessage
@@ -604,40 +544,40 @@ Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
             }
-            
+
             // Dismiss button
             QGCButton {
                 text: "Dismiss Alert"
                 Layout.alignment: Qt.AlignHCenter
                 onClicked: {
-                    collisionAlertDialog.showAlert = false
-                    QGroundControl.collisionDetectionService.clearCollisionAlerts()
+                    collisionAlertDialog.showAlert = false;
+                    QGroundControl.collisionDetectionService.clearCollisionAlerts();
                 }
             }
         }
-        
+
         // Auto-hide after 10 seconds
         Timer {
             id: autoHideTimer
             interval: 10000
             running: showAlert
             onTriggered: {
-                collisionAlertDialog.showAlert = false
+                collisionAlertDialog.showAlert = false;
             }
         }
-        
+
         // Connect to collision detection service signals
         Connections {
             target: QGroundControl.collisionDetectionService
-            
+
             function onCollisionAlert(message) {
-                collisionAlertDialog.alertMessage = message
-                collisionAlertDialog.showAlert = true
-                autoHideTimer.restart()
+                collisionAlertDialog.alertMessage = message;
+                collisionAlertDialog.showAlert = true;
+                autoHideTimer.restart();
             }
-            
+
             function onCollisionCleared() {
-                collisionAlertDialog.showAlert = false
+                collisionAlertDialog.showAlert = false;
             }
         }
     }

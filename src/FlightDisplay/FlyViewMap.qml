@@ -271,6 +271,40 @@ FlightMap {
         }
     }
 
+    // Demining area overlay - green square
+    MapRectangle {
+        id: deminingAreaOverlay
+        color: "green"
+        opacity: 0.4
+        z: QGroundControl.zOrderMapItems
+        visible: false
+        
+        // Connect to MissionService signal
+        Connections {
+            target: QGroundControl.missionService
+            function onShowDeminingAreaOverlay(center, size) {
+                console.log("GenCall71: Showing demining area overlay at:", center.toString(), "size:", size)
+                
+                // Calculate the rectangle bounds
+                // Convert size from meters to degrees (approximate)
+                var latOffset = size / 111000.0  // 1 degree latitude ≈ 111km
+                var lngOffset = size / (111000.0 * Math.cos(center.latitude * Math.PI / 180.0))  // Account for longitude convergence
+                
+                deminingAreaOverlay.topLeft = QtPositioning.coordinate(
+                    center.latitude + latOffset/2,
+                    center.longitude - lngOffset/2
+                )
+                deminingAreaOverlay.bottomRight = QtPositioning.coordinate(
+                    center.latitude - latOffset/2,
+                    center.longitude + lngOffset/2
+                )
+                
+                deminingAreaOverlay.visible = true
+                console.log("Demining area overlay bounds:", deminingAreaOverlay.topLeft.toString(), "to", deminingAreaOverlay.bottomRight.toString())
+            }
+        }
+    }
+
     // Add the vehicles to the map
     MapItemView {
         model: QGroundControl.multiVehicleManager.vehicles

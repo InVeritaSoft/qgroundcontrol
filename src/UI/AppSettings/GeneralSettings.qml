@@ -84,6 +84,14 @@ SettingsPage {
             }
         }
 
+        FactCheckBoxSlider {
+            Layout.fillWidth: true
+            text:           qsTr("Show mission complete dialog after landing")
+            fact:           _showMissionCompleteDialog
+            visible:        _showMissionCompleteDialog.visible
+            property Fact _showMissionCompleteDialog: _appSettings.showMissionCompleteDialog
+        }
+
         RowLayout {
             Layout.fillWidth:   true
             spacing:            ScreenTools.defaultFontPixelWidth * 2

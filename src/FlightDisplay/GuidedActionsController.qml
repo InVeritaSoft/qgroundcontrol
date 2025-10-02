@@ -28,6 +28,9 @@ Item {
 
     property var missionController
     property var confirmDialog
+    
+    // Signal for relay slider toggle
+    signal relaySliderToggleRequested()
     property var guidedValueSlider
     property var fwdFlightGotoMapCircle
     property var orbitMapCircle
@@ -41,6 +44,7 @@ Item {
     readonly property string rtlTitle:                      qsTr("Return")
     readonly property string takeoffTitle:                  qsTr("Takeoff")
     readonly property string gripperTitle:                  qsTr("Gripper Function")
+    readonly property string explodeTitle:                  qsTr("Explode")
     readonly property string landTitle:                     qsTr("Land")
     readonly property string startMissionTitle:             qsTr("Start Mission")
     readonly property string mvStartMissionTitle:           qsTr("Start Mission (MV)")
@@ -71,6 +75,7 @@ Item {
     readonly property string emergencyStopMessage:              qsTr("WARNING: THIS WILL STOP ALL MOTORS. IF VEHICLE IS CURRENTLY IN THE AIR IT WILL CRASH.")
     readonly property string takeoffMessage:                    qsTr("Takeoff from ground and hold position.")
     readonly property string gripperMessage:                    qsTr("Grab or Release the cargo")
+    readonly property string explodeMessage:                    qsTr("Activate Relay1 (Explode) - WARNING: This will trigger the explosion mechanism!")
     readonly property string startMissionMessage:               qsTr("Takeoff from ground and start the current mission.")
     readonly property string mvStartMissionMessage:             qsTr("Takeoff from ground and start the current mission for selected vehicles.")
     readonly property string continueMissionMessage:            qsTr("Continue the mission from the current waypoint.")
@@ -120,13 +125,14 @@ Item {
     readonly property int actionForceArm:                   24
     readonly property int actionChangeSpeed:                25
     readonly property int actionGripper:                    26
-    readonly property int actionSetHome:                    27
-    readonly property int actionSetEstimatorOrigin:         28
-    readonly property int actionSetFlightMode:              29
-    readonly property int actionChangeHeading:              30
-    readonly property int actionMVArm:                      31
-    readonly property int actionMVDisarm:                   32
-    readonly property int actionChangeLoiterRadius:         33
+    readonly property int actionExplode:                    27
+    readonly property int actionSetHome:                    28
+    readonly property int actionSetEstimatorOrigin:         29
+    readonly property int actionSetFlightMode:              30
+    readonly property int actionChangeHeading:              31
+    readonly property int actionMVArm:                      32
+    readonly property int actionMVDisarm:                   33
+    readonly property int actionChangeLoiterRadius:         34
 
 
 
@@ -570,6 +576,11 @@ Item {
             confirmDialog.message = gripperMessage
             _widgetLayer._gripperMenu.createObject(mainWindow).open()
             break
+        case actionExplode:
+            confirmDialog.title = explodeTitle
+            confirmDialog.message = explodeMessage
+            confirmDialog.hideTrigger = Qt.binding(function() { return !(_activeVehicle && _activeVehicle.id === 1) })
+            break
         case actionSetHome:
             confirmDialog.title = setHomeTitle
             confirmDialog.message = setHomeMessage
@@ -719,6 +730,11 @@ Item {
             break
         case actionGripper:           
             _gripperFunction === undefined ? _activeVehicle.sendGripperAction(Vehicle.Invalid_option) : _activeVehicle.sendGripperAction(_gripperFunction)
+            break
+        case actionExplode:
+            // Show/hide relay slider
+            console.log("Explode button clicked - toggling relay slider visibility")
+            relaySliderToggleRequested()
             break
         case actionSetHome:
             _activeVehicle.doSetHome(actionData)

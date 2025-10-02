@@ -244,6 +244,13 @@
     "default":     ""
 },
 {
+    "name":             "showMissionCompleteDialog",
+    "shortDesc": "Show mission complete dialog after landing",
+    "longDesc":  "When enabled, shows a dialog after mission completion asking whether to remove, keep, or resume the mission. When disabled, the mission will remain on the vehicle without prompting.",
+    "type":             "bool",
+    "default":     true
+},
+{
     "name": "loginAirLink",
     "shortDesc": "AirLink User Name",
     "type": "string",
