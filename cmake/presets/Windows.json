@@ -5,9 +5,12 @@
     {
       "name": "Windows",
       "displayName": "Windows configuration using Qt6",
-      "generator": "Ninja Multi-Config",
+      "generator": "Visual Studio 17 2022",
       "binaryDir": "${sourceParentDir}/build/qt6-Windows",
-      "toolchainFile": "${QT_ROOT_DIR}/lib/cmake/Qt6/qt.toolchain.cmake",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
       "cacheVariables": {
         "CMAKE_CONFIGURATION_TYPES": "Release;Debug"
       }
@@ -23,25 +26,29 @@
       "name": "Windows",
       "displayName": "Windows release build using Qt6",
       "configurePreset": "Windows",
-      "configuration": "Release"
+      "configuration": "Release",
+      "jobs": 16
     },
     {
       "name": "Windows-debug",
       "displayName": "Windows debug build using Qt6",
       "configurePreset": "Windows",
-      "configuration": "Debug"
+      "configuration": "Debug",
+      "jobs": 16
     },
     {
       "name": "Windows-ccache",
       "displayName": "Windows release build using Qt6 and ccache",
       "configurePreset": "Windows-ccache",
-      "configuration": "Release"
+      "configuration": "Release",
+      "jobs": 16
     },
     {
       "name": "Windows-debug-ccache",
       "displayName": "Windows debug build using Qt6 and ccache",
       "configurePreset": "Windows-ccache",
-      "configuration": "Debug"
+      "configuration": "Debug",
+      "jobs": 16
     }
   ],
   "testPresets": [
