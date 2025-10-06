@@ -45,9 +45,14 @@ Popup {
 
         // Content
         ScrollView {
+            id: scrollView
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.margins: ScreenTools.defaultFontPixelWidth
+            
+            // Enable scrolling
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+            ScrollBar.vertical.policy: ScrollBar.AsNeeded
 
             ColumnLayout {
                 width: parent.width
@@ -217,6 +222,40 @@ Popup {
                     checked: false
                     Layout.fillWidth: true
                 }
+                
+                // Servo 10 Toggle Control
+                QGCLabel {
+                    text: qsTr("Servo 10 Control:")
+                    font.pointSize: ScreenTools.defaultFontPointSize
+                }
+                
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: ScreenTools.defaultFontPixelWidth
+                    
+                    QGCLabel {
+                        text: qsTr("Current State:")
+                        font.pointSize: ScreenTools.defaultFontPointSize
+                    }
+                    
+                    QGCLabel {
+                        id: servoStateLabel
+                        text: servoHighCheckbox.checked ? qsTr("HIGH (2400 PWM)") : qsTr("LOW (400 PWM)")
+                        font.pointSize: ScreenTools.defaultFontPointSize
+                        color: servoHighCheckbox.checked ? "green" : "red"
+                    }
+                    
+                    QGCCheckBox {
+                        id: servoHighCheckbox
+                        text: qsTr("Servo 10 HIGH")
+                        checked: false
+                        Layout.fillWidth: true
+                        onCheckedChanged: {
+                            servoStateLabel.text = checked ? qsTr("HIGH (2400 PWM)") : qsTr("LOW (400 PWM)")
+                            servoStateLabel.color = checked ? "green" : "red"
+                        }
+                    }
+                }
             }
         }
 
@@ -249,13 +288,14 @@ Popup {
                     var servoDelay = parseInt(servoDelayField.text);
                     var payloadDropMode = payloadDropCheckbox.checked;
                     var observationDistance = parseFloat(observationDistanceField.text);
+                    var servoHighState = servoHighCheckbox.checked;
                     
                     // GenCall2: Log mission parameters
-                    console.log("GenCall2: Logging mission parameters:", missionType, areaSize, altitude, speed, "front distance:", frontDistance, "loiter time:", loiterTime, "bend height:", bendHeight, "payload drop height:", payloadDropHeight, "servo delay:", servoDelay, "payload drop:", payloadDropMode, "observation distance:", observationDistance);
+                    console.log("GenCall2: Logging mission parameters:", missionType, areaSize, altitude, speed, "front distance:", frontDistance, "loiter time:", loiterTime, "bend height:", bendHeight, "payload drop height:", payloadDropHeight, "servo delay:", servoDelay, "payload drop:", payloadDropMode, "observation distance:", observationDistance, "servo high state:", servoHighState);
                     
                     // GenCall3: Emit signal to parent (PlanToolBarIndicators.qml)
                     console.log("GenCall3: Emitting signal to parent");
-                    root.missionGenerated(missionType, areaSize, altitude, speed, frontDistance, loiterTime, bendHeight, payloadDropHeight, servoDelay, payloadDropMode, observationDistance);
+                    root.missionGenerated(missionType, areaSize, altitude, speed, frontDistance, loiterTime, bendHeight, payloadDropHeight, servoDelay, payloadDropMode, observationDistance, servoHighState);
                     
                     // GenCall4: Close the dialogue
                     console.log("GenCall4: Closing dialogue");
@@ -276,7 +316,7 @@ Popup {
     }
 
     // Signal for mission generation
-    signal missionGenerated(string missionType, int areaSize, int altitude, real speed, real frontDistance, int loiterTime, int bendHeight, real payloadDropHeight, int servoDelay, bool payloadDropMode, real observationDistance)
+    signal missionGenerated(string missionType, int areaSize, int altitude, real speed, real frontDistance, int loiterTime, int bendHeight, real payloadDropHeight, int servoDelay, bool payloadDropMode, real observationDistance, bool servoHighState)
 
     // Get All Vehicles function
     function getAllVehicles() {

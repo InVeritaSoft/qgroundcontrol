@@ -1,0 +1,22 @@
+=== HUMAN-READABLE MISSION FOR VEHICLE 2 ===
+Generated: 2024-12-19 15:30:45
+Total Mission Items: 13
+
+0. Home position (will be skipped)
+1. Releasing gripper (servo 10 = 2400)
+2. Waiting for 2 seconds
+3. Closing gripper (servo 10 = 400)
+4. Taking off to 10m altitude
+5. Heading to waypoint 1 at 37.774900, -122.419400 (altitude: 10.0m)
+6. Loitering for 1.5 seconds at waypoint 1
+7. Releasing gripper at waypoint 1 (servo 10 = 2400)
+8. Returning to mission altitude 10m after waypoint 1
+9. Heading to waypoint 2 at 37.775000, -122.419500 (altitude: 10.0m)
+10. Loitering for 1.5 seconds at waypoint 2
+11. Releasing gripper at waypoint 2 (servo 10 = 2400)
+12. Returning to mission altitude 10m after waypoint 2
+13. Returning to launch position
+14. Landing at current position
+
+=== END MISSION ===
+

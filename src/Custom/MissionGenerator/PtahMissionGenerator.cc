@@ -619,18 +619,15 @@ QList<QGeoCoordinate> PtahMissionGenerator::generatePayloadDropWaypoints(const Q
     return waypoints;
 }
 
-QList<QObject*> PtahMissionGenerator::createPayloadDropMissionItems(const QList<QGeoCoordinate>& waypoints, int altitude, int loiterTimeSeconds)
+QList<QObject*> PtahMissionGenerator::createPayloadDropMissionItems(const QList<QGeoCoordinate>& waypoints, int altitude, int loiterTimeSeconds, bool isId1)
 {
     // GenCall36: Create mission items for payload drop pattern
     qDebug() << "GenCall36: Creating payload drop mission items for" << waypoints.size() << "waypoints";
-    
     QList<QObject*> missionItems;
-    
     if (waypoints.isEmpty()) {
         qDebug() << "No waypoints provided for payload drop mission";
         return missionItems;
     }
-    
     // 1. Servo 10 = 2400 (Release payload)
     qDebug() << "Adding servo command: Release payload (2400)";
     QObject* servoRelease = new QObject();
@@ -639,8 +636,23 @@ QList<QObject*> PtahMissionGenerator::createPayloadDropMissionItems(const QList<
     servoRelease->setProperty("params", QVariantList() << 10 << 2400 << 0 << 0 << 0 << 0 << 0);
     servoRelease->setProperty("autoContinue", true);
     missionItems.append(servoRelease);
-    
-    // 2. Takeoff command
+    // 2. Delay 2s
+    qDebug() << "Adding delay command: 2 seconds";
+    QObject* delay2s = new QObject();
+    delay2s->setProperty("command", 112); // MAV_CMD_DELAY
+    delay2s->setProperty("frame", 0);
+    delay2s->setProperty("params", QVariantList() << 2 << 0 << 0 << 0 << 0 << 0 << 0);
+    delay2s->setProperty("autoContinue", true);
+    missionItems.append(delay2s);
+    // 3. Servo 10 = 400 (Hold payload)
+    qDebug() << "Adding servo command: Hold payload (400)";
+    QObject* servoHold = new QObject();
+    servoHold->setProperty("command", 183);  // MAV_CMD_DO_SET_SERVO
+    servoHold->setProperty("frame", 0);
+    servoHold->setProperty("params", QVariantList() << 10 << 400 << 0 << 0 << 0 << 0 << 0);
+    servoHold->setProperty("autoContinue", true);
+    missionItems.append(servoHold);
+    // 4. Takeoff command
     qDebug() << "Adding takeoff command";
     QObject* takeoff = new QObject();
     takeoff->setProperty("command", 22);  // MAV_CMD_NAV_TAKEOFF
@@ -650,12 +662,10 @@ QList<QObject*> PtahMissionGenerator::createPayloadDropMissionItems(const QList<
     takeoff->setProperty("altitude", altitude);
     takeoff->setProperty("altitudeMode", 1);
     missionItems.append(takeoff);
-    
-    // 3. Process each waypoint with payload drop pattern
+    // 5. Process each waypoint with payload drop pattern
     for (int i = 0; i < waypoints.size(); i++) {
         const QGeoCoordinate& waypoint = waypoints[i];
-        
-        // 3a. Waypoint command
+        // 5a. Waypoint command
         qDebug() << "Adding waypoint" << (i + 1) << "at" << waypoint.toString();
         QObject* wp = new QObject();
         wp->setProperty("command", 16);  // MAV_CMD_NAV_WAYPOINT
@@ -665,31 +675,48 @@ QList<QObject*> PtahMissionGenerator::createPayloadDropMissionItems(const QList<
         wp->setProperty("altitude", altitude);
         wp->setProperty("altitudeMode", 1);
         missionItems.append(wp);
-        
-        // 3b. Loiter command (50 seconds)
-        qDebug() << "Adding loiter command for" << loiterTimeSeconds << "seconds";
+        // 5b. Loiter command
+        int loiterTime = isId1 ? 120 : loiterTimeSeconds;
+        qDebug() << "Adding loiter command for" << loiterTime << "seconds";
         QObject* loiter = new QObject();
         loiter->setProperty("command", 31);  // MAV_CMD_NAV_LOITER_TIME
         loiter->setProperty("frame", 3);
-        loiter->setProperty("params", QVariantList() << 0 << loiterTimeSeconds << 0 << 1 << waypoint.latitude() << waypoint.longitude() << altitude);
+        loiter->setProperty("params", QVariantList() << 0 << loiterTime << 0 << 1 << waypoint.latitude() << waypoint.longitude() << altitude);
         loiter->setProperty("autoContinue", true);
         loiter->setProperty("altitude", altitude);
         loiter->setProperty("altitudeMode", 1);
         missionItems.append(loiter);
-        
-        // 3c. Servo 10 = 400 (Hold payload) - only after first waypoint
-        if (i == 0) {
-            qDebug() << "Adding servo command: Hold payload (400)";
-            QObject* servoHold = new QObject();
-            servoHold->setProperty("command", 183);  // MAV_CMD_DO_SET_SERVO
-            servoHold->setProperty("frame", 0);
-            servoHold->setProperty("params", QVariantList() << 10 << 400 << 0 << 0 << 0 << 0 << 0);
-            servoHold->setProperty("autoContinue", true);
-            missionItems.append(servoHold);
+        // 5c. Servo 10 = 2400 after loiter (NONID1)
+        if (!isId1) {
+            qDebug() << "Adding servo command: 2400 after loiter";
+            QObject* servoAfterLoiter = new QObject();
+            servoAfterLoiter->setProperty("command", 183);  // MAV_CMD_DO_SET_SERVO
+            servoAfterLoiter->setProperty("frame", 0);
+            servoAfterLoiter->setProperty("params", QVariantList() << 10 << 2400 << 0 << 0 << 0 << 0 << 0);
+            servoAfterLoiter->setProperty("autoContinue", true);
+            missionItems.append(servoAfterLoiter);
+        }
+        // 5d. Toggle Servo 10 between 400 and 2400
+        qDebug() << "Adding servo toggle command";
+        QObject* servoToggle = new QObject();
+        int pwmValue = (i % 2 == 0) ? 400 : 2400;
+        servoToggle->setProperty("command", 183);  // MAV_CMD_DO_SET_SERVO
+        servoToggle->setProperty("frame", 0);
+        servoToggle->setProperty("params", QVariantList() << 10 << pwmValue << 0 << 0 << 0 << 0 << 0);
+        servoToggle->setProperty("autoContinue", true);
+        missionItems.append(servoToggle);
+        // 5e. For ID1, after loiter, send Relay High
+        if (isId1) {
+            qDebug() << "Adding relay HIGH command for ID1 after loiter";
+            QObject* relayHigh = new QObject();
+            relayHigh->setProperty("command", 181); // MAV_CMD_DO_SET_RELAY
+            relayHigh->setProperty("frame", 0);
+            relayHigh->setProperty("params", QVariantList() << 0 << 1 << 0 << 0 << 0 << 0 << 0);
+            relayHigh->setProperty("autoContinue", true);
+            missionItems.append(relayHigh);
         }
     }
-    
-    // 4. Return to Launch
+    // 6. Return to Launch
     qDebug() << "Adding return to launch command";
     QObject* rtl = new QObject();
     rtl->setProperty("command", 20);  // MAV_CMD_NAV_RETURN_TO_LAUNCH
@@ -697,8 +724,7 @@ QList<QObject*> PtahMissionGenerator::createPayloadDropMissionItems(const QList<
     rtl->setProperty("params", QVariantList() << 0 << 0 << 0 << 0 << 0 << 0 << 0);
     rtl->setProperty("autoContinue", true);
     missionItems.append(rtl);
-    
-    // 5. Land command
+    // 7. Land command
     qDebug() << "Adding land command";
     QObject* land = new QObject();
     land->setProperty("command", 21);  // MAV_CMD_NAV_LAND
@@ -708,9 +734,15 @@ QList<QObject*> PtahMissionGenerator::createPayloadDropMissionItems(const QList<
     land->setProperty("altitude", 0);
     land->setProperty("altitudeMode", 1);
     missionItems.append(land);
-    
+    // 8. After LAND/disarm, Servo 10 = 2400
+    qDebug() << "Adding servo command: 2400 after LAND/disarm";
+    QObject* servoAfterLand = new QObject();
+    servoAfterLand->setProperty("command", 183);  // MAV_CMD_DO_SET_SERVO
+    servoAfterLand->setProperty("frame", 0);
+    servoAfterLand->setProperty("params", QVariantList() << 10 << 2400 << 0 << 0 << 0 << 0 << 0);
+    servoAfterLand->setProperty("autoContinue", true);
+    missionItems.append(servoAfterLand);
     qDebug() << "Created" << missionItems.size() << "mission items for payload drop pattern";
-    
     return missionItems;
 }
 

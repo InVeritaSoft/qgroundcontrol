@@ -341,9 +341,9 @@ Item {
     // QML Mission Generator Dialogue
     MissionGeneratorDialogue {
         id: missionGeneratorDialogue
-        onMissionGenerated: function (missionType, areaSize, altitude, speed, frontDistance, loiterTime, bendHeight, payloadDropHeight, servoDelay, payloadDropMode, observationDistance) {
+        onMissionGenerated: function (missionType, areaSize, altitude, speed, frontDistance, loiterTime, bendHeight, payloadDropHeight, servoDelay, payloadDropMode, observationDistance, servoHighState) {
             // GenCall5: Signal handler receives mission parameters
-            console.log("GenCall5: Signal handler receives mission parameters:", missionType, areaSize, altitude, speed, "front distance:", frontDistance, "loiter time:", loiterTime, "bend height:", bendHeight, "payload drop height:", payloadDropHeight, "servo delay:", servoDelay, "payload drop:", payloadDropMode, "observation distance:", observationDistance);
+            console.log("GenCall5: Signal handler receives mission parameters:", missionType, areaSize, altitude, speed, "front distance:", frontDistance, "loiter time:", loiterTime, "bend height:", bendHeight, "payload drop height:", payloadDropHeight, "servo delay:", servoDelay, "payload drop:", payloadDropMode, "observation distance:", observationDistance, "servo high state:", servoHighState);
 
             // GenCall6: Call C++ MissionService to actually generate mission
             console.log("GenCall6: Calling C++ MissionService to generate mission");

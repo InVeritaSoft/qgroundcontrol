@@ -40,7 +40,7 @@ public:
     Q_INVOKABLE QList<QGeoCoordinate> generatePayloadDropWaypoints(const QGeoCoordinate& reference, double bearing, double gapMeters, double totalDistanceMeters, int loiterTimeSeconds = 50);
     
     // Create mission items for payload drop pattern
-    Q_INVOKABLE QList<QObject*> createPayloadDropMissionItems(const QList<QGeoCoordinate>& waypoints, int altitude, int loiterTimeSeconds = 50);
+    Q_INVOKABLE QList<QObject*> createPayloadDropMissionItems(const QList<QGeoCoordinate>& waypoints, int altitude, int loiterTimeSeconds = 50, bool isId1 = false);
     
     // Validate coordinates to prevent waypoints in oceans or invalid locations
     Q_INVOKABLE bool isValidLandCoordinate(const QGeoCoordinate& coordinate);
